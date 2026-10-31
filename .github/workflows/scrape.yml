@@ -1,11 +1,13 @@
 # BG Agro Private FAMA Price Tracker
+
 name: BG Agro - Auto Update FAMA Prices
 
 on:
   schedule:
-    # 12:30 MYT and 23:00 MYT (MYT = UTC+8). FAMA's median entry time is ~10:34 MYT.
+    # 12:30 MYT and 23:00 MYT (UTC+8)
     - cron: "30 4 * * *"
     - cron: "0 15 * * *"
+
   workflow_dispatch:
 
 concurrency:
@@ -18,6 +20,7 @@ permissions:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,36 +40,41 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add data site/data
-          # Skip the commit when the only change is meta.json's generated_at timestamp.
+
+          # Skip commit when only meta.json timestamp changes
           if git diff --cached --quiet -- ':!site/data/meta.json'; then
-            echo "No data changes beyond meta timestamp - skipping commit."
-            # Keep the fresh meta.json in the working tree so the Pages artifact
-            # still carries an updated generated_at freshness stamp.
+
+            echo "No new FAMA price data detected."
+            echo "Skipping commit."
+
             git reset -q
+
           else
+
+            echo "New FAMA price data detected."
+
             git commit -m "data: scrape $(date -u +'%Y-%m-%d %H:%M') UTC"
+
+            pushed=0
+
             for i in 1 2 3; do
-              git pull --rebase origin master && git push origin master && break
+
+              if git pull --rebase origin master && git push origin master; then
+                echo "Successfully pushed updated data."
+                pushed=1
+                break
+              fi
+
               echo "Push attempt $i failed; retrying..."
               sleep $((i * 10))
+
             done
+
+            if [ "$pushed" -ne 1 ]; then
+              echo "ERROR: Failed to push updated FAMA data."
+              exit 1
+            fi
+
           fi
-
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    needs: scrape
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
