@@ -1,5 +1,5 @@
 # BG Agro Private FAMA Price Tracker
-name: name: BG Agro - Auto Update FAMA Prices
+name: BG Agro - Auto Update FAMA Prices
 
 on:
   schedule:
