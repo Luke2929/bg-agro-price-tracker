@@ -1,5 +1,5 @@
 # BG Agro Private FAMA Price Tracker
-name: Scrape FAMA prices & deploy dashboard
+name: name: BG Agro - Auto Update FAMA Prices
 
 on:
   schedule:
@@ -14,8 +14,6 @@ concurrency:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   scrape:
@@ -55,7 +53,6 @@ jobs:
             done
           fi
 
-      - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
