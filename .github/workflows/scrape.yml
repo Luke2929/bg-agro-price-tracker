@@ -1,3 +1,4 @@
+# BG Agro Private FAMA Price Tracker
 name: Scrape FAMA prices & deploy dashboard
 
 on:
