@@ -1,59 +1,80 @@
-# BG Agro Private FAMA Price Tracker
+
+# BG Agro - FAMA Price Tracker
+# Automated FAMA Data Collection and GitHub Pages Deployment
 
 name: BG Agro - Auto Update FAMA Prices
 
 on:
   schedule:
-    # 12:30 MYT and 23:00 MYT (UTC+8)
+    # 12:30 PM Malaysia Time (UTC+8)
     - cron: "30 4 * * *"
+
+    # 11:00 PM Malaysia Time (UTC+8)
     - cron: "0 15 * * *"
 
+  # Allow manual execution
   workflow_dispatch:
 
+  # Automatically update the website when code changes
+  push:
+    branches:
+      - master
+
 concurrency:
-  group: scrape
+  group: bg-agro-fama
   cancel-in-progress: false
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
+
+  # ==========================================
+  # JOB 1: SCRAPE AND PREPARE FAMA DATA
+  # ==========================================
+
   scrape:
+    name: Scrape FAMA Data
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Scrape rolling window
+      - name: Scrape rolling FAMA price window
         run: python -m scraper.scrape
 
-      - name: Rebuild dashboard data
+      - name: Rebuild dashboard JSON
         run: python -m scraper.aggregate
 
-      - name: Commit updated data
+      - name: Commit updated FAMA data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add data site/data
 
-          # Skip commit when only meta.json timestamp changes
+          # Ignore commits containing only the generated timestamp
           if git diff --cached --quiet -- ':!site/data/meta.json'; then
 
-            echo "No new FAMA price data detected."
-            echo "Skipping commit."
+            echo "No new FAMA price changes detected."
+            echo "Skipping data commit."
 
             git reset -q
 
           else
 
-            echo "New FAMA price data detected."
+            echo "New FAMA data detected."
 
             git commit -m "data: scrape $(date -u +'%Y-%m-%d %H:%M') UTC"
 
@@ -62,19 +83,55 @@ jobs:
             for i in 1 2 3; do
 
               if git pull --rebase origin master && git push origin master; then
-                echo "Successfully pushed updated data."
+                echo "Successfully pushed updated FAMA data."
                 pushed=1
                 break
               fi
 
-              echo "Push attempt $i failed; retrying..."
+              echo "Push attempt $i failed."
               sleep $((i * 10))
 
             done
 
             if [ "$pushed" -ne 1 ]; then
-              echo "ERROR: Failed to push updated FAMA data."
+              echo "ERROR: Failed to push FAMA data."
               exit 1
             fi
 
           fi
+
+      # Prepare GitHub Pages
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      # Upload dashboard and generated JSON
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  # ==========================================
+  # JOB 2: DEPLOY DASHBOARD
+  # ==========================================
+
+  deploy:
+    name: Deploy BG Agro Dashboard
+
+    needs: scrape
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
