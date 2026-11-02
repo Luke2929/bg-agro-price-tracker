@@ -1173,13 +1173,16 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
       ['单日上涨',rises.toLocaleString()+' 种','在 '+comparable.length+' 种同市场可比规格中'],
       ['单日下跌',falls.toLocaleString()+' 种',h.level+' · 精确比较前一天']
     ].map(([label,value,foot])=>'<div class="home-metric"><span>'+label+'</span><strong>'+value+'</strong><small>'+foot+'</small></div>').join('');
-    const top=[...comparable].sort((a,b)=>Math.abs(b.changes[1].percent)-Math.abs(a.changes[1].percent))[0];
-    if(top){
-      $('home-insight-title').textContent=(chineseName(top.r.varieti)||top.r.varieti)+' · '+(top.changes[1].percent>0?'上涨':'下跌')+' '+Math.abs(top.changes[1].percent).toFixed(1)+'%';
-      $('home-insight-desc').textContent='截至 '+h.date+' · '+h.level+' · '+top.changes[1].markets+' 个同市场可比观察值。这是调查记录变化，不是明日预测。';
+    const strongest=days=>[...items].filter(item=>item.changes[days]&&Number.isFinite(item.changes[days].percent))
+      .sort((a,b)=>Math.abs(b.changes[days].percent)-Math.abs(a.changes[days].percent))[0];
+    const topDay=strongest(1),topWeek=strongest(7);
+    const phrase=(item,days)=>{const change=item.changes[days];return days+' 日 · '+(chineseName(item.r.varieti)||item.r.varieti)+' '+(change.percent>0?'上涨 ':change.percent<0?'下跌 ':'持平 ')+Math.abs(change.percent).toFixed(1)+'%';};
+    if(topDay||topWeek){
+      $('home-insight-title').textContent=[topDay?phrase(topDay,1):'1 日无同市场可比记录',topWeek?phrase(topWeek,7):'7 日暂无可比记录'].join('　｜　');
+      $('home-insight-desc').textContent='截至 '+h.date+' · '+h.level+'。分别筛选同一品种、等级、单位及匹配市场；缺失日期不估算，不代表明日预测。';
     }else{
       $('home-insight-title').textContent=items.length?'已载入 '+items.length+' 种产品规格':'请调整日期或搜索条件';
-      $('home-insight-desc').textContent='当前条件下没有可计算的单日同市场变化。缺失日期不视作 0% 或估计价格。';
+      $('home-insight-desc').textContent='当前条件下没有可计算的单日或 7 日同市场变化。缺失日期不视作 0% 或估计价格。';
     }
     $('home-card-count').textContent='显示 '+Math.min(h.visible,items.length)+' / '+items.length+' 种产品规格 · 调查日期 '+(h.date||'—');
     $('home-more').hidden=items.length<=h.visible;
