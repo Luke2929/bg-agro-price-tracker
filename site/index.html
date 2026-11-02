@@ -360,6 +360,49 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
   footer{font-size:10px}
 }
 
+
+/* Daily monitoring improvements — compact provenance, watchlist and full market browsing. */
+.freshness-strip{width:min(100%,1550px);margin:0 auto;padding:15px clamp(20px,4vw,66px) 0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.freshness-strip>div{padding:13px 16px;border:1px solid #dce8df;border-radius:12px;background:#fff;min-width:0}
+.freshness-strip span{display:block;color:#70867a;font-weight:750;font-size:10px;letter-spacing:.75px}
+.freshness-strip strong{display:block;margin-top:5px;font-size:16px;color:#225642;font-weight:760;line-height:1.35;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.freshness-strip+main{padding-top:29px}
+.market-filters{padding:0 24px 21px;display:grid;grid-template-columns:1fr 1fr minmax(220px,1.6fr);gap:13px}
+.market-filters .field>span{font-size:10px}
+.market-filters input,.market-filters select{height:40px}
+.watch-filters{grid-template-columns:minmax(220px,2fr) minmax(130px,1fr) minmax(145px,1fr) auto;align-items:end}
+.watch-add{min-height:45px}
+.watch-table{min-width:1140px}
+.watch-table th,.watch-table td{padding-left:12px;padding-right:12px}
+.watch-table th:first-child,.watch-table td:first-child{min-width:220px;padding-left:21px}
+.watch-table .watch-actions{display:flex;align-items:center;gap:7px}
+.watch-actions button{border:1px solid #d2e2d7;background:#fff;color:#235e48;border-radius:7px;padding:7px 10px;font-size:11px;font-weight:700;white-space:nowrap}
+.watch-actions button:hover{background:#f0f7f1}
+.watch-actions .watch-remove{color:#8b6e64;border-color:#ebe2dd}
+.watch-actions .watch-remove:hover{background:#fff2ef}
+.watch-table .watch-price-date{display:block;font-size:10px;color:#708779;margin-top:4px}
+.drawer-watch{width:100%;margin:0 0 10px}
+@media(max-width:1150px){
+ .freshness-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .nav-tabs{gap:14px;min-width:0}
+}
+@media(max-width:730px){
+ .nav-tabs{justify-content:flex-start!important;overflow-x:auto;gap:18px;padding:0 2px;width:100%;scrollbar-width:thin}
+ .nav-tab{flex:0 0 auto;padding:0 3px;font-size:12px}
+ .freshness-strip{gap:8px;padding:10px 15px 0}
+ .freshness-strip>div{padding:11px 12px}
+ .freshness-strip span{font-size:9px}
+ .freshness-strip strong{font-size:13px}
+ .freshness-strip+main{padding-top:25px}
+ .market-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;padding:0 17px 16px}
+ .market-filters .field:last-child{grid-column:1/-1}
+ .watch-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .watch-filters .field-search{grid-column:1/-1}
+ .watch-add{grid-column:1/-1}
+ .watch-table th,.watch-table td{padding:13px 11px}
+ .watch-table th:first-child,.watch-table td:first-child{padding-left:15px}
+}
+
 </style>
  
 </head>
@@ -367,11 +410,17 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
 <div class="app-shell">
  <header class="topbar">
   <div class="brand"><span class="brand-symbol">✳</span><span><strong>BG Agro</strong><small>FAMA Price Tracker <b>V2</b></small></span></div>
-  <nav class="nav-tabs" aria-label="Dashboard pages"><button class="nav-tab active" data-tab="prices">Prices</button><button class="nav-tab" data-tab="compare">Compare & Trends</button><button class="nav-tab" data-tab="data">Data & Export</button></nav>
+  <nav class="nav-tabs" aria-label="Dashboard pages"><button class="nav-tab active" data-tab="prices">Prices</button><button class="nav-tab" data-tab="compare">Compare & Trends</button><button class="nav-tab" data-tab="watchlist">My Watchlist</button><button class="nav-tab" data-tab="data">Data & Export</button></nav>
   <div class="header-actions"><span id="source-badge" class="source-badge">● CONNECTING</span><button class="outline-button" id="import-button">↥ Import CSV</button><button class="dark-button" id="refresh-live">↻ Refresh Live</button></div>
  </header>
  <input type="file" id="csv-picker" accept=".csv,text/csv" multiple hidden>
  <div class="source-banner"><span class="status-pip"></span><p id="source-message" aria-live="polite"><b>Connecting to FAMA archive…</b> Loading original CSV records from your GitHub repository.</p><span id="source-date" class="source-date">Checking latest FAMA survey date…</span></div>
+ <div class="freshness-strip" aria-label="FAMA data coverage">
+  <div><span>LATEST SURVEY DATE</span><strong id="fresh-latest">—</strong></div>
+  <div><span>LOADED SOURCE RECORDS</span><strong id="fresh-loaded">—</strong></div>
+  <div><span>ARCHIVE DATE RANGE</span><strong id="fresh-range">—</strong></div>
+  <div><span>ARCHIVE UPDATED (MYT)</span><strong id="fresh-built">—</strong></div>
+ </div>
  <main>
   <section class="screen active" data-screen="prices">
    <div class="page-intro"><div><span class="eyebrow">MARKET DATA / PRICE LOOKUP</span><h1>Market prices</h1><p>Find a product. Check its farm, wholesale and retail prices.</p></div><div class="date-stamp"><span>SELECTED PRICE DATE</span><strong id="price-date-stamp">—</strong><small>FAMA survey date</small></div></div>
@@ -384,7 +433,31 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
    <div class="page-intro"><div><span class="eyebrow">MARKET DATA / REGIONAL COMPARISON</span><h1>Compare & trends</h1><p>Meaningful comparisons use the same variety, grade, unit and price level.</p></div><span class="light-label">Simple, verifiable comparisons</span></div>
    <div class="filter-box compare-filters"><label class="field product-selector"><span>PRODUCT / GRADE / UNIT</span><select id="compare-product"></select></label><label class="field"><span>PRICE LEVEL</span><select id="compare-level"><option value="Borong">Borong · Wholesale</option><option value="Runcit">Runcit · Retail</option><option value="Ladang">Ladang · Farm</option></select></label><label class="field"><span>COMPARE DATE</span><select id="compare-date"></select></label><label class="field"><span>HISTORY</span><select id="compare-period"><option value="30">Last 30 days</option><option value="7">Last 7 days</option><option value="90">Last 90 days</option><option value="all">All dates</option></select></label></div>
    <div class="compare-grid"><section class="panel trend-panel"><div class="panel-heading"><div><h2>Historical price trend</h2><p id="trend-description">Source observations by survey date and state</p></div><span class="light-label">RM / unit</span></div><div class="legend" id="chart-legend"></div><div class="chart-area"><svg id="trend-chart" viewBox="0 0 730 310" role="img" aria-label="Historical price chart"><g id="chart-grid"></g><g id="chart-paths"></g></svg><div class="no-chart" id="chart-empty" hidden>No historical observations for this selection.</div></div><p class="panel-caption">Each dot represents a date with recorded prices. Missing days are never estimated.</p></section><section class="panel states-panel"><div class="panel-heading"><div><h2>State comparison</h2><p id="state-description">Same survey date and product specification</p></div></div><div class="state-bars" id="state-rows"></div><p class="panel-caption">State average is shown with market count. Surveyed markets can vary across dates.</p></section></div>
-   <section class="panel market-panel"><div class="panel-heading"><div><h2>District & market prices</h2><p>Inspect exact observations for individual markets.</p></div><span class="count-pill" id="market-count">0 records</span></div><div class="table-scroll"><table class="data-table"><thead><tr><th>STATE</th><th>DISTRICT</th><th>MARKET / LOKASI</th><th>GRADE</th><th>LEVEL</th><th>UNIT</th><th class="price-col">PRICE (RM)</th><th>DATE</th></tr></thead><tbody id="market-rows"></tbody></table></div></section>
+   <section class="panel market-panel">
+    <div class="panel-heading"><div><h2>District & market prices</h2><p>Browse every original observation for the selected product, not just the first few rows.</p></div><span class="count-pill" id="market-count">0 records</span></div>
+    <div class="market-filters">
+     <label class="field"><span>STATE</span><select id="market-state-filter"></select></label>
+     <label class="field"><span>DISTRICT</span><select id="market-district-filter"></select></label>
+     <label class="field"><span>SEARCH MARKET</span><input type="search" id="market-search" placeholder="Market name or district"></label>
+    </div>
+    <div class="table-scroll"><table class="data-table"><thead><tr><th>STATE</th><th>DISTRICT</th><th>MARKET / LOKASI</th><th>GRADE</th><th>LEVEL</th><th>UNIT</th><th class="price-col">PRICE (RM)</th><th>DATE</th></tr></thead><tbody id="market-rows"></tbody></table></div>
+    <div class="table-footer"><span id="market-page-text">—</span><div class="pager"><button id="market-prev" aria-label="Previous market records">←</button><button id="market-next" aria-label="Next market records">→</button></div></div>
+   </section>
+  </section>
+  <section class="screen" data-screen="watchlist">
+   <div class="page-intro"><div><span class="eyebrow">YOUR MARKET / DAILY MONITORING</span><h1>My watchlist</h1><p>Save produce and states you check often. Every price comes from recorded FAMA observations.</p></div><span class="light-label">Saved on this browser</span></div>
+   <div class="filter-box watch-filters">
+    <label class="field field-search"><span>PRODUCT / GRADE / UNIT</span><select id="watch-product"></select></label>
+    <label class="field"><span>STATE</span><select id="watch-state"></select></label>
+    <label class="field"><span>PRICE LEVEL</span><select id="watch-level"><option value="Borong">Borong · Wholesale</option><option value="Runcit">Runcit · Retail</option><option value="Ladang">Ladang · Farm</option></select></label>
+    <button type="button" class="dark-button watch-add" id="watch-add">+ Add product</button>
+   </div>
+   <section class="panel">
+    <div class="panel-heading"><div><h2>Saved price checks</h2><p>Latest recorded average · 1, 7 and 30-day same-market comparisons.</p></div><span class="count-pill" id="watch-count">0 saved</span></div>
+    <div class="table-scroll"><table class="data-table watch-table"><thead><tr><th>PRODUCT / SPECIFICATION</th><th>STATE</th><th>LEVEL</th><th class="price-col">LATEST RECORDED PRICE</th><th class="delta-col">Δ 1D</th><th class="delta-col">Δ 7D</th><th class="delta-col">Δ 30D</th><th>AS OF</th><th>ACTIONS</th></tr></thead><tbody id="watch-rows"></tbody></table></div>
+    <div class="table-footer"><span id="watch-foot">Saved locally in this browser.</span><span>No missing prices estimated.</span></div>
+   </section>
+   <p class="footnote">ⓘ Each saved item tracks a variety, grade, unit, state and price level. The latest reading can be older than the dashboard's newest survey date. Percentage changes compare identical markets on both exact calendar dates.</p>
   </section>
   <section class="screen" data-screen="data">
    <div class="page-intro"><div><span class="eyebrow">SOURCE DATA / CUSTOMER EXPORT</span><h1>Data & export</h1><p>Browse and download exactly the rows your customer needs.</p></div><span class="light-label">All 17 original FAMA columns</span></div>
@@ -396,7 +469,7 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
  </main>
  <footer><span>BG Agro · FAMA Price Tracker V2 · Original FAMA archive</span><span>Source observations, not official sale quotations.</span></footer>
 </div>
-<div class="overlay" id="drawer-overlay" hidden></div><aside class="product-drawer" id="drawer" hidden role="dialog" aria-modal="true" aria-labelledby="drawer-name"><div class="drawer-top"><span>PRODUCT DETAILS</span><button id="close-drawer" aria-label="Close details">✕</button></div><h2 id="drawer-name">Product</h2><p class="drawer-description" id="drawer-meta">—</p><div class="drawer-levels" id="drawer-levels"></div><h3>Original market observations</h3><p class="drawer-description">Individual source records for your selection.</p><div id="drawer-records" class="drawer-records"></div><button class="dark-button drawer-compare" id="drawer-compare">Compare states & history →</button></aside>
+<div class="overlay" id="drawer-overlay" hidden></div><aside class="product-drawer" id="drawer" hidden role="dialog" aria-modal="true" aria-labelledby="drawer-name"><div class="drawer-top"><span>PRODUCT DETAILS</span><button id="close-drawer" aria-label="Close details">✕</button></div><h2 id="drawer-name">Product</h2><p class="drawer-description" id="drawer-meta">—</p><div class="drawer-levels" id="drawer-levels"></div><h3>Original market observations</h3><p class="drawer-description" id="drawer-records-note">Individual source records for your selection.</p><div id="drawer-records" class="drawer-records"></div><button class="outline-button drawer-watch" id="drawer-watch">☆ Save to Watchlist</button><button class="dark-button drawer-compare" id="drawer-compare">Compare states & history →</button></aside>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
 /* BG Agro offline Excel (.xlsx) generator. OOXML + ZIP, no network or external runtime dependency. */
@@ -702,7 +775,15 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
   const dateIso=d=>d.toISOString().slice(0,10);
   const dayOffset=(date,days)=>{const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+days);return dateIso(d);};
   let records=[],sourceMode='loading',comparator=null,archiveLoader=null,archiveMeta=null,loadInProgress=0,loadErrors=[],drawerKey='',rawPage=0,chartSelected=new Set(),toastTimer;
-  const state={tab:'prices',price:{category:'Sayur-Sayuran',negeri:'',date:'',grade:'',search:'',changeLevel:'Runcit',moverPeriod:1},compare:{product:'',level:'Borong',date:'',period:'30'},raw:{from:'',to:'',state:'',level:'',search:'',category:'',grade:'',market:''}};
+  const state={tab:'prices',price:{category:'Sayur-Sayuran',negeri:'',date:'',grade:'',search:'',changeLevel:'Runcit',moverPeriod:1},compare:{product:'',level:'Borong',date:'',period:'30'},market:{negeri:'',daerah:'',search:'',page:0},raw:{from:'',to:'',state:'',level:'',search:'',category:'',grade:'',market:''}};
+  const WATCH_STORAGE='bg-agro-fama-watchlist-v1',WATCH_MAX=20;
+  function readWatchlist(){
+    try{const data=JSON.parse(localStorage.getItem(WATCH_STORAGE)||'[]');
+      return Array.isArray(data)?data.filter(item=>item&&typeof item.key==='string'&&item.key.length<300&&typeof item.state==='string'&&item.state.length<100&&LEVELS.includes(item.level)).slice(0,WATCH_MAX):[];
+    }catch(_){return [];}
+  }
+  let watchlist=readWatchlist(),watchStateInitialized=false;
+  function saveWatchlist(){try{localStorage.setItem(WATCH_STORAGE,JSON.stringify(watchlist));return true;}catch(_){toast('Browser storage is unavailable; this selection may not persist.');return false;}}
 
   function fillSelect(id,values,firstLabel,selected='',allValue=''){
     const select=$(id);const choice=selected||select.value||allValue;
@@ -729,6 +810,12 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     fillSelect('compare-date',ds,null,state.compare.date||latest);
     fillSelect('compare-product',products().map(r=>productKey(r)),null,state.compare.product||productKey(products()[0]||{}));
     Array.from($('compare-product').options).forEach(o=>{const [variety,grade,unit]=o.value.split('||');o.textContent=[variety,grade,unit].filter(Boolean).join(' · ');});
+    fillSelect('watch-product',products().map(productKey),null,$('watch-product').value||productKey(products()[0]||{}));
+    Array.from($('watch-product').options).forEach(o=>{const [variety,grade,unit]=o.value.split('||');o.textContent=[variety,grade,unit].filter(Boolean).join(' · ');});
+    const selectedWatchState=$('watch-state').value;
+    fillSelect('watch-state',states(),'All Malaysia');
+    $('watch-state').value=watchStateInitialized?selectedWatchState:(states().includes('PERAK')?'PERAK':'');
+    watchStateInitialized=true;
     fillSelect('raw-state',states(),'All states',state.raw.state);
     fillSelect('raw-category',categories(),'All categories',state.raw.category);
     fillSelect('raw-grade',grades(),'All grades',state.raw.grade);
@@ -744,7 +831,12 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     $('price-search').value=state.price.search;
   }
   function displaySource(){
-    const last=dates()[0]||'—',count=records.length.toLocaleString();
+    const observedDates=dates(),last=observedDates[0]||'—',count=records.length.toLocaleString();
+    const built=sourceMode==='live'&&archiveMeta?.generated_at_utc?new Date(archiveMeta.generated_at_utc).toLocaleString('en-MY',{timeZone:'Asia/Kuala_Lumpur',dateStyle:'medium',timeStyle:'short'})+' MYT':sourceMode==='local'?'Local CSV':'—';
+    $('fresh-latest').textContent=last;
+    $('fresh-loaded').textContent=(sourceMode==='live'||sourceMode==='local')?count:'—';
+    $('fresh-range').textContent=observedDates.length?observedDates.at(-1)+' → '+observedDates[0]:'—';
+    $('fresh-built').textContent=built;
     $('source-badge').classList.toggle('loaded',sourceMode==='live'||sourceMode==='local');
     if(sourceMode==='live'){
       $('source-badge').textContent='● LIVE FAMA DATA';
@@ -807,15 +899,55 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     renderTopMovers(groups,changes);
     document.querySelectorAll('#price-rows tr[data-key]').forEach(tr=>tr.addEventListener('click',()=>showDrawer(tr.dataset.key)));
   }
+  function addWatch(key,negeri,level){
+    if(!key||!LEVELS.includes(level)){toast('Choose a FAMA product and price level first.');return;}
+    if(watchlist.some(item=>item.key===key&&item.state===negeri&&item.level===level)){toast('This price check is already in My Watchlist.');return;}
+    if(watchlist.length>=WATCH_MAX){toast('My Watchlist supports up to '+WATCH_MAX+' saved checks. Remove one before adding more.');return;}
+    watchlist.push({key,state:negeri,level});saveWatchlist();renderWatchlist();toast('Saved to My Watchlist.');
+  }
+  function renderWatchlist(){
+    $('watch-count').textContent=watchlist.length+' saved';
+    $('watch-foot').textContent=watchlist.length+' saved price checks · kept on this browser only.';
+    if(!watchlist.length){
+      $('watch-rows').innerHTML='<tr><td colspan="9" class="empty-cell">No saved products yet. Choose a product and state above, or open a product in Prices and select ☆ Save to Watchlist.</td></tr>';
+      return;
+    }
+    $('watch-rows').innerHTML=watchlist.map((item,index)=>{
+      const [variety,grade,unit]=item.key.split('||');
+      const matching=records.filter(r=>productKey(r)===item.key&&r.peringkat===item.level&&(!item.state||r.negeri===item.state));
+      const latest=matching.reduce((date,r)=>r.tarikh_harga>date?r.tarikh_harga:date,'');
+      const sourceRows=latest?matching.filter(r=>r.tarikh_harga===latest):[];
+      const value=amount(sourceRows);
+      const delta=days=>{
+        const comp=latest?comparator.compare(item.key,latest,days,item.level,item.state):null;
+        if(!comp)return '<span class="delta-missing" title="No comparable source markets on both exact dates">—</span>';
+        const direction=comp.percent>0?'up':comp.percent<0?'down':'flat',symbol=comp.percent>0?'▲':comp.percent<0?'▼':'•',sign=comp.percent>0?'+':'';
+        return '<span class="delta-main '+direction+'">'+symbol+' '+sign+comp.percent.toFixed(1)+'%</span><span class="delta-detail">'+comp.markets+' matched markets</span>';
+      };
+      return '<tr><td><span class="product-name">'+escapeHtml(variety||'Unknown product')+'</span><span class="product-extra">'+escapeHtml([grade,unit].filter(Boolean).join(' · '))+'</span></td><td>'+escapeHtml(item.state||'All Malaysia')+'</td><td>'+escapeHtml(item.level)+'</td><td class="price-col">'+(value?'<span class="price-value">'+fmt(value.mean)+'</span><span class="price-count">'+value.markets+' markets · '+value.n+' records</span>':'<span class="price-missing">—</span>')+'</td><td class="delta-col">'+delta(1)+'</td><td class="delta-col">'+delta(7)+'</td><td class="delta-col">'+delta(30)+'</td><td>'+escapeHtml(latest||'No source rows')+'</td><td><div class="watch-actions"><button type="button" data-action="view" data-index="'+index+'" '+(!latest?'disabled':'')+'>View</button><button type="button" class="watch-remove" data-action="remove" data-index="'+index+'">Remove</button></div></td></tr>';
+    }).join('');
+  }
+  function openWatchItem(item){
+    const datesForItem=records.filter(r=>productKey(r)===item.key&&r.peringkat===item.level&&(!item.state||r.negeri===item.state)).map(r=>r.tarikh_harga).sort();
+    const latest=datesForItem.at(-1);
+    if(!latest){toast('No currently loaded source observations for this saved item.');return;}
+    state.price.date=latest;state.price.negeri=item.state;state.price.category='';state.price.grade=item.key.split('||')[1]||'';state.price.search=item.key.split('||')[0];state.price.changeLevel=item.level;
+    initFilters();
+    $('price-state').value=item.state;$('price-category').value='';$('price-grade').value=state.price.grade;
+    state.price.negeri=item.state;state.price.category='';$('price-search').value=state.price.search;
+    onTab('prices');showDrawer(item.key);
+  }
   function showDrawer(key){
     drawerKey=key;const [name,grade,unit]=key.split('||');const rows=records.filter(r=>productKey(r)===key&&r.tarikh_harga===state.price.date&&(!state.price.negeri||r.negeri===state.price.negeri));
     $('drawer-name').textContent=name;$('drawer-meta').textContent=[grade,unit,state.price.negeri||'All Malaysia',state.price.date].join(' · ');
     $('drawer-levels').innerHTML=LEVELS.map(level=>{const a=amount(rows.filter(r=>r.peringkat===level));return '<div class="drawer-level"><span>'+level+'</span><strong>'+(a?fmt(a.mean):'—')+'</strong><small>'+(a?a.n+' source rows':'No record')+'</small></div>';}).join('');
-    $('drawer-records').innerHTML=rows.length?rows.sort((a,b)=>a.lokasi.localeCompare(b.lokasi)).slice(0,35).map(r=>'<div class="drawer-record"><div><strong>'+escapeHtml(r.lokasi)+'</strong><small>'+escapeHtml(r.negeri)+' · '+escapeHtml(r.daerah)+' · '+escapeHtml(r.peringkat)+'</small></div><b>'+fmt(r.harga)+'</b></div>').join(''):'<div class="drawer-record">No original observations.</div>';
+    $('drawer-watch').textContent=watchlist.some(item=>item.key===key&&item.state===state.price.negeri&&item.level===state.price.changeLevel)?'✓ Already in My Watchlist':'☆ Save to Watchlist';
+    $('drawer-records-note').textContent=rows.length.toLocaleString()+' original source records for this selection. Scroll to inspect all of them.';
+    $('drawer-records').innerHTML=rows.length?rows.sort((a,b)=>a.lokasi.localeCompare(b.lokasi)).map(r=>'<div class="drawer-record"><div><strong>'+escapeHtml(r.lokasi)+'</strong><small>'+escapeHtml(r.negeri)+' · '+escapeHtml(r.daerah)+' · '+escapeHtml(r.peringkat)+'</small></div><b>'+fmt(r.harga)+'</b></div>').join(''):'<div class="drawer-record">No original observations.</div>';
     $('drawer').hidden=false;$('drawer-overlay').hidden=false;document.body.style.overflow='hidden';
   }
   function closeDrawer(){$('drawer').hidden=true;$('drawer-overlay').hidden=true;document.body.style.overflow='';}
-  function onTab(name){state.tab=name;document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));closeDrawer();if(name==='prices')renderPrices();if(name==='compare')ensureCompareContext().catch(e=>toast(e.message));if(name==='data')renderRaw();window.scrollTo({top:0,behavior:'smooth'});}
+  function onTab(name){state.tab=name;document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));closeDrawer();if(name==='prices')renderPrices();if(name==='compare')ensureCompareContext().catch(e=>toast(e.message));if(name==='watchlist')renderWatchlist();if(name==='data')renderRaw();window.scrollTo({top:0,behavior:'smooth'});}
   function chartSVG(points,activeStates,from,to){
     const pad={l:50,t:21,r:16,b:43},width=730,height=310,plotW=width-pad.l-pad.r,plotH=height-pad.t-pad.b;
     const ms=t=>Date.parse(t+'T12:00:00Z'),minX=ms(from),maxX=ms(to),spanX=Math.max(86400000,maxX-minX);
@@ -834,13 +966,35 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
       return '<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>'+circles;
     }).join('');
   }
+  function renderMarketRows(){
+    const c=state.compare,m=state.market;
+    const all=records.filter(r=>r.tarikh_harga===c.date&&productKey(r)===c.product&&r.peringkat===c.level);
+    const availableStates=unique(all.map(r=>r.negeri));
+    if(m.negeri&&!availableStates.includes(m.negeri))m.negeri='';
+    fillSelect('market-state-filter',availableStates,'All states');
+    $('market-state-filter').value=m.negeri;
+    const inState=all.filter(r=>!m.negeri||r.negeri===m.negeri);
+    const availableDistricts=unique(inState.map(r=>r.daerah));
+    if(m.daerah&&!availableDistricts.includes(m.daerah))m.daerah='';
+    fillSelect('market-district-filter',availableDistricts,'All districts');
+    $('market-district-filter').value=m.daerah;
+    const search=m.search.trim().toLowerCase();
+    const filtered=inState.filter(r=>(!m.daerah||r.daerah===m.daerah)&&(!search||(r.lokasi+' '+r.daerah).toLowerCase().includes(search)))
+      .sort((a,b)=>a.negeri.localeCompare(b.negeri)||a.daerah.localeCompare(b.daerah)||a.lokasi.localeCompare(b.lokasi));
+    const pageSize=40,pages=Math.max(1,Math.ceil(filtered.length/pageSize));
+    m.page=Math.max(0,Math.min(m.page,pages-1));
+    const pageRows=filtered.slice(m.page*pageSize,(m.page+1)*pageSize);
+    $('market-count').textContent=filtered.length.toLocaleString()+' / '+all.length.toLocaleString()+' records';
+    $('market-rows').innerHTML=pageRows.length?pageRows.map(r=>'<tr><td>'+escapeHtml(r.negeri)+'</td><td>'+escapeHtml(r.daerah)+'</td><td>'+escapeHtml(r.lokasi)+'</td><td>'+escapeHtml(r.gred)+'</td><td>'+escapeHtml(r.peringkat)+'</td><td>'+escapeHtml(r.unit)+'</td><td class="price-col"><span class="price-value">'+(Number.isFinite(number(r.harga))?fmt(r.harga):'—')+'</span></td><td>'+escapeHtml(r.tarikh_harga)+'</td></tr>').join(''):'<tr><td colspan="8" class="empty-cell">No source records match these market filters.</td></tr>';
+    $('market-page-text').textContent=filtered.length?'Showing '+(m.page*pageSize+1)+'–'+(m.page*pageSize+pageRows.length)+' of '+filtered.length.toLocaleString()+' matching records · Page '+(m.page+1)+' / '+pages:'No matching records';
+    $('market-prev').disabled=m.page===0;$('market-next').disabled=m.page>=pages-1;
+  }
   function renderCompare(){
     const c=state.compare;const relevant=records.filter(r=>productKey(r)===c.product&&r.peringkat===c.level);
     if(!c.date||!c.product||!records.length){
       $('state-description').textContent='Waiting for original FAMA observations';
       $('state-rows').innerHTML='<p class="empty-cell">Loading original FAMA data…</p>';
-      $('market-count').textContent='0 records';
-      $('market-rows').innerHTML='<tr><td colspan="8" class="empty-cell">No observations loaded yet.</td></tr>';
+      renderMarketRows();
       $('trend-description').textContent='Historical observations will appear when the data is ready.';
       $('chart-grid').innerHTML='';$('chart-paths').innerHTML='';$('chart-legend').innerHTML='';$('chart-empty').hidden=false;
       return;
@@ -851,8 +1005,7 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     const top=Math.max(1,...ranked.map(r=>r.mean));
     $('state-description').textContent=c.date+' · '+c.level+' · source average';
     $('state-rows').innerHTML=ranked.length?ranked.map(r=>'<div class="state-line"><div class="state-meta"><strong>'+escapeHtml(titleCase(r.name))+'</strong><span>'+fmt(r.mean)+'</span></div><div class="state-track"><div class="state-fill" style="width:'+(r.mean/top*100).toFixed(1)+'%"></div></div><small>'+r.markets+' markets · '+r.n+' records · '+escapeHtml(c.date)+'</small></div>').join(''):'<p class="empty-cell">No state prices on the selected date.</p>';
-    $('market-count').textContent=onDate.length+' records';
-    $('market-rows').innerHTML=onDate.length?onDate.slice(0,28).map(r=>'<tr><td>'+escapeHtml(r.negeri)+'</td><td>'+escapeHtml(r.daerah)+'</td><td>'+escapeHtml(r.lokasi)+'</td><td>'+escapeHtml(r.gred)+'</td><td>'+escapeHtml(r.peringkat)+'</td><td>'+escapeHtml(r.unit)+'</td><td class="price-col"><span class="price-value">'+fmt(r.harga)+'</span></td><td>'+escapeHtml(r.tarikh_harga)+'</td></tr>').join(''):'<tr><td colspan="8" class="empty-cell">No observations for the selected date.</td></tr>';
+    renderMarketRows();
     const max=c.date||dates()[0],min=c.period==='all'?(dates().at(-1)||max):dayOffset(max,-(Number(c.period)-1));
     const range=relevant.filter(r=>r.tarikh_harga>=min&&r.tarikh_harga<=max);
     const grouped=new Map();range.forEach(r=>{const key=r.negeri+'||'+r.tarikh_harga;if(!grouped.has(key))grouped.set(key,[]);grouped.get(key).push(r);});
@@ -1029,6 +1182,18 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     $('csv-picker').addEventListener('change',async e=>{await importFiles(e.target.files);e.target.value='';});
     for(const [id,key] of [['price-category','category'],['price-state','negeri'],['price-date','date'],['price-grade','grade'],['price-search','search']]){$(id).addEventListener(id==='price-search'?'input':'change',e=>{state.price[key]=e.target.value;if(key==='date')ensurePriceContext().catch(err=>toast(err.message));else renderPrices();});}
     for(const [id,key] of [['compare-product','product'],['compare-level','level'],['compare-date','date'],['compare-period','period']]){$(id).addEventListener('change',e=>{state.compare[key]=e.target.value;if(key==='product')chartSelected.clear();if(key==='date'||key==='period')ensureCompareContext().catch(err=>toast(err.message));else renderCompare();});}
+    $('watch-add').addEventListener('click',()=>addWatch($('watch-product').value,$('watch-state').value,$('watch-level').value));
+    $('watch-rows').addEventListener('click',e=>{
+      const button=e.target.closest('button[data-action]');if(!button)return;
+      const index=Number(button.dataset.index),item=watchlist[index];if(!item)return;
+      if(button.dataset.action==='remove'){watchlist.splice(index,1);saveWatchlist();renderWatchlist();toast('Removed from My Watchlist.');}
+      if(button.dataset.action==='view')openWatchItem(item);
+    });
+    $('market-state-filter').addEventListener('change',e=>{state.market.negeri=e.target.value;state.market.daerah='';state.market.page=0;renderMarketRows();});
+    $('market-district-filter').addEventListener('change',e=>{state.market.daerah=e.target.value;state.market.page=0;renderMarketRows();});
+    $('market-search').addEventListener('input',e=>{state.market.search=e.target.value;state.market.page=0;renderMarketRows();});
+    $('market-prev').addEventListener('click',()=>{state.market.page--;renderMarketRows();});
+    $('market-next').addEventListener('click',()=>{state.market.page++;renderMarketRows();});
     for(const [id,key] of [['raw-from','from'],['raw-to','to'],['raw-state','state'],['raw-level','level'],['raw-search','search'],['raw-category','category'],['raw-grade','grade'],['raw-market','market']]){$(id).addEventListener(['raw-search','raw-market'].includes(id)?'input':'change',e=>{state.raw[key]=e.target.value;rawPage=0;renderRaw();});}
     $('raw-reset').addEventListener('click',()=>{const latest=dates()[0]||'';state.raw={from:latest?dayOffset(latest,-6):'',to:latest,state:'',level:'',search:'',category:'',grade:'',market:''};initFilters();rawPage=0;renderRaw();});
     $('load-raw-range').addEventListener('click',async()=>{const b=$('load-raw-range');b.disabled=true;b.textContent='Loading original CSVs…';try{await ensureRawRange();initFilters();renderRaw();toast('Selected date range is ready for Excel export.');}catch(error){toast(error.message);}finally{b.disabled=false;b.textContent='Load selected range';}});
@@ -1036,6 +1201,7 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     $('raw-prev').addEventListener('click',()=>{rawPage--;renderRaw();});$('raw-next').addEventListener('click',()=>{rawPage++;renderRaw();});
     $('export-raw').addEventListener('click',()=>exportExcel(true));$('export-summary').addEventListener('click',()=>exportExcel(false));
     $('close-drawer').addEventListener('click',closeDrawer);$('drawer-overlay').addEventListener('click',closeDrawer);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
+    $('drawer-watch').addEventListener('click',()=>{addWatch(drawerKey,state.price.negeri,state.price.changeLevel);$('drawer-watch').textContent='✓ Already in My Watchlist';});
     $('drawer-compare').addEventListener('click',()=>{state.compare.product=drawerKey;$('compare-product').value=drawerKey;state.compare.date=state.price.date;$('compare-date').value=state.compare.date;chartSelected.clear();onTab('compare');});
   }
   comparator=new BGAgroCompare.MatchedMarketComparator(records);
