@@ -270,6 +270,7 @@ h2{font-size:18px;letter-spacing:-.4px;color:#203b33;font-weight:760;margin-bott
 .mover-card:hover{background:#f3f9f4;border-color:#94c7a8;transform:translateY(-2px);box-shadow:0 8px 16px rgba(24,79,49,.065)}
 .mover-name{font-size:13px;color:#1f4033;font-weight:760;min-height:36px}
 .mover-meta{font-size:11px;color:#617669;margin:9px 0}
+.mover-price-context{display:block;font-size:10px;font-weight:650;color:#748b7c;margin:0 0 2px}
 .mover-price{font-size:21px;color:#1d573f;font-weight:780}
 .mover-change{font-size:14px;font-weight:800;margin:9px 0 4px}
 .mover-change.up,.delta-main.up{color:#b84043}
@@ -777,9 +778,9 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
       const arrow=direction==='up'?'▲':direction==='down'?'▼':'•';
       const sign=change.percent>0?'+':'';
       const rmSign=change.rmDifference>0?'+':change.rmDifference<0?'−':'';
-      return '<button type="button" class="mover-card" data-key="'+escapeHtml(key)+'" title="Open original market observations"><span class="mover-name">'+escapeHtml(product.varieti)+'</span><span class="mover-meta">'+escapeHtml(product.gred)+' · '+escapeHtml(product.unit)+' · '+escapeHtml(level)+'</span><strong class="mover-price">'+fmt(change.current)+'</strong><span class="mover-change '+direction+'">'+arrow+' '+sign+change.percent.toFixed(1)+'% · '+rmSign+'RM'+Math.abs(change.rmDifference).toFixed(2)+'</span><span class="mover-dates">'+change.currentDate+' vs '+change.previousDate+'</span><span class="mover-dates">'+change.markets+' matching markets</span></button>';
+      return '<button type="button" class="mover-card" data-key="'+escapeHtml(key)+'" title="Open original market observations"><span class="mover-name">'+escapeHtml(product.varieti)+'</span><span class="mover-meta">'+escapeHtml(product.gred)+' · '+escapeHtml(product.unit)+' · '+escapeHtml(level)+'</span><span class="mover-price-context">Average across matched markets</span><strong class="mover-price">'+fmt(change.current)+'</strong><span class="mover-change '+direction+'">'+arrow+' '+sign+change.percent.toFixed(1)+'% · '+rmSign+'RM'+Math.abs(change.rmDifference).toFixed(2)+'</span><span class="mover-dates">'+change.currentDate+' vs '+change.previousDate+'</span><span class="mover-dates">'+change.markets+' matching markets</span></button>';
     }).join(''):'<div class="mover-empty">No same-market comparison available for '+escapeHtml(state.price.date)+' vs '+escapeHtml(BGAgroCompare.previousDate(state.price.date,period))+'. Try another date or price level.</div>';
-    $('mover-foot').textContent='Top '+ranked.length+' of '+groups.length+' products with comparable observations · '+level+' · '+period+'-day change · no missing prices estimated.';
+    $('mover-foot').textContent='Top '+ranked.length+' of '+groups.length+' selected products · '+level+' · '+period+'-day matched-market change · no missing prices estimated.';
     $('mover-content').querySelectorAll('button[data-key]').forEach(b=>b.addEventListener('click',()=>showDrawer(b.dataset.key)));
   }
   function renderPrices(){
