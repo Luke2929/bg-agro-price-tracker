@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
- <meta name="theme-color" content="#f5f7f4">
- <meta name="description" content="BG Agro FAMA price tracker with automatically refreshed original FAMA market records.">
- <title>BG Agro · FAMA Price Tracker V2</title>
+ <meta name="theme-color" content="#173d31">
+ <meta name="description" content="BG Agro 农产品价格透明系统：查看马来西亚 FAMA 原始调查价格、农场价与批发价、各州差异、历史趋势，并下载完整 Excel。">
+ <title>BG Agro · 农产品价格透明系统 | FAMA 马来西亚市场调查价格</title>
  <style>
 :root {
   --ink:#1d3529; --muted:#76867e; --forest:#1e4936; --forest-dark:#173c2c; --mint:#eaf4ed;
@@ -403,38 +403,249 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
  .watch-table th:first-child,.watch-table td:first-child{padding-left:15px}
 }
 
+
+/* BG Agro farmer-first interface: real FAMA source, no synthetic prices. */
+:root{--forest:#173d31;--forest-dark:#102e26;--bg:#f7f8f4;--ink:#1d3328;--line:#e0e9df;--radius:18px}
+body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-serif;font-size:15px;color:var(--ink);background:var(--bg)}
+.topbar{background:#173d31!important;color:#fff;border-bottom:1px solid #386451;box-shadow:0 5px 18px rgba(16,46,38,.09)}
+.brand-symbol{background:#e9f4da;color:#173d31;box-shadow:none}
+.brand strong{color:#fff;font-weight:850}
+.brand small{color:#d1e5d7;font-size:11px}
+.brand small b{color:#c6e6a9}
+.nav-tab{color:#cbded0;font-size:13px}
+.nav-tab.active,.nav-tab:hover{color:#fff}
+.nav-tab.active:after{background:#c5e89c}
+.header-actions .outline-button{border-color:#7ca28b;background:transparent;color:#fff}
+.header-actions .outline-button:hover{background:#295b45}
+.header-actions .dark-button{background:#e2f0d8;border-color:#e2f0d8;color:#173d31}
+.header-actions .dark-button:hover{background:#c7e7b7}
+.source-badge{background:#2b5746;border-color:#668e74;color:#e2f3db}
+.source-badge.loaded{background:#e3f2dc;color:#1c653f;border-color:#b1d4ad}
+.home-screen{--home-green:#173d31;--home-muted:#627668}
+.farmer-hero{position:relative;overflow:hidden;isolation:isolate;display:flex;justify-content:space-between;align-items:center;gap:35px;min-height:300px;background:linear-gradient(115deg,#173d31 0%,#1b4d3d 65%,#27614b 100%);border-radius:25px;padding:40px clamp(25px,4vw,55px);color:#fff;box-shadow:0 12px 30px rgba(18,59,35,.10)}
+.farmer-hero:before,.farmer-hero:after{content:"";position:absolute;width:420px;height:420px;border:1px solid rgba(185,225,172,.19);border-radius:50%;right:-85px;top:-250px;pointer-events:none;z-index:-1}
+.farmer-hero:after{width:580px;height:580px;right:-230px;top:-320px}
+.farmer-hero-main{max-width:690px}
+.hero-eyebrow{display:flex;gap:9px;align-items:center;color:#bedfbd;font-size:12px;letter-spacing:1.7px;font-weight:850;margin-bottom:16px}
+.hero-dot{width:8px;height:8px;background:#c5e89c;border-radius:50%}
+.farmer-hero h1{font-size:clamp(33px,4.1vw,53px);line-height:1.15;font-weight:850;letter-spacing:-1.25px;color:#fff;margin:0 0 18px}
+.farmer-hero h1 em{color:#c7e8a2;font-style:normal}
+.farmer-hero p{color:#d9e9de;font-size:16px;line-height:1.85;margin:0}
+.farmer-hero-date{width:264px;flex:0 0 264px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);border-radius:18px;padding:20px 22px;backdrop-filter:blur(6px)}
+.farmer-hero-date span{display:block;font-size:12px;color:#c7ddcc;font-weight:700}
+.farmer-hero-date strong{display:block;font-size:26px;margin:6px 0 4px;color:#fff;font-variant-numeric:tabular-nums}
+.farmer-hero-date b{display:block;font-size:14px;margin-top:4px;color:#f1faeb}
+.hero-divider{height:1px;background:#719785;margin:15px 0}
+.home-intro-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:14px;margin:18px 0 30px}
+.home-insight,.home-notice{display:flex;gap:14px;align-items:flex-start;padding:18px 21px;border-radius:16px;border:1px solid #dde9d6;background:linear-gradient(105deg,#eef7e9,#fafcf7)}
+.home-insight-icon{display:grid;place-items:center;min-width:46px;height:46px;background:#d9ecca;border-radius:13px;font-size:23px}
+.home-kicker{display:block;font-size:11px;font-weight:850;letter-spacing:1.4px;color:#4c8158;margin-bottom:6px}
+.home-insight h3{margin:0 0 5px;font-size:17px;color:#254532}
+.home-insight p,.home-notice p{margin:0;font-size:12px;line-height:1.7;color:#697b6d}
+.home-notice{background:#fff9ed;border-color:#f1e1c8}
+.home-notice>span{font-size:21px;color:#a87439}
+.home-notice strong{color:#59442a;font-size:14px}
+.home-notice p{color:#816b50;margin-top:5px}
+.home-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:35px 0 17px}
+.home-heading h2{font-size:25px;color:#193d2d;margin:0 0 5px;letter-spacing:-.6px}
+.home-heading p{font-size:13px;color:#718074;margin:0}
+.home-summary-trigger{font-size:13px}
+.home-toolbar{display:grid;grid-template-columns:minmax(240px,2.1fr) repeat(5,minmax(112px,1fr));gap:11px;padding:17px;background:#fff;border:1px solid #dfe9df;border-radius:17px;margin:0 0 16px;box-shadow:0 5px 22px rgba(25,58,40,.035)}
+.home-toolbar .field span{font-size:10px;letter-spacing:.5px;color:#536d5c}
+.home-toolbar .field select,.home-toolbar .field input{height:45px;background:#f9fbf7;border-radius:10px;color:#274b36;font-size:12px}
+.home-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.home-metric{padding:17px 19px;background:#fff;border:1px solid #e1e9df;border-radius:15px;min-width:0}
+.home-metric span{display:block;font-size:11px;color:#718775;font-weight:800}
+.home-metric strong{display:block;font-size:25px;color:#193d2d;margin:4px 0 3px;line-height:1.3;font-variant-numeric:tabular-nums}
+.home-metric small{display:block;color:#809083;font-size:11px;line-height:1.45}
+.home-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.home-card{background:#fff;border:1px solid #e0e8de;border-radius:18px;box-shadow:0 4px 22px rgba(16,60,32,.045);padding:20px;min-width:0;display:flex;flex-direction:column;gap:13px;transition:transform .17s,border-color .17s}
+.home-card:hover{border-color:#aecbac;transform:translateY(-2px)}
+.home-card-top{display:flex;align-items:flex-start;gap:12px}
+.home-card-emoji{display:grid;place-items:center;flex:0 0 47px;width:47px;height:47px;background:#edf5e8;border-radius:12px;font-size:23px}
+.home-card-title{min-width:0;flex:1}
+.home-card-title h3{font-size:18px;line-height:1.25;margin:0 0 2px;color:#263d2d;font-weight:850}
+.home-card-title small{display:block;color:#809083;font-size:11px;line-height:1.45}
+.home-card-tag{display:inline-flex;margin-top:5px;padding:5px 8px;border-radius:7px;background:#eff4ec;color:#527057;font-size:10px;font-weight:800}
+.home-card-prices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.home-card-price{min-width:0;background:#f6f9f4;border-radius:12px;padding:12px}
+.home-card-price.wholesale{background:#edf5ec}
+.home-card-price span{display:block;font-size:11px;color:#5b7961;font-weight:800}
+.home-card-price strong{display:block;font-size:23px;margin:5px 0 3px;color:#1b3d2b;font-weight:860;letter-spacing:-.55px;font-variant-numeric:tabular-nums}
+.home-card-price small{font-size:10px;color:#718576}
+.home-card-spread{display:flex;gap:9px;align-items:center;justify-content:space-between;font-size:11px;color:#6b7d6e}
+.home-card-spread strong{color:#b2682d;font-size:15px;font-weight:850}
+.home-card-bottom{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-top:auto;padding-top:12px;border-top:1px solid #edf0ea}
+.home-card-bottom span{font-size:10px;color:#768778;line-height:1.4}
+.home-card-bottom button{background:none;border:none;color:#286e45;font-weight:850;font-size:12px;white-space:nowrap}
+.home-card-bottom button:hover{text-decoration:underline}
+.home-card-change{font-size:12px;font-weight:850}
+.home-card-change.up{color:#287849}.home-card-change.down{color:#ae5b38}.home-card-change.flat{color:#687e6e}.home-card-change.na{color:#929f95}
+.home-more-line{display:flex;align-items:center;justify-content:space-between;gap:13px;margin:16px 0 22px;color:#6d806f;font-size:12px}
+.home-empty{grid-column:1/-1;text-align:center;border:1px dashed #b8cdb9;background:#fff;border-radius:15px;padding:34px;color:#6b846e;font-size:14px}
+.home-prices-table{min-width:1380px}
+.home-prices-table th,.home-prices-table td{padding-left:12px;padding-right:12px}
+.home-prices-table th:first-child,.home-prices-table td:first-child{min-width:215px}
+.home-state-heading{margin-top:37px}
+.home-state-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,.85fr);gap:16px}
+.home-state-panel{padding:19px 21px}
+.home-state-controls{display:grid;grid-template-columns:minmax(180px,2fr) minmax(160px,1fr);gap:12px;margin-bottom:18px}
+.home-state-bars{display:grid;gap:12px}
+.home-state-row{display:grid;grid-template-columns:155px minmax(60px,1fr) 105px;gap:12px;align-items:center;font-size:12px}
+.home-state-row span{font-weight:800;color:#3d5f46}
+.home-state-track{height:12px;background:#edf3e9;border-radius:20px;overflow:hidden}
+.home-state-fill{height:100%;background:#86b372;border-radius:20px}
+.home-state-row:first-child .home-state-fill{background:#2e7049}
+.home-state-row strong{text-align:right;font-weight:850}
+.home-state-row small{grid-column:1/-1;color:#879686;font-size:10px;margin-top:-9px}
+.home-state-foot{margin:17px 0 0;padding-top:13px;border-top:1px solid #e7eee5;color:#748678;font-size:11px}
+.home-trade-guide{background:#eff7e9;border:1px solid #dcebd5;border-radius:18px;padding:24px}
+.home-guide-icon{font-size:28px}
+.home-trade-guide h3{font-size:21px;margin:8px 0 10px;color:#234a32}
+.home-trade-guide p,.home-trade-guide li{color:#56715d;font-size:13px;line-height:1.7}
+.home-trade-guide ul{padding-left:19px;margin-bottom:0}
+.home-trade-guide li{margin:6px 0}
+.home-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.home-steps>div{background:#fff;border:1px solid #dfe8dc;padding:21px;border-radius:15px}
+.home-steps span{display:grid;place-items:center;width:35px;height:35px;background:#e5f1e0;color:#437b4e;border-radius:9px;font-size:13px;font-weight:900;margin-bottom:12px}
+.home-steps h3{font-size:16px;margin:0 0 7px;color:#224330}
+.home-steps p{font-size:12px;line-height:1.7;color:#687d6c;margin:0}
+.home-summary-panel{margin:27px 0 0;background:#fff;border:1px solid #dbe7dc;border-radius:20px;overflow:hidden;box-shadow:0 6px 25px rgba(16,60,35,.055)}
+.home-summary-head{background:#173d31;padding:21px 24px;color:#fff}
+.home-summary-head>span{font-size:11px;color:#c3e6b5;font-weight:800}
+.home-summary-head h2{font-size:25px;color:#fff;margin:6px 0}
+.home-summary-head p{color:#e1eee1;font-size:12px;margin:0}
+.home-summary-body{padding:21px 24px}
+.home-summary-meta{font-size:12px;color:#46694b;margin-bottom:14px}
+.home-summary-table{width:100%;border-collapse:collapse;font-size:12px}
+.home-summary-table th{text-align:left;padding:11px 9px;border-bottom:1px solid #d9e5db;background:#f1f7ef;color:#31543a}
+.home-summary-table td{padding:11px 9px;border-bottom:1px solid #eaf0e8}
+.home-summary-body>p{font-size:11px;color:#687c6b;margin:16px 0}
+.home-summary-actions{display:flex;gap:10px;flex-wrap:wrap}
+@media(max-width:1250px){.home-toolbar{grid-template-columns:repeat(3,minmax(0,1fr))}.home-search-field{grid-column:span 2}}
+@media(max-width:1060px){.home-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.home-intro-grid{grid-template-columns:1fr}.home-state-grid{grid-template-columns:1fr}}
+@media(max-width:730px){
+ .topbar{grid-template-columns:auto minmax(0,1fr);height:auto!important}
+ .brand strong{font-size:18px}.brand small{font-size:10px}
+ .nav-tabs{width:100%;min-width:0;overflow-x:auto;justify-content:flex-start!important;gap:16px;padding:0 3px}
+ .nav-tab{flex:0 0 auto;font-size:12px;padding:0 3px}
+ .farmer-hero{display:block;padding:26px 19px;border-radius:17px;min-height:0}
+ .farmer-hero h1{font-size:33px}
+ .farmer-hero p{font-size:13px}
+ .hero-eyebrow{font-size:10px;letter-spacing:.9px}
+ .farmer-hero-date{display:grid;grid-template-columns:1fr auto;align-items:center;gap:5px 10px;width:auto;margin-top:22px;padding:14px 16px}
+ .farmer-hero-date strong{font-size:18px;text-align:right}
+ .farmer-hero-date b{text-align:right;font-size:11px}
+ .farmer-hero-date .hero-divider{display:none}
+ .home-intro-grid{margin:12px 0 22px;gap:9px}
+ .home-insight,.home-notice{padding:14px}
+ .home-heading{margin:25px 0 13px}
+ .home-heading h2{font-size:22px}
+ .home-toolbar{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px;gap:9px}
+ .home-search-field{grid-column:1/-1}
+ .home-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .home-metric{padding:13px}
+ .home-metric strong{font-size:23px}
+ .home-cards{grid-template-columns:1fr;gap:11px}
+ .home-card{padding:17px}
+ .home-card-price strong{font-size:25px}
+ .home-state-controls{grid-template-columns:1fr}
+ .home-state-row{grid-template-columns:94px minmax(48px,1fr) 75px;gap:7px;font-size:11px}
+ .home-state-panel{padding:15px}
+ .home-state-row small{font-size:9px}
+ .home-steps{grid-template-columns:1fr;gap:10px}
+ .home-summary-body{padding:12px}
+}
+@media print{
+ @page{size:A4;margin:12mm}
+ body{background:#fff;color:#172d20}
+ .topbar,.source-banner,.freshness-strip,footer,.overlay,.product-drawer,.toast{display:none!important}
+ .app-shell{min-height:auto!important;display:block!important}
+ main{width:100%!important;margin:0!important;padding:0!important}
+ main>.screen{display:none!important}
+ main>.home-screen{display:block!important}
+ .home-screen>:not(.home-summary-panel){display:none!important}
+ .home-summary-panel{display:block!important;box-shadow:none!important;border:0!important;margin:0!important;border-radius:0!important}
+ .home-summary-head{background:#173d31!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ .home-summary-actions{display:none!important}
+ .home-summary-table{font-size:10px}
+ .home-summary-table th,.home-summary-table td{padding:7px 6px}
+ .home-summary-table tr{break-inside:avoid}
+}
+
+/* Farmer-facing change indicators: clearly marked arrows, green for rising prices. */
+.home-prices-table .delta-main.up{color:#287849;background:#eaf5e9}.home-prices-table .delta-main.down{color:#ae5b38;background:#fff0e8}
+
 </style>
  
 </head>
 <body>
 <div class="app-shell">
  <header class="topbar">
-  <div class="brand"><span class="brand-symbol">✳</span><span><strong>BG Agro</strong><small>FAMA Price Tracker <b>V2</b></small></span></div>
-  <nav class="nav-tabs" aria-label="Dashboard pages"><button class="nav-tab active" data-tab="prices">Prices</button><button class="nav-tab" data-tab="compare">Compare & Trends</button><button class="nav-tab" data-tab="watchlist">My Watchlist</button><button class="nav-tab" data-tab="data">Data & Export</button></nav>
-  <div class="header-actions"><span id="source-badge" class="source-badge">● CONNECTING</span><button class="outline-button" id="import-button">↥ Import CSV</button><button class="dark-button" id="refresh-live">↻ Refresh Live</button></div>
+  <div class="brand"><span class="brand-symbol">✳</span><span><strong>BG Agro</strong><small>农产品价格透明系统 <b>FAMA DATA</b></small></span></div>
+  <nav class="nav-tabs" aria-label="Dashboard pages"><button class="nav-tab active" data-tab="home">农价首页</button><button class="nav-tab" data-tab="prices">价格明细</button><button class="nav-tab" data-tab="compare">州际比较 · 趋势</button><button class="nav-tab" data-tab="watchlist">我的关注</button><button class="nav-tab" data-tab="data">数据 · Excel</button></nav>
+  <div class="header-actions"><span id="source-badge" class="source-badge">● CONNECTING</span><button class="outline-button" id="import-button">↥ 导入 CSV</button><button class="dark-button" id="refresh-live">↻ 刷新数据</button></div>
  </header>
  <input type="file" id="csv-picker" accept=".csv,text/csv" multiple hidden>
  <div class="source-banner"><span class="status-pip"></span><p id="source-message" aria-live="polite"><b>Connecting to FAMA archive…</b> Loading original CSV records from your GitHub repository.</p><span id="source-date" class="source-date">Checking latest FAMA survey date…</span></div>
  <div class="freshness-strip" aria-label="FAMA data coverage">
-  <div><span>LATEST SURVEY DATE</span><strong id="fresh-latest">—</strong></div>
-  <div><span>LOADED SOURCE RECORDS</span><strong id="fresh-loaded">—</strong></div>
-  <div><span>ARCHIVE DATE RANGE</span><strong id="fresh-range">—</strong></div>
-  <div><span>ARCHIVE UPDATED (MYT)</span><strong id="fresh-built">—</strong></div>
+  <div><span>最新调查日期</span><strong id="fresh-latest">—</strong></div>
+  <div><span>已载入原始记录</span><strong id="fresh-loaded">—</strong></div>
+  <div><span>已载入日期范围</span><strong id="fresh-range">—</strong></div>
+  <div><span>档案更新时间 (MYT)</span><strong id="fresh-built">—</strong></div>
  </div>
  <main>
-  <section class="screen active" data-screen="prices">
-   <div class="page-intro"><div><span class="eyebrow">MARKET DATA / PRICE LOOKUP</span><h1>Market prices</h1><p>Find a product. Check its farm, wholesale and retail prices.</p></div><div class="date-stamp"><span>SELECTED PRICE DATE</span><strong id="price-date-stamp">—</strong><small>FAMA survey date</small></div></div>
+  <section class="screen active home-screen" data-screen="home">
+   <div class="farmer-hero">
+    <div class="farmer-hero-main"><span class="hero-eyebrow"><span class="hero-dot"></span> MALAYSIA AGRICULTURAL PRICE TRANSPARENCY</span><h1>你种的农产品，<br><em>今天值多少钱？</em></h1><p>用真实 FAMA 市场调查资料，一次看清农场价、批发价、不同州属和近期变化。价格是参考，不是买卖承诺。</p></div>
+    <div class="farmer-hero-date"><span>最新可用调查日期</span><strong id="home-latest">—</strong><div class="hero-divider"></div><span>数据来源</span><b id="home-status">正在连接 FAMA 档案…</b></div>
+   </div>
+   <div class="home-intro-grid">
+    <div class="home-insight"><span class="home-insight-icon">🌱</span><div><span class="home-kicker">今日重点 · FAMA 调查记录</span><h3 id="home-insight-title">农场与批发市场价格，一眼看懂</h3><p id="home-insight-desc">请选择农产品或州属，查看真实记录和价格变化。</p></div></div>
+    <div class="home-notice"><span>ⓘ</span><div><strong>价差 ≠ 中间商赚的钱</strong><p>农场价与批发价可能来自不同市场、不同交易环节。运输、包装、损耗与质量差异均未扣除。</p></div></div>
+   </div>
+   <div class="home-heading"><div><span class="home-kicker">TODAY'S FARM MARKET</span><h2>农产品价格速览</h2><p>先看农场价，再看批发价；所有数值来自 FAMA 原始 CSV。</p></div><button class="outline-button home-summary-trigger" id="home-summary-toggle" type="button">▤ 一页价格总结 / PDF</button></div>
+   <div class="home-toolbar">
+    <label class="field home-search-field"><span>搜索农产品（中文 / Bahasa Melayu）</span><input type="search" id="home-search" placeholder="例如：秋葵、KACANG BENDI、CILI MERAH"></label>
+    <label class="field"><span>州属</span><select id="home-state"></select></label>
+    <label class="field"><span>类别</span><select id="home-category"></select></label>
+    <label class="field"><span>调查日期</span><select id="home-date"></select></label>
+    <label class="field"><span>比较层级</span><select id="home-level"><option value="Borong">批发 · Borong</option><option value="Ladang">农场 · Ladang</option><option value="Runcit">零售 · Runcit</option></select></label>
+    <label class="field"><span>排序</span><select id="home-sort"><option value="default">常见作物优先</option><option value="farm-high">农场价：高 → 低</option><option value="farm-low">农场价：低 → 高</option><option value="spread-high">农场 / 批发价差：高 → 低</option><option value="change-high">单日涨幅：高 → 低</option><option value="change-down">单日跌幅：高 → 低</option></select></label>
+   </div>
+   <div class="home-metrics" id="home-metrics" aria-live="polite"></div>
+   <div class="home-cards" id="home-cards" aria-live="polite"><p class="home-empty">正在加载原始 FAMA 价格…</p></div>
+   <div class="home-more-line"><span id="home-card-count">—</span><button class="outline-button" id="home-more" type="button" hidden>显示更多农产品 ↓</button></div>
+   <section class="panel home-table-panel">
+    <div class="panel-heading"><div><h2>完整价格对照表</h2><p>农场、批发、零售调查均价及历史涨跌，同一品种等级与单位才会合并。</p></div><span class="count-pill" id="home-table-count">—</span></div>
+    <div class="table-scroll"><table class="data-table home-prices-table"><thead><tr><th>农产品 / 品种</th><th>等级 · 单位</th><th class="price-col">农场均价</th><th class="price-col">农场范围</th><th class="price-col">批发均价</th><th class="price-col">零售均价</th><th class="price-col">均价差</th><th class="delta-col">1 天涨跌</th><th class="delta-col">7 天涨跌</th><th class="delta-col">30 天涨跌</th><th></th></tr></thead><tbody id="home-table-rows"></tbody></table></div>
+    <div class="table-footer"><span>均价差仅作市场层级参考，不代表实际利润。</span><span id="home-table-foot">—</span></div>
+   </section>
+   <div class="home-heading home-state-heading"><div><span class="home-kicker">STATE COMPARISON</span><h2>各州农产品价格比较</h2><p>相同调查日期、品种、等级、单位及价格层级的州属均价。</p></div></div>
+   <div class="home-state-grid">
+    <section class="panel home-state-panel"><div class="home-state-controls"><label class="field"><span>农产品 / 等级 / 单位</span><select id="home-compare-product"></select></label><label class="field"><span>价格层级</span><select id="home-state-level"><option value="Ladang">农场 · Ladang</option><option value="Borong">批发 · Borong</option><option value="Runcit">零售 · Runcit</option></select></label></div><div class="home-state-bars" id="home-state-bars"></div><p class="home-state-foot" id="home-state-foot">只比较相同规格的来源平均价。</p></section>
+    <aside class="home-trade-guide"><span class="home-guide-icon">🚚</span><h3>高价州，不一定更赚钱</h3><p>跨州销售之前，请额外确认：</p><ul><li>买家真正收购的品级、尺寸、数量</li><li>运输、包装、冷藏及损耗成本</li><li>货款结算时间和付款风险</li><li>实际买家报价，而非仅参考调查均价</li></ul></aside>
+   </div>
+   <div class="home-heading home-how-heading"><div><span class="home-kicker">SIMPLE TO USE</span><h2>三步看懂你的农产品价格</h2></div></div>
+   <div class="home-steps"><div><span>01</span><h3>找到你的农产品</h3><p>搜索中文或马来文名称，再选择州属及 FAMA 调查日期。</p></div><div><span>02</span><h3>看价格与市场差异</h3><p>查看农场、批发和零售价，点击卡片核对原始市场记录。</p></div><div><span>03</span><h3>分享前核对来源</h3><p>打开一页总结，确认日期、价格层级和市场数量，再打印或保存 PDF。</p></div></div>
+   <section class="home-summary-panel" id="home-summary-panel" hidden>
+    <div class="home-summary-head"><span>BG Agro · FAMA 市场调查价格</span><h2>农产品价格一页速览</h2><p id="home-summary-desc">—</p></div>
+    <div class="home-summary-body"><div class="home-summary-meta" id="home-summary-meta"></div><div class="table-scroll"><table class="home-summary-table"><thead><tr><th>农产品 / 规格</th><th>农场</th><th>批发</th><th>零售</th><th>1D</th><th>7D</th><th>30D</th></tr></thead><tbody id="home-summary-rows"></tbody></table></div><p>数据来源：FAMA 公开市场调查资料，由 BG Agro 存档和整理。各层级调查价未必来自相同交易，不能视为实际成交价或利润；缺失数据不作估算。</p><div class="home-summary-actions"><button class="dark-button" id="home-print" type="button">🖨️ 打印 / 保存为 PDF</button><button class="outline-button" id="home-summary-close" type="button">关闭总结</button></div></div>
+   </section>
+  </section>
+  <section class="screen" data-screen="prices">
+   <div class="page-intro"><div><span class="eyebrow">MARKET DATA / PRICE LOOKUP</span><h1>完整价格明细</h1><p>按产品、州属及调查日期，核对农场、批发和零售市场的真实记录。</p></div><div class="date-stamp"><span>当前调查日期</span><strong id="price-date-stamp">—</strong><small>FAMA survey date</small></div></div>
    <div class="filter-box"><label class="field field-search"><span>SEARCH PRODUCT</span><input id="price-search" type="search" placeholder="BAYAM, CILI MERAH, KUBIS…"></label><label class="field"><span>CATEGORY</span><select id="price-category"></select></label><label class="field"><span>STATE</span><select id="price-state"></select></label><label class="field"><span>PRICE DATE</span><select id="price-date"></select></label></div>
-   <section class="panel movers-panel"><div class="panel-heading movers-heading"><div><h2>Top movers</h2><p>Biggest recorded price changes · same markets on both dates</p></div><div class="movers-tabs" role="group" aria-label="Top movers comparison period"><button class="mover-period active" data-days="1">1-Day Movers</button><button class="mover-period" data-days="7">7-Day Movers</button><button class="mover-period" data-days="30">30-Day Movers</button></div></div><div class="mover-content" id="mover-content"></div><div class="mover-foot" id="mover-foot">Calculated from matching market observations only.</div></section>
-   <section class="panel"><div class="panel-heading"><div><h2>All product prices</h2><p>Actual survey prices and comparable historical price changes.</p></div><div class="panel-tools"><label class="minor-field">GRADE <select id="price-grade"></select></label><div class="level-pills" role="group" aria-label="Price level for change comparison"><button class="level-option" data-level="Ladang">Ladang</button><button class="level-option" data-level="Borong">Borong</button><button class="level-option active" data-level="Runcit">Runcit</button></div><span class="count-pill" id="price-count">— products</span></div></div><div class="table-scroll"><table class="data-table price-table"><thead><tr><th>PRODUCT / VARIETY</th><th>GRADE</th><th>UNIT</th><th class="price-col">LADANG<small>Farm</small></th><th class="price-col">BORONG<small>Wholesale</small></th><th class="price-col">RUNCIT<small>Retail</small></th><th class="delta-col">Δ 1D<small>vs yesterday</small></th><th class="delta-col">Δ 7D<small>vs 7 days ago</small></th><th class="delta-col">Δ 30D<small>vs 30 days ago</small></th><th>SURVEY DATE</th><th></th></tr></thead><tbody id="price-rows"></tbody></table></div><div class="table-footer"><span id="price-table-foot">Click a vegetable to see its original market observations.</span><span>Changes: matched markets only · selected level</span></div></section>
+   <section class="panel movers-panel"><div class="panel-heading movers-heading"><div><h2>涨跌幅最大的农产品</h2><p>按涨跌百分比绝对值排序 · 两个日期使用相同市场比较</p></div><div class="movers-tabs" role="group" aria-label="Top movers comparison period"><button class="mover-period active" data-days="1">昨天对比</button><button class="mover-period" data-days="7">7天对比</button><button class="mover-period" data-days="30">30天对比</button></div></div><div class="mover-content" id="mover-content"></div><div class="mover-foot" id="mover-foot">Calculated from matching market observations only.</div></section>
+   <section class="panel"><div class="panel-heading"><div><h2>全部农产品调查价格</h2><p>不同价格层级、市场数量和 1／7／30 天真实涨跌。</p></div><div class="panel-tools"><label class="minor-field">GRADE <select id="price-grade"></select></label><div class="level-pills" role="group" aria-label="Price level for change comparison"><button class="level-option" data-level="Ladang">Ladang</button><button class="level-option" data-level="Borong">Borong</button><button class="level-option active" data-level="Runcit">Runcit</button></div><span class="count-pill" id="price-count">— products</span></div></div><div class="table-scroll"><table class="data-table price-table"><thead><tr><th>PRODUCT / VARIETY</th><th>GRADE</th><th>UNIT</th><th class="price-col">LADANG<small>Farm</small></th><th class="price-col">BORONG<small>Wholesale</small></th><th class="price-col">RUNCIT<small>Retail</small></th><th class="delta-col">Δ 1D<small>vs yesterday</small></th><th class="delta-col">Δ 7D<small>vs 7 days ago</small></th><th class="delta-col">Δ 30D<small>vs 30 days ago</small></th><th>SURVEY DATE</th><th></th></tr></thead><tbody id="price-rows"></tbody></table></div><div class="table-footer"><span id="price-table-foot">Click a vegetable to see its original market observations.</span><span>Changes: matched markets only · selected level</span></div></section>
    <p class="footnote">ⓘ Price changes compare the same product, grade, unit, price level and market on the selected date versus exactly 1, 7 or 30 calendar days earlier. Missing comparisons show —; they are not treated as 0% or filled with older observations. Headline price averages can cover more markets than the matched-market change.</p>
   </section>
   <section class="screen" data-screen="compare">
-   <div class="page-intro"><div><span class="eyebrow">MARKET DATA / REGIONAL COMPARISON</span><h1>Compare & trends</h1><p>Meaningful comparisons use the same variety, grade, unit and price level.</p></div><span class="light-label">Simple, verifiable comparisons</span></div>
+   <div class="page-intro"><div><span class="eyebrow">MARKET DATA / REGIONAL COMPARISON</span><h1>各州比较与历史趋势</h1><p>只比较相同品种、等级、单位和价格层级，避免混合不同规格。</p></div><span class="light-label">Simple, verifiable comparisons</span></div>
    <div class="filter-box compare-filters"><label class="field product-selector"><span>PRODUCT / GRADE / UNIT</span><select id="compare-product"></select></label><label class="field"><span>PRICE LEVEL</span><select id="compare-level"><option value="Borong">Borong · Wholesale</option><option value="Runcit">Runcit · Retail</option><option value="Ladang">Ladang · Farm</option></select></label><label class="field"><span>COMPARE DATE</span><select id="compare-date"></select></label><label class="field"><span>HISTORY</span><select id="compare-period"><option value="30">Last 30 days</option><option value="7">Last 7 days</option><option value="90">Last 90 days</option><option value="all">All dates</option></select></label></div>
-   <div class="compare-grid"><section class="panel trend-panel"><div class="panel-heading"><div><h2>Historical price trend</h2><p id="trend-description">Source observations by survey date and state</p></div><span class="light-label">RM / unit</span></div><div class="legend" id="chart-legend"></div><div class="chart-area"><svg id="trend-chart" viewBox="0 0 730 310" role="img" aria-label="Historical price chart"><g id="chart-grid"></g><g id="chart-paths"></g></svg><div class="no-chart" id="chart-empty" hidden>No historical observations for this selection.</div></div><p class="panel-caption">Each dot represents a date with recorded prices. Missing days are never estimated.</p></section><section class="panel states-panel"><div class="panel-heading"><div><h2>State comparison</h2><p id="state-description">Same survey date and product specification</p></div></div><div class="state-bars" id="state-rows"></div><p class="panel-caption">State average is shown with market count. Surveyed markets can vary across dates.</p></section></div>
+   <div class="compare-grid"><section class="panel trend-panel"><div class="panel-heading"><div><h2>历史价格趋势</h2><p id="trend-description">Source observations by survey date and state</p></div><span class="light-label">RM / unit</span></div><div class="legend" id="chart-legend"></div><div class="chart-area"><svg id="trend-chart" viewBox="0 0 730 310" role="img" aria-label="Historical price chart"><g id="chart-grid"></g><g id="chart-paths"></g></svg><div class="no-chart" id="chart-empty" hidden>No historical observations for this selection.</div></div><p class="panel-caption">Each dot represents a date with recorded prices. Missing days are never estimated.</p></section><section class="panel states-panel"><div class="panel-heading"><div><h2>各州价格比较</h2><p id="state-description">Same survey date and product specification</p></div></div><div class="state-bars" id="state-rows"></div><p class="panel-caption">State average is shown with market count. Surveyed markets can vary across dates.</p></section></div>
    <section class="panel market-panel">
-    <div class="panel-heading"><div><h2>District & market prices</h2><p>Browse every original observation for the selected product, not just the first few rows.</p></div><span class="count-pill" id="market-count">0 records</span></div>
+    <div class="panel-heading"><div><h2>地区与市场原始价格</h2><p>Browse every original observation for the selected product, not just the first few rows.</p></div><span class="count-pill" id="market-count">0 records</span></div>
     <div class="market-filters">
      <label class="field"><span>STATE</span><select id="market-state-filter"></select></label>
      <label class="field"><span>DISTRICT</span><select id="market-district-filter"></select></label>
@@ -445,31 +656,31 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
    </section>
   </section>
   <section class="screen" data-screen="watchlist">
-   <div class="page-intro"><div><span class="eyebrow">YOUR MARKET / DAILY MONITORING</span><h1>My watchlist</h1><p>Save produce and states you check often. Every price comes from recorded FAMA observations.</p></div><span class="light-label">Saved on this browser</span></div>
+   <div class="page-intro"><div><span class="eyebrow">YOUR MARKET / DAILY MONITORING</span><h1>我关注的农产品</h1><p>把常查的品种、州属和价格层级保存起来，快速查看真实 FAMA 价格。</p></div><span class="light-label">仅保存在当前浏览器</span></div>
    <div class="filter-box watch-filters">
     <label class="field field-search"><span>PRODUCT / GRADE / UNIT</span><select id="watch-product"></select></label>
     <label class="field"><span>STATE</span><select id="watch-state"></select></label>
     <label class="field"><span>PRICE LEVEL</span><select id="watch-level"><option value="Borong">Borong · Wholesale</option><option value="Runcit">Runcit · Retail</option><option value="Ladang">Ladang · Farm</option></select></label>
-    <button type="button" class="dark-button watch-add" id="watch-add">+ Add product</button>
+    <button type="button" class="dark-button watch-add" id="watch-add">+ 加入我的关注</button>
    </div>
    <section class="panel">
-    <div class="panel-heading"><div><h2>Saved price checks</h2><p>Latest recorded average · 1, 7 and 30-day same-market comparisons.</p></div><span class="count-pill" id="watch-count">0 saved</span></div>
+    <div class="panel-heading"><div><h2>我的常看价格</h2><p>Latest recorded average · 1, 7 and 30-day same-market comparisons.</p></div><span class="count-pill" id="watch-count">0 saved</span></div>
     <div class="table-scroll"><table class="data-table watch-table"><thead><tr><th>PRODUCT / SPECIFICATION</th><th>STATE</th><th>LEVEL</th><th class="price-col">LATEST RECORDED PRICE</th><th class="delta-col">Δ 1D</th><th class="delta-col">Δ 7D</th><th class="delta-col">Δ 30D</th><th>AS OF</th><th>ACTIONS</th></tr></thead><tbody id="watch-rows"></tbody></table></div>
     <div class="table-footer"><span id="watch-foot">Saved locally in this browser.</span><span>No missing prices estimated.</span></div>
    </section>
    <p class="footnote">ⓘ Each saved item tracks a variety, grade, unit, state and price level. The latest reading can be older than the dashboard's newest survey date. Percentage changes compare identical markets on both exact calendar dates.</p>
   </section>
   <section class="screen" data-screen="data">
-   <div class="page-intro"><div><span class="eyebrow">SOURCE DATA / CUSTOMER EXPORT</span><h1>Data & export</h1><p>Browse and download exactly the rows your customer needs.</p></div><span class="light-label">All 17 original FAMA columns</span></div>
+   <div class="page-intro"><div><span class="eyebrow">SOURCE DATA / CUSTOMER EXPORT</span><h1>原始数据与 Excel 导出</h1><p>按客户需要的日期、州属、品种和市场筛选全部原始记录，并导出 Excel。</p></div><span class="light-label">保留全部 17 个 FAMA 原始字段</span></div>
    <div class="filter-box raw-filters"><label class="field"><span>FROM DATE</span><input type="date" id="raw-from"></label><label class="field"><span>TO DATE</span><input type="date" id="raw-to"></label><label class="field"><span>STATE</span><select id="raw-state"></select></label><label class="field"><span>PRICE LEVEL</span><select id="raw-level"><option value="">All levels</option><option>Ladang</option><option>Borong</option><option>Runcit</option></select></label><label class="field"><span>PRODUCT SEARCH</span><input id="raw-search" placeholder="Any vegetable or product"></label><label class="field"><span>CATEGORY</span><select id="raw-category"></select></label><label class="field"><span>GRADE</span><select id="raw-grade"></select></label><label class="field"><span>MARKET / DISTRICT</span><input id="raw-market" placeholder="Daerah or lokasi"></label><div class="raw-filter-foot"><span id="raw-match-count">— matching original rows</span><div class="raw-actions"><button id="load-raw-range" class="outline-button">Load selected range</button><button id="raw-reset" class="text-button">Clear filters</button></div></div></div>
-   <div class="export-grid"><section class="export-tile"><span class="export-symbol">S</span><div><h3>Summary Data <span class="tag">FOR YOU</span></h3><p>Daily observed averages, grouped by product, grade, level and state.</p></div><button class="outline-button" id="export-summary">Download Summary .xlsx</button></section><section class="export-tile highlighted"><span class="export-symbol dark">X</span><div><h3>Full Raw Data <span class="tag green">FOR CUSTOMERS</span></h3><p>All 17 source fields. No averages, altered source values or invented data.</p></div><button class="dark-button" id="export-raw">Download Full Raw .xlsx</button></section></div>
-   <section class="panel raw-panel"><div class="panel-heading"><div><h2>Original FAMA records</h2><p>Preview matching source records before exporting.</p></div><label class="all-columns"><input type="checkbox" id="all-columns"> Show all 17 columns</label></div><div class="table-scroll raw-scroll"><table class="data-table raw-table"><thead id="raw-thead"></thead><tbody id="raw-tbody"></tbody></table></div><div class="table-footer"><span id="raw-pagination-text">—</span><div class="pager"><button id="raw-prev" aria-label="Previous records">←</button><button id="raw-next" aria-label="Next records">→</button></div></div></section>
+   <div class="export-grid"><section class="export-tile"><span class="export-symbol">S</span><div><h3>Summary Data <span class="tag">自己分析</span></h3><p>Daily observed averages, grouped by product, grade, level and state.</p></div><button class="outline-button" id="export-summary">下载汇总 Excel .xlsx</button></section><section class="export-tile highlighted"><span class="export-symbol dark">X</span><div><h3>Full Raw Data <span class="tag green">客户核对</span></h3><p>All 17 source fields. No averages, altered source values or invented data.</p></div><button class="dark-button" id="export-raw">下载完整原始 Excel .xlsx</button></section></div>
+   <section class="panel raw-panel"><div class="panel-heading"><div><h2>FAMA 原始调查记录</h2><p>Preview matching source records before exporting.</p></div><label class="all-columns"><input type="checkbox" id="all-columns"> Show all 17 columns</label></div><div class="table-scroll raw-scroll"><table class="data-table raw-table"><thead id="raw-thead"></thead><tbody id="raw-tbody"></tbody></table></div><div class="table-footer"><span id="raw-pagination-text">—</span><div class="pager"><button id="raw-prev" aria-label="Previous records">←</button><button id="raw-next" aria-label="Next records">→</button></div></div></section>
    <p class="footnote">ⓘ Full Raw Data includes the exact original CSV fields in their source order: priceid, tarikh_harga, systemdate, negeri, daerah, lokasi, peringkat, sublevel, kategori, kumpulan, jenis, varieti, gred, unit, harga, average14, supply.</p>
   </section>
  </main>
- <footer><span>BG Agro · FAMA Price Tracker V2 · Original FAMA archive</span><span>Source observations, not official sale quotations.</span></footer>
+ <footer><span>BG Agro · 农产品价格透明系统 · FAMA 原始记录</span><span>市场调查参考数据，不是官方成交报价或明日价格预测。</span></footer>
 </div>
-<div class="overlay" id="drawer-overlay" hidden></div><aside class="product-drawer" id="drawer" hidden role="dialog" aria-modal="true" aria-labelledby="drawer-name"><div class="drawer-top"><span>PRODUCT DETAILS</span><button id="close-drawer" aria-label="Close details">✕</button></div><h2 id="drawer-name">Product</h2><p class="drawer-description" id="drawer-meta">—</p><div class="drawer-levels" id="drawer-levels"></div><h3>Original market observations</h3><p class="drawer-description" id="drawer-records-note">Individual source records for your selection.</p><div id="drawer-records" class="drawer-records"></div><button class="outline-button drawer-watch" id="drawer-watch">☆ Save to Watchlist</button><button class="dark-button drawer-compare" id="drawer-compare">Compare states & history →</button></aside>
+<div class="overlay" id="drawer-overlay" hidden></div><aside class="product-drawer" id="drawer" hidden role="dialog" aria-modal="true" aria-labelledby="drawer-name"><div class="drawer-top"><span>农产品详情 · PRODUCT DETAILS</span><button id="close-drawer" aria-label="Close details">✕</button></div><h2 id="drawer-name">Product</h2><p class="drawer-description" id="drawer-meta">—</p><div class="drawer-levels" id="drawer-levels"></div><h3>Original market observations</h3><p class="drawer-description" id="drawer-records-note">Individual source records for your selection.</p><div id="drawer-records" class="drawer-records"></div><button class="outline-button drawer-watch" id="drawer-watch">☆ Save to Watchlist</button><button class="dark-button drawer-compare" id="drawer-compare">查看各州价格与历史趋势 →</button></aside>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
 /* BG Agro offline Excel (.xlsx) generator. OOXML + ZIP, no network or external runtime dependency. */
@@ -774,8 +985,8 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
   const productKey=r=>[r.varieti,r.gred,r.unit].join('||');
   const dateIso=d=>d.toISOString().slice(0,10);
   const dayOffset=(date,days)=>{const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+days);return dateIso(d);};
-  let records=[],sourceMode='loading',comparator=null,archiveLoader=null,archiveMeta=null,loadInProgress=0,loadErrors=[],drawerKey='',rawPage=0,chartSelected=new Set(),toastTimer;
-  const state={tab:'prices',price:{category:'Sayur-Sayuran',negeri:'',date:'',grade:'',search:'',changeLevel:'Runcit',moverPeriod:1},compare:{product:'',level:'Borong',date:'',period:'30'},market:{negeri:'',daerah:'',search:'',page:0},raw:{from:'',to:'',state:'',level:'',search:'',category:'',grade:'',market:''}};
+  let records=[],sourceMode='loading',comparator=null,archiveLoader=null,archiveMeta=null,loadInProgress=0,loadErrors=[],drawerKey='',drawerContext={date:'',negeri:'',level:'Runcit'},rawPage=0,chartSelected=new Set(),toastTimer;
+  const state={tab:'home',home:{category:'Sayur-Sayuran',negeri:'',date:'',level:'Borong',stateLevel:'Ladang',search:'',sort:'default',visible:12,compareProduct:''},price:{category:'Sayur-Sayuran',negeri:'',date:'',grade:'',search:'',changeLevel:'Runcit',moverPeriod:1},compare:{product:'',level:'Borong',date:'',period:'30'},market:{negeri:'',daerah:'',search:'',page:0},raw:{from:'',to:'',state:'',level:'',search:'',category:'',grade:'',market:''}};
   const WATCH_STORAGE='bg-agro-fama-watchlist-v1',WATCH_MAX=20;
   function readWatchlist(){
     try{const data=JSON.parse(localStorage.getItem(WATCH_STORAGE)||'[]');
@@ -807,6 +1018,19 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     fillSelect('price-state',states(),'All Malaysia',state.price.negeri);
     fillSelect('price-grade',grades(),'All grades',state.price.grade);
     fillSelect('price-date',ds,null,state.price.date||latest);
+    fillSelect('home-date',ds,null,state.home.date||latest);
+    fillSelect('home-state',states(),'全国 · All Malaysia',state.home.negeri);
+    Array.from($('home-state').options).forEach(o=>{if(o.value)o.textContent=stateLabel(o.value);});
+    fillSelect('home-category',categories(),'全部类别',state.home.category);
+    $('home-state').value=state.home.negeri;
+    $('home-category').value=state.home.category||'';
+    const todayFarmKeys=new Set(records.filter(r=>r.tarikh_harga===latest&&r.peringkat==='Ladang').map(productKey));
+    const farmProducts=products().filter(r=>todayFarmKeys.has(productKey(r)));
+    const preferredHome=farmProducts.find(r=>/KACANG BENDI/i.test(r.varieti))||farmProducts[0]||products()[0];
+    fillSelect('home-compare-product',products().map(productKey),null,state.home.compareProduct||productKey(preferredHome||{}));
+    Array.from($('home-compare-product').options).forEach(o=>{const [name,grade,unit]=o.value.split('||');o.textContent=[chineseName(name),name,grade,unit].filter(Boolean).join(' · ');});
+    $('home-level').value=state.home.level;$('home-state-level').value=state.home.stateLevel;
+    $('home-sort').value=state.home.sort;$('home-search').value=state.home.search;
     fillSelect('compare-date',ds,null,state.compare.date||latest);
     fillSelect('compare-product',products().map(r=>productKey(r)),null,state.compare.product||productKey(products()[0]||{}));
     Array.from($('compare-product').options).forEach(o=>{const [variety,grade,unit]=o.value.split('||');o.textContent=[variety,grade,unit].filter(Boolean).join(' · ');});
@@ -825,6 +1049,7 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     $('raw-from').min=min;$('raw-from').max=archiveMeta&&sourceMode!=='local'?archiveMeta.window.max:max;
     $('raw-to').min=min;$('raw-to').max=archiveMeta&&sourceMode!=='local'?archiveMeta.window.max:max;
     $('raw-from').value=state.raw.from;$('raw-to').value=state.raw.to;
+    state.home.date=$('home-date').value;state.home.compareProduct=$('home-compare-product').value;
     state.price.date=$('price-date').value;state.compare.date=$('compare-date').value;state.compare.product=$('compare-product').value;
     $('compare-level').value=state.compare.level;$('compare-period').value=state.compare.period;
     $('raw-level').value=state.raw.level;$('raw-search').value=state.raw.search;$('raw-market').value=state.raw.market;
@@ -837,6 +1062,8 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     $('fresh-loaded').textContent=(sourceMode==='live'||sourceMode==='local')?count:'—';
     $('fresh-range').textContent=observedDates.length?observedDates.at(-1)+' → '+observedDates[0]:'—';
     $('fresh-built').textContent=built;
+    $('home-latest').textContent=last;
+    $('home-status').textContent=sourceMode==='live'?'真实 FAMA CSV · 已载入':sourceMode==='local'?'本地导入的原始 CSV':sourceMode==='error'?'来源暂时不可用':'正在载入原始记录…';
     $('source-badge').classList.toggle('loaded',sourceMode==='live'||sourceMode==='local');
     if(sourceMode==='live'){
       $('source-badge').textContent='● LIVE FAMA DATA';
@@ -856,6 +1083,135 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
       $('source-date').textContent='Connecting to the original FAMA archive…';
       $('source-message').innerHTML='<b>Loading original FAMA records.</b> Please wait for the source files to finish downloading.';
     }
+  }
+  const CHINESE_CROPS=[
+    [/^KACANG BENDI\b/i,'秋葵','🌱'],[/^CILI MERAH\b/i,'红辣椒','🌶️'],[/^CILI HIJAU\b/i,'青辣椒','🌶️'],
+    [/^BAYAM\b/i,'菠菜','🥬'],[/^SAWI HIJAU\b/i,'青芥菜','🥬'],[/^KANGKUNG\b/i,'空心菜','🥬'],
+    [/^KACANG PANJANG\b/i,'长豆','🫛'],[/^KUBIS BULAT\b/i,'包菜','🥬'],[/^TOMATO\b/i,'番茄','🍅'],
+    [/^TIMUN\b/i,'黄瓜','🥒'],[/^TERUNG PANJANG\b/i,'长茄子','🍆'],[/^TEMBIKAI\b/i,'西瓜','🍉'],
+    [/^PISANG\b/i,'香蕉','🍌'],[/^TELUR\b/i,'鸡蛋','🥚'],[/^AYAM\b/i,'鸡','🐓'],[/^DAGING LEMBU\b/i,'牛肉','🥩']
+  ];
+  function chineseName(name){const match=CHINESE_CROPS.find(([pattern])=>pattern.test(String(name||'')));return match?match[1]:'';}
+  const STATE_CN={'PERAK':'霹雳','SELANGOR':'雪兰莪','PULAU PINANG':'槟城','JOHOR':'柔佛','PAHANG':'彭亨','KEDAH':'吉打','KELANTAN':'吉兰丹','TERENGGANU':'登嘉楼','NEGERI SEMBILAN':'森美兰','MELAKA':'马六甲','PERLIS':'玻璃市','SABAH':'沙巴','SARAWAK':'砂拉越','W.P. KUALA LUMPUR':'吉隆坡','W.P. PUTRAJAYA':'布城','W.P. LABUAN':'纳闽'};
+  function stateLabel(name){const cn=STATE_CN[String(name||'').toUpperCase()];return cn?cn+' · '+name:name;}
+  function homeEmoji(r){const hit=CHINESE_CROPS.find(([pattern])=>pattern.test(String(r.varieti||'')));return hit?hit[2]:r.kategori==='Buah-Buahan'?'🍉':r.kategori==='Ternakan'?'🐓':'🌿';}
+  function homeMoney(v){return Number.isFinite(v)?fmt(v):'—';}
+  function homeSigned(v){return !Number.isFinite(v)?'—':(v>0?'+':v<0?'−':'')+'RM '+Math.abs(v).toFixed(2);}
+  function homeDelta(c){
+    if(!c)return '<span class="delta-missing">—</span>';
+    const dir=c.percent>0?'up':c.percent<0?'down':'flat';
+    return '<span class="delta-main '+dir+'">'+(c.percent>0?'▲ +':c.percent<0?'▼ ':'• ')+c.percent.toFixed(1)+'%</span><span class="delta-detail">'+c.markets+' 同市场</span>';
+  }
+  function homeData(){
+    const h=state.home,needle=h.search.trim().toLowerCase();
+    const selected=records.filter(r=>r.tarikh_harga===h.date&&(!h.negeri||r.negeri===h.negeri)&&(!h.category||r.kategori===h.category)
+      &&(!needle||(r.varieti+' '+chineseName(r.varieti)).toLowerCase().includes(needle)));
+    const grouped=new Map();
+    for(const r of selected){
+      const key=productKey(r);
+      if(!grouped.has(key))grouped.set(key,{key,r,levels:{Ladang:[],Borong:[],Runcit:[]}});
+      const entry=grouped.get(key);
+      if(entry.levels[r.peringkat])entry.levels[r.peringkat].push(r);
+    }
+    const items=[...grouped.values()].map(entry=>{
+      const farm=amount(entry.levels.Ladang),wholesale=amount(entry.levels.Borong),retail=amount(entry.levels.Runcit);
+      const validFarm=entry.levels.Ladang.map(r=>number(r.harga)).filter(Number.isFinite);
+      const spread=farm&&wholesale?wholesale.mean-farm.mean:null;
+      return {...entry,farm,wholesale,retail,spread,
+        farmMin:validFarm.length?Math.min(...validFarm):null,farmMax:validFarm.length?Math.max(...validFarm):null,
+        changes:{1:comparator.compare(entry.key,h.date,1,h.level,h.negeri),7:comparator.compare(entry.key,h.date,7,h.level,h.negeri),30:comparator.compare(entry.key,h.date,30,h.level,h.negeri)}};
+    });
+    const priorities=['KACANG BENDI','CILI MERAH','BAYAM','SAWI','KUBIS','TOMATO','KANGKUNG','TIMUN','TERUNG','KACANG PANJANG','LOBAK','TEMBIKAI'];
+    const rank=item=>{const name=item.r.varieti.toUpperCase(),idx=priorities.findIndex(p=>name.startsWith(p));return idx<0?999:idx;};
+    items.sort((a,b)=>{
+      const aFarm=a.farm?.mean,bFarm=b.farm?.mean,aSpread=a.spread,bSpread=b.spread,aChange=a.changes[1]?.percent,bChange=b.changes[1]?.percent;
+      if(h.sort==='farm-high')return (bFarm??-Infinity)-(aFarm??-Infinity)||a.r.varieti.localeCompare(b.r.varieti);
+      if(h.sort==='farm-low')return (aFarm??Infinity)-(bFarm??Infinity)||a.r.varieti.localeCompare(b.r.varieti);
+      if(h.sort==='spread-high')return (bSpread??-Infinity)-(aSpread??-Infinity)||a.r.varieti.localeCompare(b.r.varieti);
+      if(h.sort==='change-high')return (bChange??-Infinity)-(aChange??-Infinity)||a.r.varieti.localeCompare(b.r.varieti);
+      if(h.sort==='change-down')return (aChange??Infinity)-(bChange??Infinity)||a.r.varieti.localeCompare(b.r.varieti);
+      return rank(a)-rank(b)||a.r.varieti.localeCompare(b.r.varieti);
+    });
+    return {items,selected};
+  }
+  function renderHomeStateBars(){
+    const h=state.home;
+    const rows=records.filter(r=>r.tarikh_harga===h.date&&productKey(r)===h.compareProduct&&r.peringkat===h.stateLevel);
+    const byState=new Map();
+    for(const r of rows){if(!byState.has(r.negeri))byState.set(r.negeri,[]);byState.get(r.negeri).push(r);}
+    const ranked=[...byState].map(([name,subset])=>({name,price:amount(subset)})).filter(x=>x.price).sort((a,b)=>b.price.mean-a.price.mean);
+    if(!ranked.length){
+      $('home-state-bars').innerHTML='<p class="home-empty">该日期、品种及层级没有可用的州属记录。请选择另一种农产品或改看批发价。</p>';
+      $('home-state-foot').textContent='没有记录不代表价格为 RM0。';
+      return;
+    }
+    const max=Math.max(1,...ranked.map(x=>x.price.mean));
+    $('home-state-bars').innerHTML=ranked.map(({name,price},i)=>
+      '<div class="home-state-row"><span>'+(i===0?'🏅 ':'')+escapeHtml(stateLabel(name))+'</span><div class="home-state-track"><div class="home-state-fill" style="width:'+(price.mean/max*100).toFixed(1)+'%"></div></div><strong>'+homeMoney(price.mean)+'</strong><small>'+price.markets+' 个市场 · '+price.n+' 条记录 · '+escapeHtml(h.date)+'</small></div>'
+    ).join('');
+    $('home-state-foot').textContent='只展示实际有记录的州属 · '+h.stateLevel+' · '+h.date+' · 不含运输或交易费用。';
+  }
+  function renderHomeSummary(data){
+    data=data||homeData();
+    const h=state.home,rows=data.items.slice(0,12);
+    $('home-summary-desc').textContent='FAMA 调查日期：'+(h.date||'—')+' · '+(h.negeri?stateLabel(h.negeri):'全国')+' · '+(h.category||'全部类别');
+    $('home-summary-meta').textContent='展示 '+rows.length+' / '+data.items.length+' 项产品规格 · 比较层级 '+h.level+' · 原始记录 '+data.selected.length.toLocaleString()+' 条 · 缺失数据不估算';
+    const p=c=>c?(c.percent>0?'+':'')+c.percent.toFixed(1)+'%':'—';
+    $('home-summary-rows').innerHTML=rows.length?rows.map(item=>
+      '<tr><td><strong>'+escapeHtml(chineseName(item.r.varieti)||item.r.varieti)+'</strong><br><small>'+escapeHtml(item.r.varieti)+' · '+escapeHtml(item.r.gred)+' · '+escapeHtml(item.r.unit)+'</small></td><td>'+homeMoney(item.farm?.mean)+'</td><td>'+homeMoney(item.wholesale?.mean)+'</td><td>'+homeMoney(item.retail?.mean)+'</td><td>'+p(item.changes[1])+'</td><td>'+p(item.changes[7])+'</td><td>'+p(item.changes[30])+'</td></tr>'
+    ).join(''):'<tr><td colspan="7">所选日期及筛选条件没有原始记录。</td></tr>';
+  }
+  function renderHome(){
+    const h=state.home,{items,selected}=homeData();
+    const markets=new Set(selected.map(r=>[r.negeri,r.daerah,r.lokasi,r.sublevel].join('||'))).size;
+    const comparable=items.filter(item=>item.changes[1]);
+    const rises=comparable.filter(item=>item.changes[1].percent>0).length;
+    const falls=comparable.filter(item=>item.changes[1].percent<0).length;
+    $('home-metrics').innerHTML=[
+      ['可查询产品规格',items.length.toLocaleString()+' 种','相同品种、等级、单位单独计算'],
+      ['调查市场',markets.toLocaleString()+' 个',selected.length.toLocaleString()+' 条原始记录'],
+      ['单日上涨',rises.toLocaleString()+' 种','在 '+comparable.length+' 种同市场可比规格中'],
+      ['单日下跌',falls.toLocaleString()+' 种',h.level+' · 精确比较前一天']
+    ].map(([label,value,foot])=>'<div class="home-metric"><span>'+label+'</span><strong>'+value+'</strong><small>'+foot+'</small></div>').join('');
+    const top=[...comparable].sort((a,b)=>Math.abs(b.changes[1].percent)-Math.abs(a.changes[1].percent))[0];
+    if(top){
+      $('home-insight-title').textContent=(chineseName(top.r.varieti)||top.r.varieti)+' · '+(top.changes[1].percent>0?'上涨':'下跌')+' '+Math.abs(top.changes[1].percent).toFixed(1)+'%';
+      $('home-insight-desc').textContent='截至 '+h.date+' · '+h.level+' · '+top.changes[1].markets+' 个同市场可比观察值。这是调查记录变化，不是明日预测。';
+    }else{
+      $('home-insight-title').textContent=items.length?'已载入 '+items.length+' 种产品规格':'请调整日期或搜索条件';
+      $('home-insight-desc').textContent='当前条件下没有可计算的单日同市场变化。缺失日期不视作 0% 或估计价格。';
+    }
+    $('home-card-count').textContent='显示 '+Math.min(h.visible,items.length)+' / '+items.length+' 种产品规格 · 调查日期 '+(h.date||'—');
+    $('home-more').hidden=items.length<=h.visible;
+    const cards=items.slice(0,h.visible);
+    $('home-cards').innerHTML=cards.length?cards.map(item=>{
+      const r=item.r,cn=chineseName(r.varieti),change=item.changes[1],dir=change?(change.percent>0?'up':change.percent<0?'down':'flat'):'na';
+      const changeText=change?(change.percent>0?'▲ +':change.percent<0?'▼ ':'• ')+change.percent.toFixed(1)+'%':'1 日暂无可比数据';
+      const spread=Number.isFinite(item.spread)?homeSigned(item.spread):'—';
+      const grade=[r.gred,r.unit].filter(Boolean).join(' · ');
+      return '<article class="home-card"><div class="home-card-top"><span class="home-card-emoji" aria-hidden="true">'+homeEmoji(r)+'</span><div class="home-card-title"><h3>'+escapeHtml(cn||r.varieti)+'</h3><small>'+escapeHtml(cn?r.varieti:r.kategori)+'</small><span class="home-card-tag">'+escapeHtml(grade)+'</span></div></div>'+
+        '<div class="home-card-prices"><div class="home-card-price"><span>🌿 农场均价 · Ladang</span><strong>'+homeMoney(item.farm?.mean)+'</strong><small>'+(item.farm?item.farm.markets+' 个市场 · '+item.farm.n+' 笔':'该层级没有记录')+'</small></div>'+
+        '<div class="home-card-price wholesale"><span>🏬 批发均价 · Borong</span><strong>'+homeMoney(item.wholesale?.mean)+'</strong><small>'+(item.wholesale?item.wholesale.markets+' 个市场 · '+item.wholesale.n+' 笔':'该层级没有记录')+'</small></div></div>'+
+        '<div class="home-card-spread"><span>两层级调查均价差</span><strong>'+spread+'</strong></div>'+
+        '<div class="home-card-bottom"><span><span class="home-card-change '+dir+'">'+changeText+'</span><br>'+escapeHtml(h.level)+' · '+escapeHtml(h.date)+'</span><button type="button" data-home-key="'+escapeHtml(item.key)+'">查看市场 ↗</button></div></article>';
+    }).join(''):'<div class="home-empty">所选日期或条件没有匹配的原始 FAMA 记录。换日期、类别或州属再试。</div>';
+    $('home-table-count').textContent=items.length+' 项产品规格';
+    $('home-table-foot').textContent='比较层级 '+h.level+' · '+(h.date||'—')+' · 同市场对比';
+    const avg=a=>a?'<span class="price-value">'+homeMoney(a.mean)+'</span><span class="price-count">'+a.markets+' 个市场 · '+a.n+' 笔</span>':'<span class="price-missing">—</span>';
+    $('home-table-rows').innerHTML=items.length?items.map(item=>{
+      const r=item.r,cn=chineseName(r.varieti),range=Number.isFinite(item.farmMin)?homeMoney(item.farmMin)+' – '+homeMoney(item.farmMax):'—';
+      return '<tr><td><span class="product-name">'+escapeHtml(cn||r.varieti)+'</span><span class="product-extra">'+escapeHtml(r.varieti)+'</span></td><td>'+escapeHtml(r.gred)+' · '+escapeHtml(r.unit)+'</td><td class="price-col">'+avg(item.farm)+'</td><td class="price-col">'+range+'</td><td class="price-col">'+avg(item.wholesale)+'</td><td class="price-col">'+avg(item.retail)+'</td><td class="price-col">'+homeSigned(item.spread)+'</td><td class="delta-col">'+homeDelta(item.changes[1])+'</td><td class="delta-col">'+homeDelta(item.changes[7])+'</td><td class="delta-col">'+homeDelta(item.changes[30])+'</td><td><button type="button" class="text-button" data-home-key="'+escapeHtml(item.key)+'">详情 ↗</button></td></tr>';
+    }).join(''):'<tr><td colspan="11" class="empty-cell">没有符合条件的原始 FAMA 数据。</td></tr>';
+    renderHomeStateBars();
+    if(!$('home-summary-panel').hidden)renderHomeSummary({items,selected});
+  }
+  async function ensureHomeContext(){
+    if(sourceMode==='live'&&state.home.date){
+      const d=state.home.date;
+      await loadRequiredDates([d,dayOffset(d,-1),dayOffset(d,-7),dayOffset(d,-30)],'正在加载指定日期及可比价格');
+      initFilters();
+    }
+    renderHome();
   }
   function renderTopMovers(groups,changes){
     const period=state.price.moverPeriod;
@@ -937,17 +1293,21 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     state.price.negeri=item.state;state.price.category='';$('price-search').value=state.price.search;
     onTab('prices');showDrawer(item.key);
   }
-  function showDrawer(key){
-    drawerKey=key;const [name,grade,unit]=key.split('||');const rows=records.filter(r=>productKey(r)===key&&r.tarikh_harga===state.price.date&&(!state.price.negeri||r.negeri===state.price.negeri));
-    $('drawer-name').textContent=name;$('drawer-meta').textContent=[grade,unit,state.price.negeri||'All Malaysia',state.price.date].join(' · ');
-    $('drawer-levels').innerHTML=LEVELS.map(level=>{const a=amount(rows.filter(r=>r.peringkat===level));return '<div class="drawer-level"><span>'+level+'</span><strong>'+(a?fmt(a.mean):'—')+'</strong><small>'+(a?a.n+' source rows':'No record')+'</small></div>';}).join('');
-    $('drawer-watch').textContent=watchlist.some(item=>item.key===key&&item.state===state.price.negeri&&item.level===state.price.changeLevel)?'✓ Already in My Watchlist':'☆ Save to Watchlist';
-    $('drawer-records-note').textContent=rows.length.toLocaleString()+' original source records for this selection. Scroll to inspect all of them.';
-    $('drawer-records').innerHTML=rows.length?rows.sort((a,b)=>a.lokasi.localeCompare(b.lokasi)).map(r=>'<div class="drawer-record"><div><strong>'+escapeHtml(r.lokasi)+'</strong><small>'+escapeHtml(r.negeri)+' · '+escapeHtml(r.daerah)+' · '+escapeHtml(r.peringkat)+'</small></div><b>'+fmt(r.harga)+'</b></div>').join(''):'<div class="drawer-record">No original observations.</div>';
+  function showDrawer(key,context={}){
+    drawerKey=key;
+    drawerContext={date:context.date||state.price.date,negeri:context.negeri===undefined?state.price.negeri:context.negeri,level:context.level||state.price.changeLevel};
+    const [name,grade,unit]=key.split('||');
+    const rows=records.filter(r=>productKey(r)===key&&r.tarikh_harga===drawerContext.date&&(!drawerContext.negeri||r.negeri===drawerContext.negeri));
+    $('drawer-name').textContent=chineseName(name)?chineseName(name)+' · '+name:name;
+    $('drawer-meta').textContent=[grade,unit,drawerContext.negeri||'全国',drawerContext.date].join(' · ');
+    $('drawer-levels').innerHTML=LEVELS.map(level=>{const a=amount(rows.filter(r=>r.peringkat===level));return '<div class="drawer-level"><span>'+level+'</span><strong>'+(a?fmt(a.mean):'—')+'</strong><small>'+(a?a.n+' 条原始记录':'该层级没有记录')+'</small></div>';}).join('');
+    $('drawer-watch').textContent=watchlist.some(item=>item.key===key&&item.state===drawerContext.negeri&&item.level===drawerContext.level)?'✓ 已在我的关注中':'☆ 加入我的关注';
+    $('drawer-records-note').textContent=rows.length.toLocaleString()+' 条原始市场记录 · 可以滚动查看全部。';
+    $('drawer-records').innerHTML=rows.length?rows.sort((a,b)=>a.lokasi.localeCompare(b.lokasi)).map(r=>'<div class="drawer-record"><div><strong>'+escapeHtml(r.lokasi)+'</strong><small>'+escapeHtml(r.negeri)+' · '+escapeHtml(r.daerah)+' · '+escapeHtml(r.peringkat)+'</small></div><b>'+(Number.isFinite(number(r.harga))?fmt(r.harga):'—')+'</b></div>').join(''):'<div class="drawer-record">此日期没有原始市场记录。</div>';
     $('drawer').hidden=false;$('drawer-overlay').hidden=false;document.body.style.overflow='hidden';
   }
   function closeDrawer(){$('drawer').hidden=true;$('drawer-overlay').hidden=true;document.body.style.overflow='';}
-  function onTab(name){state.tab=name;document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));closeDrawer();if(name==='prices')renderPrices();if(name==='compare')ensureCompareContext().catch(e=>toast(e.message));if(name==='watchlist')renderWatchlist();if(name==='data')renderRaw();window.scrollTo({top:0,behavior:'smooth'});}
+  function onTab(name){state.tab=name;document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));closeDrawer();if(name==='home')renderHome();if(name==='prices')renderPrices();if(name==='compare')ensureCompareContext().catch(e=>toast(e.message));if(name==='watchlist')renderWatchlist();if(name==='data')renderRaw();window.scrollTo({top:0,behavior:'smooth'});}
   function chartSVG(points,activeStates,from,to){
     const pad={l:50,t:21,r:16,b:43},width=730,height=310,plotW=width-pad.l-pad.r,plotH=height-pad.t-pad.b;
     const ms=t=>Date.parse(t+'T12:00:00Z'),minX=ms(from),maxX=ms(to),spanX=Math.max(86400000,maxX-minX);
@@ -1077,8 +1437,8 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
       if(!loader.records.size)throw Error('No original FAMA price rows could be retrieved.');
       archiveMeta=meta;archiveLoader=loader;loadErrors=result.errors;
       sourceMode='live';replaceRecordsFromArchive();
-      state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';
-      chartSelected.clear();rawPage=0;initFilters();displaySource();onTab('prices');
+      state.home.date='';state.home.compareProduct='';state.home.visible=12;state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';
+      chartSelected.clear();rawPage=0;initFilters();displaySource();onTab('home');
       if(result.errors.length)toast('Live data loaded, but '+result.errors.length+' dates failed. Retry before exporting those dates.');
     }catch(error){
       if(previous.mode==='live'){
@@ -1143,8 +1503,8 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     for(const r of combined){if(!/^\d{4}-\d{2}-\d{2}$/.test(r.tarikh_harga)||!Number.isFinite(number(r.harga)))continue;
       const key=r.priceid||COLUMNS.map(c=>r[c]).join('|');if(seen.has(key))continue;seen.add(key);valid.push(r);}
     if(!valid.length){displaySource();toast('No records with valid date and price found.');return;}
-    records=valid;comparator=new BGAgroCompare.MatchedMarketComparator(records);sourceMode='local';state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';state.raw.category='';state.raw.grade='';state.raw.state='';state.price.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';chartSelected.clear();rawPage=0;
-    initFilters();displaySource();onTab('prices');toast(valid.length.toLocaleString()+' original records loaded locally.'+(errors.length?' '+errors.length+' files skipped.':''));
+    records=valid;comparator=new BGAgroCompare.MatchedMarketComparator(records);sourceMode='local';state.home.date='';state.home.compareProduct='';state.home.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';state.home.visible=12;state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';state.raw.category='';state.raw.grade='';state.raw.state='';state.price.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';chartSelected.clear();rawPage=0;
+    initFilters();displaySource();onTab('home');toast(valid.length.toLocaleString()+' original records loaded locally.'+(errors.length?' '+errors.length+' files skipped.':''));
   }
   async function exportExcel(raw){
     if(sourceMode!=='live'&&sourceMode!=='local'){toast('Load real FAMA data first, or import original CSV files.');return;}
@@ -1175,6 +1535,23 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
   }
   function bind(){
     document.querySelectorAll('.nav-tab').forEach(b=>b.addEventListener('click',()=>onTab(b.dataset.tab)));
+    for(const [id,key] of [['home-state','negeri'],['home-category','category'],['home-level','level'],['home-sort','sort'],['home-search','search']]){
+      $(id).addEventListener(id==='home-search'?'input':'change',e=>{state.home[key]=e.target.value;state.home.visible=12;renderHome();});
+    }
+    $('home-date').addEventListener('change',e=>{state.home.date=e.target.value;state.home.visible=12;ensureHomeContext().catch(err=>toast('无法加载指定日期：'+err.message));});
+    $('home-more').addEventListener('click',()=>{state.home.visible+=12;renderHome();});
+    const openHomeDetail=e=>{const b=e.target.closest('button[data-home-key]');if(b)showDrawer(b.dataset.homeKey,{date:state.home.date,negeri:state.home.negeri,level:state.home.level});};
+    $('home-cards').addEventListener('click',openHomeDetail);
+    $('home-table-rows').addEventListener('click',openHomeDetail);
+    $('home-compare-product').addEventListener('change',e=>{state.home.compareProduct=e.target.value;renderHomeStateBars();});
+    $('home-state-level').addEventListener('change',e=>{state.home.stateLevel=e.target.value;renderHomeStateBars();});
+    $('home-summary-toggle').addEventListener('click',()=>{
+      const panel=$('home-summary-panel');panel.hidden=!panel.hidden;
+      $('home-summary-toggle').textContent=panel.hidden?'▤ 一页价格总结 / PDF':'收起一页总结';
+      if(!panel.hidden){renderHomeSummary();panel.scrollIntoView({behavior:'smooth',block:'start'});}
+    });
+    $('home-summary-close').addEventListener('click',()=>{$('home-summary-panel').hidden=true;$('home-summary-toggle').textContent='▤ 一页价格总结 / PDF';});
+    $('home-print').addEventListener('click',()=>{renderHomeSummary();window.print();});
     document.querySelectorAll('.mover-period').forEach(b=>b.addEventListener('click',()=>{state.price.moverPeriod=Number(b.dataset.days);renderPrices();}));
     document.querySelectorAll('.level-option').forEach(b=>b.addEventListener('click',()=>{state.price.changeLevel=b.dataset.level;renderPrices();}));
     $('import-button').addEventListener('click',()=>$('csv-picker').click());
@@ -1201,8 +1578,8 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     $('raw-prev').addEventListener('click',()=>{rawPage--;renderRaw();});$('raw-next').addEventListener('click',()=>{rawPage++;renderRaw();});
     $('export-raw').addEventListener('click',()=>exportExcel(true));$('export-summary').addEventListener('click',()=>exportExcel(false));
     $('close-drawer').addEventListener('click',closeDrawer);$('drawer-overlay').addEventListener('click',closeDrawer);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
-    $('drawer-watch').addEventListener('click',()=>{addWatch(drawerKey,state.price.negeri,state.price.changeLevel);$('drawer-watch').textContent='✓ Already in My Watchlist';});
-    $('drawer-compare').addEventListener('click',()=>{state.compare.product=drawerKey;$('compare-product').value=drawerKey;state.compare.date=state.price.date;$('compare-date').value=state.compare.date;chartSelected.clear();onTab('compare');});
+    $('drawer-watch').addEventListener('click',()=>{addWatch(drawerKey,drawerContext.negeri,drawerContext.level);$('drawer-watch').textContent='✓ 已在我的关注中';});
+    $('drawer-compare').addEventListener('click',()=>{state.compare.product=drawerKey;$('compare-product').value=drawerKey;state.compare.date=drawerContext.date;$('compare-date').value=state.compare.date;state.compare.level=drawerContext.level;$('compare-level').value=drawerContext.level;chartSelected.clear();onTab('compare');});
   }
   comparator=new BGAgroCompare.MatchedMarketComparator(records);
   displaySource();bind();loadLive();
