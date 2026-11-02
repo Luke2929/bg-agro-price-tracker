@@ -3,7 +3,7 @@
 <head>
  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
  <meta name="theme-color" content="#f5f7f4">
- <meta name="description" content="BG Agro FAMA price tracker private V2 design preview. Example figures only until CSV import.">
+ <meta name="description" content="BG Agro FAMA price tracker with automatically refreshed original FAMA market records.">
  <title>BG Agro · FAMA Price Tracker V2</title>
  <style>
 :root {
@@ -311,6 +311,8 @@ h2{font-size:18px;letter-spacing:-.4px;color:#203b33;font-weight:760;margin-bott
 .state-fill{background:linear-gradient(90deg,#91cbaa,#397b60)}
 .state-line small{font-size:11px;color:#718579}
 .raw-filter-foot{font-size:12px;color:#426d52}
+.raw-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+.raw-actions .outline-button{min-height:36px;padding:7px 12px;font-size:11px}
 .text-button{font-size:12px;color:#32664d}
 .export-tile{border-radius:16px;padding:24px;gap:15px}
 .export-tile.highlighted{background:#f1f8f2;border-color:#cbe0ce}
@@ -351,6 +353,9 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
   .data-table th{font-size:11px}.data-table td{font-size:12px}
   .price-table{min-width:1330px}.table-footer{padding:14px 16px;font-size:11px}
   .export-tile{padding:18px}.export-tile h3{font-size:15px}.product-drawer{padding:22px}
+  .header-actions{gap:6px}.header-actions .outline-button,.header-actions .dark-button{padding:8px 9px;min-height:37px;font-size:10px}
+  .raw-filter-foot{align-items:flex-start;flex-direction:column;gap:9px}.raw-actions{justify-content:flex-start}
+  .movers-tabs{flex-wrap:wrap;white-space:normal}
   footer{font-size:10px}
 }
 
@@ -362,15 +367,15 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
  <header class="topbar">
   <div class="brand"><span class="brand-symbol">✳</span><span><strong>BG Agro</strong><small>FAMA Price Tracker <b>V2</b></small></span></div>
   <nav class="nav-tabs" aria-label="Dashboard pages"><button class="nav-tab active" data-tab="prices">Prices</button><button class="nav-tab" data-tab="compare">Compare & Trends</button><button class="nav-tab" data-tab="data">Data & Export</button></nav>
-  <div class="header-actions"><span id="source-badge" class="source-badge">● DEMO PREVIEW</span><button class="dark-button" id="import-button">↥ Import CSV</button></div>
+  <div class="header-actions"><span id="source-badge" class="source-badge">● CONNECTING</span><button class="outline-button" id="import-button">↥ Import CSV</button><button class="dark-button" id="refresh-live">↻ Refresh Live</button></div>
  </header>
  <input type="file" id="csv-picker" accept=".csv,text/csv" multiple hidden>
- <div class="source-banner"><span class="status-pip"></span><p id="source-message"><b>Design preview.</b> All prices are fictional examples. Import original FAMA daily CSV files to inspect real records in this browser.</p><span id="source-date" class="source-date">Source: sample data</span></div>
+ <div class="source-banner"><span class="status-pip"></span><p id="source-message" aria-live="polite"><b>Connecting to FAMA archive…</b> Loading original CSV records from your GitHub repository.</p><span id="source-date" class="source-date">Checking latest FAMA survey date…</span></div>
  <main>
   <section class="screen active" data-screen="prices">
    <div class="page-intro"><div><span class="eyebrow">MARKET DATA / PRICE LOOKUP</span><h1>Market prices</h1><p>Find a product. Check its farm, wholesale and retail prices.</p></div><div class="date-stamp"><span>SELECTED PRICE DATE</span><strong id="price-date-stamp">—</strong><small>FAMA survey date</small></div></div>
    <div class="filter-box"><label class="field field-search"><span>SEARCH PRODUCT</span><input id="price-search" type="search" placeholder="BAYAM, CILI MERAH, KUBIS…"></label><label class="field"><span>CATEGORY</span><select id="price-category"></select></label><label class="field"><span>STATE</span><select id="price-state"></select></label><label class="field"><span>PRICE DATE</span><select id="price-date"></select></label></div>
-   <section class="panel movers-panel"><div class="panel-heading movers-heading"><div><h2>Top movers</h2><p>Biggest recorded price changes · same markets on both dates</p></div><div class="movers-tabs" role="group" aria-label="Top movers comparison period"><button class="mover-period active" data-days="1">1-Day Movers</button><button class="mover-period" data-days="7">7-Day Movers</button></div></div><div class="mover-content" id="mover-content"></div><div class="mover-foot" id="mover-foot">Calculated from matching market observations only.</div></section>
+   <section class="panel movers-panel"><div class="panel-heading movers-heading"><div><h2>Top movers</h2><p>Biggest recorded price changes · same markets on both dates</p></div><div class="movers-tabs" role="group" aria-label="Top movers comparison period"><button class="mover-period active" data-days="1">1-Day Movers</button><button class="mover-period" data-days="7">7-Day Movers</button><button class="mover-period" data-days="30">30-Day Movers</button></div></div><div class="mover-content" id="mover-content"></div><div class="mover-foot" id="mover-foot">Calculated from matching market observations only.</div></section>
    <section class="panel"><div class="panel-heading"><div><h2>All product prices</h2><p>Actual survey prices and comparable historical price changes.</p></div><div class="panel-tools"><label class="minor-field">GRADE <select id="price-grade"></select></label><div class="level-pills" role="group" aria-label="Price level for change comparison"><button class="level-option" data-level="Ladang">Ladang</button><button class="level-option" data-level="Borong">Borong</button><button class="level-option active" data-level="Runcit">Runcit</button></div><span class="count-pill" id="price-count">— products</span></div></div><div class="table-scroll"><table class="data-table price-table"><thead><tr><th>PRODUCT / VARIETY</th><th>GRADE</th><th>UNIT</th><th class="price-col">LADANG<small>Farm</small></th><th class="price-col">BORONG<small>Wholesale</small></th><th class="price-col">RUNCIT<small>Retail</small></th><th class="delta-col">Δ 1D<small>vs yesterday</small></th><th class="delta-col">Δ 7D<small>vs 7 days ago</small></th><th class="delta-col">Δ 30D<small>vs 30 days ago</small></th><th>SURVEY DATE</th><th></th></tr></thead><tbody id="price-rows"></tbody></table></div><div class="table-footer"><span id="price-table-foot">Click a vegetable to see its original market observations.</span><span>Changes: matched markets only · selected level</span></div></section>
    <p class="footnote">ⓘ Price changes compare the same product, grade, unit, price level and market on the selected date versus exactly 1, 7 or 30 calendar days earlier. Missing comparisons show —; they are not treated as 0% or filled with older observations. Headline price averages can cover more markets than the matched-market change.</p>
   </section>
@@ -382,13 +387,13 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
   </section>
   <section class="screen" data-screen="data">
    <div class="page-intro"><div><span class="eyebrow">SOURCE DATA / CUSTOMER EXPORT</span><h1>Data & export</h1><p>Browse and download exactly the rows your customer needs.</p></div><span class="light-label">All 17 original FAMA columns</span></div>
-   <div class="filter-box raw-filters"><label class="field"><span>FROM DATE</span><input type="date" id="raw-from"></label><label class="field"><span>TO DATE</span><input type="date" id="raw-to"></label><label class="field"><span>STATE</span><select id="raw-state"></select></label><label class="field"><span>PRICE LEVEL</span><select id="raw-level"><option value="">All levels</option><option>Ladang</option><option>Borong</option><option>Runcit</option></select></label><label class="field"><span>PRODUCT SEARCH</span><input id="raw-search" placeholder="Any vegetable or product"></label><label class="field"><span>CATEGORY</span><select id="raw-category"></select></label><label class="field"><span>GRADE</span><select id="raw-grade"></select></label><label class="field"><span>MARKET / DISTRICT</span><input id="raw-market" placeholder="Daerah or lokasi"></label><div class="raw-filter-foot"><span id="raw-match-count">— matching original rows</span><button id="raw-reset" class="text-button">Clear filters</button></div></div>
+   <div class="filter-box raw-filters"><label class="field"><span>FROM DATE</span><input type="date" id="raw-from"></label><label class="field"><span>TO DATE</span><input type="date" id="raw-to"></label><label class="field"><span>STATE</span><select id="raw-state"></select></label><label class="field"><span>PRICE LEVEL</span><select id="raw-level"><option value="">All levels</option><option>Ladang</option><option>Borong</option><option>Runcit</option></select></label><label class="field"><span>PRODUCT SEARCH</span><input id="raw-search" placeholder="Any vegetable or product"></label><label class="field"><span>CATEGORY</span><select id="raw-category"></select></label><label class="field"><span>GRADE</span><select id="raw-grade"></select></label><label class="field"><span>MARKET / DISTRICT</span><input id="raw-market" placeholder="Daerah or lokasi"></label><div class="raw-filter-foot"><span id="raw-match-count">— matching original rows</span><div class="raw-actions"><button id="load-raw-range" class="outline-button">Load selected range</button><button id="raw-reset" class="text-button">Clear filters</button></div></div></div>
    <div class="export-grid"><section class="export-tile"><span class="export-symbol">S</span><div><h3>Summary Data <span class="tag">FOR YOU</span></h3><p>Daily observed averages, grouped by product, grade, level and state.</p></div><button class="outline-button" id="export-summary">Download Summary .xlsx</button></section><section class="export-tile highlighted"><span class="export-symbol dark">X</span><div><h3>Full Raw Data <span class="tag green">FOR CUSTOMERS</span></h3><p>All 17 source fields. No averages, altered source values or invented data.</p></div><button class="dark-button" id="export-raw">Download Full Raw .xlsx</button></section></div>
    <section class="panel raw-panel"><div class="panel-heading"><div><h2>Original FAMA records</h2><p>Preview matching source records before exporting.</p></div><label class="all-columns"><input type="checkbox" id="all-columns"> Show all 17 columns</label></div><div class="table-scroll raw-scroll"><table class="data-table raw-table"><thead id="raw-thead"></thead><tbody id="raw-tbody"></tbody></table></div><div class="table-footer"><span id="raw-pagination-text">—</span><div class="pager"><button id="raw-prev" aria-label="Previous records">←</button><button id="raw-next" aria-label="Next records">→</button></div></div></section>
    <p class="footnote">ⓘ Full Raw Data includes the exact original CSV fields in their source order: priceid, tarikh_harga, systemdate, negeri, daerah, lokasi, peringkat, sublevel, kategori, kumpulan, jenis, varieti, gred, unit, harga, average14, supply.</p>
   </section>
  </main>
- <footer><span>BG Agro · FAMA Price Tracker V2 · Private design prototype</span><span>Source observations, not official sale quotations.</span></footer>
+ <footer><span>BG Agro · FAMA Price Tracker V2 · Original FAMA archive</span><span>Source observations, not official sale quotations.</span></footer>
 </div>
 <div class="overlay" id="drawer-overlay" hidden></div><aside class="product-drawer" id="drawer" hidden role="dialog" aria-modal="true" aria-labelledby="drawer-name"><div class="drawer-top"><span>PRODUCT DETAILS</span><button id="close-drawer" aria-label="Close details">✕</button></div><h2 id="drawer-name">Product</h2><p class="drawer-description" id="drawer-meta">—</p><div class="drawer-levels" id="drawer-levels"></div><h3>Original market observations</h3><p class="drawer-description">Individual source records for your selection.</p><div id="drawer-records" class="drawer-records"></div><button class="dark-button drawer-compare" id="drawer-compare">Compare states & history →</button></aside>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -597,30 +602,95 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
 
 </script>
 <script>
+/* Fetch original FAMA daily CSVs on demand; no fabricated fallback observations. */
+(function(root){
+  'use strict';
+  const ISO=/^\d{4}-\d{2}-\d{2}$/;
+  const previous=(date,days)=>{
+    const d=new Date(date+'T12:00:00Z');
+    if(!ISO.test(date)||!Number.isFinite(d.getTime()))throw Error('Invalid archive date: '+date);
+    d.setUTCDate(d.getUTCDate()-days);
+    return d.toISOString().slice(0,10);
+  };
+  function range(from,to){
+    if(!ISO.test(from)||!ISO.test(to)||from>to)throw Error('Select a valid date range (From must not exceed To).');
+    const days=[];
+    for(let d=from;d<=to;d=previous(d,-1)){
+      days.push(d);
+      if(days.length>3660)throw Error('This range is too large for a browser download.');
+    }
+    return days;
+  }
+  class ArchiveLoader{
+    constructor({fetcher,parseCSV,baseUrl,revision='',maxConcurrency=5}){
+      if(typeof fetcher!=='function'||typeof parseCSV!=='function')throw Error('ArchiveLoader requires fetch and CSV parser.');
+      this.fetcher=fetcher;this.parseCSV=parseCSV;this.baseUrl=baseUrl.replace(/\/+$/,'')+'/';
+      this.revision=revision;this.maxConcurrency=maxConcurrency;
+      this.loaded=new Set();this.absent=new Set();this.pending=new Map();this.records=new Map();
+    }
+    hasDate(date){return this.loaded.has(date)||this.absent.has(date);}
+    missingDates(from,to){return range(from,to).filter(d=>!this.hasDate(d));}
+    rows(){return [...this.records.values()];}
+    async fetchDate(date){
+      if(this.hasDate(date))return;
+      if(this.pending.has(date))return this.pending.get(date);
+      const promise=this.download(date).finally(()=>this.pending.delete(date));
+      this.pending.set(date,promise);
+      return promise;
+    }
+    async download(date){
+      const url=this.baseUrl+encodeURIComponent(date)+'.csv?rev='+encodeURIComponent(this.revision);
+      let lastError;
+      for(let attempt=0;attempt<3;attempt++){
+        try{
+          const response=await this.fetcher(url);
+          if(response.status===404){this.absent.add(date);return;}
+          if(!response.ok)throw Error('HTTP '+response.status+' loading '+date);
+          const rows=this.parseCSV(await response.text());
+          if(rows.some(r=>r.tarikh_harga!==date))throw Error('Date mismatch in original CSV for '+date);
+          for(const r of rows){
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(r.tarikh_harga))continue;
+            if(!String(r.harga).trim()||!Number.isFinite(Number(r.harga)))continue;
+            const key=r.priceid||[r.tarikh_harga,r.negeri,r.lokasi,r.varieti,r.gred,r.peringkat].join('|');
+            this.records.set(key,r);
+          }
+          this.loaded.add(date);
+          return;
+        }catch(err){
+          lastError=err;
+          if(attempt<2)await new Promise(resolve=>setTimeout(resolve,400*(attempt+1)));
+        }
+      }
+      throw lastError;
+    }
+    async loadDates(dates,{onProgress}={}){
+      const requested=[...new Set(dates)].filter(d=>!this.hasDate(d));
+      let completed=0,next=0;const errors=[];
+      const worker=async()=>{
+        while(next<requested.length){
+          const date=requested[next++];
+          try{await this.fetchDate(date);}catch(error){errors.push({date,message:error.message});}
+          completed++;
+          if(onProgress)onProgress({completed,total:requested.length,date,failed:errors.length});
+        }
+      };
+      await Promise.all(Array.from({length:Math.min(this.maxConcurrency,requested.length)},worker));
+      return {requested:requested.length,errors,recordCount:this.records.size};
+    }
+    loadRange(from,to,options){return this.loadDates(range(from,to),options);}
+  }
+  root.BGAgroArchive={ArchiveLoader,range,previous};
+})(typeof window!=='undefined'?window:globalThis);
+
+</script>
+<script>
 (function(){
   'use strict';
   const COLUMNS=['priceid','tarikh_harga','systemdate','negeri','daerah','lokasi','peringkat','sublevel','kategori','kumpulan','jenis','varieti','gred','unit','harga','average14','supply'];
   const VISIBLE=['tarikh_harga','negeri','daerah','lokasi','peringkat','varieti','gred','unit','harga'];
   const LEVELS=['Ladang','Borong','Runcit'];
   const COLORS=['#267559','#c38a50','#3679a8','#8e67a5','#78954a','#c76d67'];
-  const STATES=[
-    {name:'PERAK',district:'KINTA',markets:['PASAR BORONG IPOH','PASAR PASIR PINJI']},
-    {name:'PULAU PINANG',district:'SEBERANG PERAI TENGAH',markets:['PASAR BORONG BUKIT MERTAJAM','PASAR BUKIT MERTAJAM']},
-    {name:'SELANGOR',district:'PETALING',markets:['PASAR BORONG SELAYANG','PASAR SUBANG']},
-    {name:'JOHOR',district:'JOHOR BAHRU',markets:['PASAR BORONG JOHOR BAHRU','PASAR LARKIN']},
-    {name:'KEDAH',district:'KULIM',markets:['PASAR KULIM','PASAR LUNAS']}
-  ];
-  const PRODUCE=[
-    {name:'BAYAM',category:'Sayur-Sayuran',unit:'Kilogram',grade:'F.A.Q.',base:3.5},
-    {name:'KANGKUNG',category:'Sayur-Sayuran',unit:'Kilogram',grade:'F.A.Q.',base:3.0},
-    {name:'CILI MERAH KULAI / KULAI HIBRID',category:'Sayur-Sayuran',unit:'Kilogram',grade:'F.A.Q.',base:10.4},
-    {name:'KACANG BENDI',category:'Sayur-Sayuran',unit:'Kilogram',grade:'F.A.Q.',base:4.8},
-    {name:'KUBIS BULAT (CHINA)',category:'Sayur-Sayuran',unit:'Kilogram',grade:'F.A.Q.',base:3.7},
-    {name:'TOMATO (TANAH TINGGI)',category:'Sayur-Sayuran',unit:'Kilogram',grade:'F.A.Q.',base:4.1},
-    {name:'CILI HIJAU',category:'Sayur-Sayuran',unit:'Kilogram',grade:'A',base:6.7},
-    {name:'PISANG BERANGAN',category:'Buah-Buahan',unit:'Kilogram',grade:'F.A.Q.',base:3.9},
-    {name:'TELUR AYAM',category:'Ternakan',unit:'Biji',grade:'B',base:.6}
-  ];
+  const FAMA_DAILY='https://raw.githubusercontent.com/Luke2929/bg-agro-price-tracker/master/data/daily/';
   const $=id=>document.getElementById(id);
   const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fmt=value=>'RM '+Number(value).toFixed(2);
@@ -630,24 +700,8 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
   const productKey=r=>[r.varieti,r.gred,r.unit].join('||');
   const dateIso=d=>d.toISOString().slice(0,10);
   const dayOffset=(date,days)=>{const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+days);return dateIso(d);};
-  let records=[],demoMode=true,comparator=null,drawerKey='',rawPage=0,chartSelected=new Set(),toastTimer;
+  let records=[],sourceMode='loading',comparator=null,archiveLoader=null,archiveMeta=null,loadInProgress=0,loadErrors=[],drawerKey='',rawPage=0,chartSelected=new Set(),toastTimer;
   const state={tab:'prices',price:{category:'Sayur-Sayuran',negeri:'',date:'',grade:'',search:'',changeLevel:'Runcit',moverPeriod:1},compare:{product:'',level:'Borong',date:'',period:'30'},raw:{from:'',to:'',state:'',level:'',search:'',category:'',grade:'',market:''}};
-
-  function demoRecords(){
-    const rows=[];let id=880000;
-    for(let d=0;d<46;d++){
-      const date=dayOffset('2026-09-16',d);
-      if(new Date(date+'T12:00:00Z').getUTCDay()===0)continue;
-      PRODUCE.forEach((p,pi)=>STATES.forEach((s,si)=>LEVELS.forEach((level,li)=>s.markets.forEach((market,mi)=>{
-        if((d+pi*3+si+li+mi)%17===0)return;
-        const multiplier=[.72,1,1.42][li],season=1+.11*Math.sin(d/3.2+pi*.64),stateFactor=1+si*.055,marketFactor=1+mi*.035;
-        const price=Math.max(.15,Math.round((p.base*multiplier*season*stateFactor*marketFactor+(d%3)*.04)*100)/100);
-        const row={priceid:String(id++),tarikh_harga:date,systemdate:date+' 08:34:19.29000',negeri:s.name,daerah:s.district,lokasi:market,peringkat:level,sublevel:li===0?'10':li===1?'20':'30',kategori:p.category,kumpulan:'02',jenis:String(pi+1).padStart(3,'0'),varieti:p.name,gred:p.grade,unit:p.unit,harga:String(price),average14:String((price*.98).toFixed(2)),supply:['NORMAL','SEDERHANA','TINGGI'][(si+d+pi)%3]};
-        rows.push(row);
-      }))));
-    }
-    return rows;
-  }
 
   function fillSelect(id,values,firstLabel,selected='',allValue=''){
     const select=$(id);const choice=selected||select.value||allValue;
@@ -656,13 +710,17 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     select.value=opts.some(x=>x[0]===choice)?choice:opts[0]?.[0]||'';
   }
   function dates(){return unique(records.map(r=>r.tarikh_harga)).reverse();}
+  function dateChoices(){
+    return sourceMode!=='local'&&archiveMeta?.window?.min&&archiveMeta?.window?.max
+      ?BGAgroArchive.range(archiveMeta.window.min,archiveMeta.window.max).reverse():dates();
+  }
   function categories(){return unique(records.map(r=>r.kategori));}
   function grades(){return unique(records.map(r=>r.gred));}
   function states(){return unique(records.map(r=>r.negeri));}
   function products(){return [...new Map(records.map(r=>[productKey(r),r])).values()].sort((a,b)=>a.varieti.localeCompare(b.varieti));}
   function amount(rows){const valid=rows.map(r=>number(r.harga)).filter(Number.isFinite);return valid.length?{mean:valid.reduce((a,b)=>a+b,0)/valid.length,n:valid.length,markets:new Set(rows.filter(r=>Number.isFinite(number(r.harga))).map(r=>r.lokasi)).size}:null;}
   function initFilters(){
-    const ds=dates(),latest=ds[0]||'';
+    const actual=dates(),ds=dateChoices(),latest=actual[0]||ds[0]||'';
     fillSelect('price-category',categories(),'All categories',state.price.category);
     fillSelect('price-state',states(),'All Malaysia',state.price.negeri);
     fillSelect('price-grade',grades(),'All grades',state.price.grade);
@@ -673,9 +731,11 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     fillSelect('raw-state',states(),'All states',state.raw.state);
     fillSelect('raw-category',categories(),'All categories',state.raw.category);
     fillSelect('raw-grade',grades(),'All grades',state.raw.grade);
-    const min=ds[ds.length-1]||'',max=latest;
+    const min=archiveMeta&&sourceMode!=='local'?archiveMeta.window.min:(actual.at(-1)||''),max=latest;
     state.raw.from=state.raw.from||dayOffset(max,-6);if(state.raw.from<min)state.raw.from=min;
     state.raw.to=state.raw.to||max;
+    $('raw-from').min=min;$('raw-from').max=archiveMeta&&sourceMode!=='local'?archiveMeta.window.max:max;
+    $('raw-to').min=min;$('raw-to').max=archiveMeta&&sourceMode!=='local'?archiveMeta.window.max:max;
     $('raw-from').value=state.raw.from;$('raw-to').value=state.raw.to;
     state.price.date=$('price-date').value;state.compare.date=$('compare-date').value;state.compare.product=$('compare-product').value;
     $('compare-level').value=state.compare.level;$('compare-period').value=state.compare.period;
@@ -683,10 +743,26 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     $('price-search').value=state.price.search;
   }
   function displaySource(){
-    const ds=dates();$('source-badge').textContent=demoMode?'● DEMO PREVIEW':'● LOCAL CSV LOADED';
-    $('source-badge').classList.toggle('loaded',!demoMode);
-    $('source-date').textContent=(demoMode?'Example price date: ':'Latest source price: ')+(ds[0]||'—');
-    $('source-message').innerHTML=demoMode?'<b>Design preview.</b> All displayed prices are fictional examples. Import original FAMA daily CSV files to inspect real records.':'<b>Original CSV loaded.</b> '+records.length.toLocaleString()+' source rows available in your browser. Files are processed locally; they are not uploaded.';
+    const last=dates()[0]||'—',count=records.length.toLocaleString();
+    $('source-badge').classList.toggle('loaded',sourceMode==='live'||sourceMode==='local');
+    if(sourceMode==='live'){
+      $('source-badge').textContent='● LIVE FAMA DATA';
+      $('source-date').textContent='Latest FAMA survey: '+last;
+      const stamp=archiveMeta?.generated_at_utc?new Date(archiveMeta.generated_at_utc).toLocaleString('en-MY',{timeZone:'Asia/Kuala_Lumpur',dateStyle:'medium',timeStyle:'short'})+' MYT':'unknown';
+      $('source-message').innerHTML='<b>Original FAMA records.</b> '+count+' source rows loaded from your GitHub archive · latest archive update '+escapeHtml(stamp)+'.'+(loadErrors.length?' <b>Warning:</b> '+loadErrors.length+' dates failed to load; retry before exporting those dates.':'');
+    }else if(sourceMode==='local'){
+      $('source-badge').textContent='● LOCAL CSV LOADED';
+      $('source-date').textContent='Latest imported survey: '+last;
+      $('source-message').innerHTML='<b>Original CSV imported.</b> '+count+' source rows available in this browser. Files were processed locally.';
+    }else if(sourceMode==='error'){
+      $('source-badge').textContent='● DATA UNAVAILABLE';
+      $('source-date').textContent='No live FAMA prices loaded';
+      $('source-message').innerHTML='<b>Live archive could not be loaded.</b> Click Refresh Live to retry, or Import CSV. No example prices are shown.';
+    }else{
+      $('source-badge').textContent='● LOADING FAMA';
+      $('source-date').textContent='Connecting to the original FAMA archive…';
+      $('source-message').innerHTML='<b>Loading original FAMA records.</b> Please wait for the source files to finish downloading.';
+    }
   }
   function renderTopMovers(groups,changes){
     const period=state.price.moverPeriod;
@@ -738,7 +814,7 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     $('drawer').hidden=false;$('drawer-overlay').hidden=false;document.body.style.overflow='hidden';
   }
   function closeDrawer(){$('drawer').hidden=true;$('drawer-overlay').hidden=true;document.body.style.overflow='';}
-  function onTab(name){state.tab=name;document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));closeDrawer();if(name==='prices')renderPrices();if(name==='compare')renderCompare();if(name==='data')renderRaw();window.scrollTo({top:0,behavior:'smooth'});}
+  function onTab(name){state.tab=name;document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));closeDrawer();if(name==='prices')renderPrices();if(name==='compare')ensureCompareContext().catch(e=>toast(e.message));if(name==='data')renderRaw();window.scrollTo({top:0,behavior:'smooth'});}
   function chartSVG(points,activeStates,from,to){
     const pad={l:50,t:21,r:16,b:43},width=730,height=310,plotW=width-pad.l-pad.r,plotH=height-pad.t-pad.b;
     const ms=t=>Date.parse(t+'T12:00:00Z'),minX=ms(from),maxX=ms(to),spanX=Math.max(86400000,maxX-minX);
@@ -759,6 +835,15 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
   }
   function renderCompare(){
     const c=state.compare;const relevant=records.filter(r=>productKey(r)===c.product&&r.peringkat===c.level);
+    if(!c.date||!c.product||!records.length){
+      $('state-description').textContent='Waiting for original FAMA observations';
+      $('state-rows').innerHTML='<p class="empty-cell">Loading original FAMA data…</p>';
+      $('market-count').textContent='0 records';
+      $('market-rows').innerHTML='<tr><td colspan="8" class="empty-cell">No observations loaded yet.</td></tr>';
+      $('trend-description').textContent='Historical observations will appear when the data is ready.';
+      $('chart-grid').innerHTML='';$('chart-paths').innerHTML='';$('chart-legend').innerHTML='';$('chart-empty').hidden=false;
+      return;
+    }
     const onDate=relevant.filter(r=>r.tarikh_harga===c.date);
     const byState=new Map();onDate.forEach(r=>{if(!byState.has(r.negeri))byState.set(r.negeri,[]);byState.get(r.negeri).push(r);});
     const ranked=[...byState].map(([name,rows])=>({name,...amount(rows)})).filter(r=>r.mean!=null).sort((a,b)=>b.mean-a.mean);
@@ -785,7 +870,11 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
   }
   function renderRaw(){
     const rows=rawMatches(),all=$('all-columns').checked,columns=all?COLUMNS:VISIBLE;
-    $('raw-match-count').textContent=rows.length.toLocaleString()+' matching source rows';
+    let incomplete=0;
+    if(sourceMode==='live'&&archiveLoader&&state.raw.from&&state.raw.to&&state.raw.from<=state.raw.to&&state.raw.from>=archiveMeta.window.min&&state.raw.to<=archiveMeta.window.max){
+      incomplete=archiveLoader.missingDates(state.raw.from,state.raw.to).length;
+    }
+    $('raw-match-count').textContent=rows.length.toLocaleString()+' matching source rows'+(incomplete?' · '+incomplete+' dates not yet loaded; click Load selected range':' · date range checked');
     $('raw-thead').innerHTML='<tr>'+columns.map(c=>'<th>'+escapeHtml(c.toUpperCase())+'</th>').join('')+'</tr>';
     const perPage=18,pages=Math.max(1,Math.ceil(rows.length/perPage));rawPage=Math.min(rawPage,pages-1);
     const slice=rows.slice(rawPage*perPage,(rawPage+1)*perPage);
@@ -810,6 +899,86 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     if(required.some(x=>!headers.includes(x)))throw Error('Missing original FAMA columns. Please select data/daily/*.csv, not summary exports.');
     return data.filter(r=>r.length>1).map(values=>{const obj={};COLUMNS.forEach(c=>{const i=headers.indexOf(c);obj[c]=i<0?'':String(values[i]??'').trim();});return obj;});
   }
+  function setLoadingMessage(label,completed=0,total=0){
+    $('source-badge').textContent='● SYNCING FAMA';$('source-badge').classList.remove('loaded');
+    $('source-message').textContent=label+(total?' · '+completed+' / '+total+' dates checked':'')+'. Original CSVs are downloaded directly from the GitHub archive.';
+    $('source-date').textContent='Loading real market observations…';
+  }
+  function replaceRecordsFromArchive(){
+    records=archiveLoader.rows();
+    comparator=new BGAgroCompare.MatchedMarketComparator(records);
+  }
+  async function loadLive(){
+    const previous={mode:sourceMode,records,comparator,loader:archiveLoader,meta:archiveMeta};
+    sourceMode='loading';displaySource();$('refresh-live').disabled=true;
+    try{
+      const response=await fetch('./data/meta.json?ts='+Date.now(),{cache:'no-store'});
+      if(!response.ok)throw Error('Dashboard metadata is unavailable (HTTP '+response.status+').');
+      const meta=await response.json();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(meta?.window?.min||'')||!/^\d{4}-\d{2}-\d{2}$/.test(meta?.window?.max||'')||meta.window.min>meta.window.max)throw Error('FAMA archive date window is invalid.');
+      const loader=new BGAgroArchive.ArchiveLoader({fetcher:fetch.bind(window),parseCSV,baseUrl:FAMA_DAILY,revision:meta.generated_at_utc||''});
+      const from=dayOffset(meta.window.max,-30)<meta.window.min?meta.window.min:dayOffset(meta.window.max,-30);
+      setLoadingMessage('Loading the latest 31 days of FAMA data');
+      const result=await loader.loadRange(from,meta.window.max,{onProgress:p=>setLoadingMessage('Loading the latest 31 days of FAMA data',p.completed,p.total)});
+      if(!loader.records.size)throw Error('No original FAMA price rows could be retrieved.');
+      archiveMeta=meta;archiveLoader=loader;loadErrors=result.errors;
+      sourceMode='live';replaceRecordsFromArchive();
+      state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';
+      chartSelected.clear();rawPage=0;initFilters();displaySource();onTab('prices');
+      if(result.errors.length)toast('Live data loaded, but '+result.errors.length+' dates failed. Retry before exporting those dates.');
+    }catch(error){
+      if(previous.mode==='live'){
+        sourceMode='live';records=previous.records;comparator=previous.comparator;archiveLoader=previous.loader;archiveMeta=previous.meta;
+        toast('Refresh failed; keeping the last loaded FAMA data. '+error.message);
+      }else{
+        sourceMode='error';toast('Unable to load live FAMA archive: '+error.message);
+      }
+      displaySource();
+    }finally{$('refresh-live').disabled=false;}
+  }
+  async function loadRequiredDates(days,label){
+    if(sourceMode!=='live'||!archiveLoader||!archiveMeta)return {errors:[]};
+    const valid=[...new Set(days)].filter(d=>d>=archiveMeta.window.min&&d<=archiveMeta.window.max);
+    if(!valid.length)return {errors:[]};
+    loadInProgress++;
+    setLoadingMessage(label);
+    try{
+      const result=await archiveLoader.loadDates(valid,{onProgress:p=>setLoadingMessage(label,p.completed,p.total)});
+      if(result.requested)replaceRecordsFromArchive();
+      if(result.errors.length){
+        loadErrors=result.errors;
+        toast(result.errors.length+' FAMA dates could not be loaded. Retry this range.');
+      }else loadErrors=[];
+      return result;
+    }finally{
+      loadInProgress--;
+      if(!loadInProgress)displaySource();
+    }
+  }
+  async function ensurePriceContext(){
+    if(sourceMode==='live'&&state.price.date){
+      const date=state.price.date;
+      await loadRequiredDates([date,dayOffset(date,-1),dayOffset(date,-7),dayOffset(date,-30)],'Checking same-market comparison dates');
+    }
+    renderPrices();
+  }
+  async function ensureCompareContext(){
+    if(sourceMode==='live'&&state.compare.date){
+      const selectedDate=state.compare.date,period=state.compare.period;
+      const start=period==='all'?archiveMeta.window.min:dayOffset(selectedDate,-(Number(period)-1));
+      const from=start<archiveMeta.window.min?archiveMeta.window.min:start;
+      if(from<=selectedDate)await loadRequiredDates(BGAgroArchive.range(from,selectedDate),'Loading historical price trends');
+    }
+    renderCompare();
+  }
+  async function ensureRawRange(){
+    if(sourceMode!=='live'||!archiveLoader)return;
+    const f=state.raw;
+    if(!f.from||!f.to||f.from>f.to)throw Error('Please select a valid From / To date range.');
+    if(f.from<archiveMeta.window.min||f.to>archiveMeta.window.max)throw Error('Selected dates must be within '+archiveMeta.window.min+' to '+archiveMeta.window.max+'.');
+    const result=await loadRequiredDates(BGAgroArchive.range(f.from,f.to),'Loading full original records for selected range');
+    if(result.errors.length)throw Error(result.errors.length+' days failed to download. Export stopped to avoid incomplete customer data.');
+  }
   async function importFiles(files){
     const list=[...files].filter(f=>/\.csv$/i.test(f.name));if(!list.length){toast('Please select .csv files from the data/daily folder.');return;}
     $('source-message').textContent='Reading '+list.length+' CSV files in your browser…';
@@ -820,16 +989,17 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     for(const r of combined){if(!/^\d{4}-\d{2}-\d{2}$/.test(r.tarikh_harga)||!Number.isFinite(number(r.harga)))continue;
       const key=r.priceid||COLUMNS.map(c=>r[c]).join('|');if(seen.has(key))continue;seen.add(key);valid.push(r);}
     if(!valid.length){displaySource();toast('No records with valid date and price found.');return;}
-    records=valid;comparator=new BGAgroCompare.MatchedMarketComparator(records);demoMode=false;state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';state.raw.category='';state.raw.grade='';state.raw.state='';state.price.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';chartSelected.clear();rawPage=0;
+    records=valid;comparator=new BGAgroCompare.MatchedMarketComparator(records);sourceMode='local';state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';state.raw.category='';state.raw.grade='';state.raw.state='';state.price.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';chartSelected.clear();rawPage=0;
     initFilters();displaySource();onTab('prices');toast(valid.length.toLocaleString()+' original records loaded locally.'+(errors.length?' '+errors.length+' files skipped.':''));
   }
   async function exportExcel(raw){
-    if(demoMode){toast('Excel downloads require your real FAMA CSVs. Click Import CSV first.');return;}
-    const rows=rawMatches();if(!rows.length){toast('No records match this date range and filters.');return;}
+    if(sourceMode!=='live'&&sourceMode!=='local'){toast('Load real FAMA data first, or import original CSV files.');return;}
     const button=$(raw?'export-raw':'export-summary'),original=button.textContent;button.disabled=true;button.textContent='Preparing Excel…';
     try{
+      if(sourceMode==='live'){await ensureRawRange();renderRaw();}
+      const rows=rawMatches();if(!rows.length)throw Error('No original source rows match your selected dates and filters.');
       if(!window.BGAgroExcel)throw Error('Excel module is unavailable.');
-      const f=state.raw;const meta={granularity:raw?'raw':'summary',from:f.from,to:f.to,min:dates().at(-1),max:dates()[0],source:'User-imported original FAMA daily CSV archive',coverage:f.state||'All states',selection:f.search||'All products',filters:JSON.stringify(f)};
+      const f=state.raw;const meta={granularity:raw?'raw':'summary',from:f.from,to:f.to,min:archiveMeta&&sourceMode==='live'?archiveMeta.window.min:dates().at(-1),max:archiveMeta&&sourceMode==='live'?archiveMeta.window.max:dates()[0],source:sourceMode==='live'?'BG Agro original FAMA daily CSV archive (GitHub)':'User-imported original FAMA daily CSV archive',coverage:f.state||'All states',selection:f.search||'All products',filters:JSON.stringify(f)};
       let sheetRows,headers,widths,base;
       if(raw){
         headers=COLUMNS;widths=COLUMNS.map(c=>['lokasi','varieti'].includes(c)?40:['systemdate'].includes(c)?26:19);base='Full Raw Data';
@@ -854,18 +1024,21 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
     document.querySelectorAll('.mover-period').forEach(b=>b.addEventListener('click',()=>{state.price.moverPeriod=Number(b.dataset.days);renderPrices();}));
     document.querySelectorAll('.level-option').forEach(b=>b.addEventListener('click',()=>{state.price.changeLevel=b.dataset.level;renderPrices();}));
     $('import-button').addEventListener('click',()=>$('csv-picker').click());
+    $('refresh-live').addEventListener('click',()=>loadLive());
     $('csv-picker').addEventListener('change',async e=>{await importFiles(e.target.files);e.target.value='';});
-    for(const [id,key] of [['price-category','category'],['price-state','negeri'],['price-date','date'],['price-grade','grade'],['price-search','search']]){$(id).addEventListener(id==='price-search'?'input':'change',e=>{state.price[key]=e.target.value;renderPrices();});}
-    for(const [id,key] of [['compare-product','product'],['compare-level','level'],['compare-date','date'],['compare-period','period']]){$(id).addEventListener('change',e=>{state.compare[key]=e.target.value;if(key==='product')chartSelected.clear();renderCompare();});}
+    for(const [id,key] of [['price-category','category'],['price-state','negeri'],['price-date','date'],['price-grade','grade'],['price-search','search']]){$(id).addEventListener(id==='price-search'?'input':'change',e=>{state.price[key]=e.target.value;if(key==='date')ensurePriceContext().catch(err=>toast(err.message));else renderPrices();});}
+    for(const [id,key] of [['compare-product','product'],['compare-level','level'],['compare-date','date'],['compare-period','period']]){$(id).addEventListener('change',e=>{state.compare[key]=e.target.value;if(key==='product')chartSelected.clear();if(key==='date'||key==='period')ensureCompareContext().catch(err=>toast(err.message));else renderCompare();});}
     for(const [id,key] of [['raw-from','from'],['raw-to','to'],['raw-state','state'],['raw-level','level'],['raw-search','search'],['raw-category','category'],['raw-grade','grade'],['raw-market','market']]){$(id).addEventListener(['raw-search','raw-market'].includes(id)?'input':'change',e=>{state.raw[key]=e.target.value;rawPage=0;renderRaw();});}
-    $('raw-reset').addEventListener('click',()=>{state.raw={from:dates().at(-1)||'',to:dates()[0]||'',state:'',level:'',search:'',category:'',grade:'',market:''};initFilters();rawPage=0;renderRaw();});
+    $('raw-reset').addEventListener('click',()=>{const latest=dates()[0]||'';state.raw={from:latest?dayOffset(latest,-6):'',to:latest,state:'',level:'',search:'',category:'',grade:'',market:''};initFilters();rawPage=0;renderRaw();});
+    $('load-raw-range').addEventListener('click',async()=>{const b=$('load-raw-range');b.disabled=true;b.textContent='Loading original CSVs…';try{await ensureRawRange();initFilters();renderRaw();toast('Selected date range is ready for Excel export.');}catch(error){toast(error.message);}finally{b.disabled=false;b.textContent='Load selected range';}});
     $('all-columns').addEventListener('change',()=>{rawPage=0;renderRaw();});
     $('raw-prev').addEventListener('click',()=>{rawPage--;renderRaw();});$('raw-next').addEventListener('click',()=>{rawPage++;renderRaw();});
     $('export-raw').addEventListener('click',()=>exportExcel(true));$('export-summary').addEventListener('click',()=>exportExcel(false));
     $('close-drawer').addEventListener('click',closeDrawer);$('drawer-overlay').addEventListener('click',closeDrawer);document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
     $('drawer-compare').addEventListener('click',()=>{state.compare.product=drawerKey;$('compare-product').value=drawerKey;state.compare.date=state.price.date;$('compare-date').value=state.compare.date;chartSelected.clear();onTab('compare');});
   }
-  records=demoRecords();comparator=new BGAgroCompare.MatchedMarketComparator(records);initFilters();displaySource();bind();renderPrices();
+  comparator=new BGAgroCompare.MatchedMarketComparator(records);
+  displaySource();bind();loadLive();
 })();
 
 </script>
