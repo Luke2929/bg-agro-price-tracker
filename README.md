@@ -104,7 +104,6 @@ The Python scraper uses the standard library. The dashboard is a static HTML/Jav
 ## Credits and disclaimer
 
 - **Dashboard customization and project:** [BG Agro / Luke2929](https://github.com/Luke2929).
-- **Original project adapted from:** [ipohbot-png/fama-price-tracker](https://github.com/ipohbot-png/fama-price-tracker). Credit to the original author for the initial scraping and aggregation work.
 - **Price observations:** [Federal Agricultural Marketing Authority (FAMA), Malaysia](https://www.fama.gov.my/).
 
 BG Agro is an **independent project** and is **not an official FAMA website** or endorsed by FAMA. Please verify important price or purchasing decisions against the original source and relevant market participants.
