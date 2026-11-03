@@ -122,7 +122,9 @@ tbody tr:last-child td{border-bottom:0}
 .legend button{border:1px solid #e1e8df;background:#fff;color:#607468;padding:6px 10px;border-radius:100px;display:flex;align-items:center;gap:6px;font-size:10px;font-weight:750}
 .legend button.inactive{opacity:.4}
 .legend .legend-dot{height:7px;width:7px;border-radius:50%}
-.chart-area{height:281px;margin:0 22px;position:relative}
+.chart-area{height:281px;margin:0 22px;position:relative;overflow-x:auto;overflow-y:hidden;scrollbar-color:#b9cfc1 transparent;scrollbar-width:thin}
+.chart-area .chart-bar{transition:opacity .15s ease;cursor:help}
+.chart-area .chart-bar:hover{opacity:.7}
 #trend-chart{width:100%;height:100%;overflow:visible}
 .no-chart{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#9faea1;font-size:12px;background:rgba(255,255,255,.8)}
 .panel-caption{padding:12px 24px 18px;font-size:10px;line-height:1.6;color:#9aa99d;margin:0}
@@ -646,8 +648,8 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   <section class="screen" data-screen="compare">
    <div class="page-intro"><div><span class="eyebrow">MARKET DATA / REGIONAL COMPARISON</span><h1>各州比较与历史趋势</h1><p>只比较相同品种、等级、单位和价格层级，避免混合不同规格。</p></div><span class="light-label">Simple, verifiable comparisons</span></div>
    <div class="filter-box compare-filters"><label class="field product-selector"><span>PRODUCT / GRADE / UNIT</span><select id="compare-product"></select></label><label class="field"><span>PRICE LEVEL</span><select id="compare-level"><option value="Borong">Borong · Wholesale</option><option value="Runcit">Runcit · Retail</option><option value="Ladang">Ladang · Farm</option></select></label><label class="field"><span>COMPARE DATE</span><select id="compare-date"></select></label><label class="field"><span>HISTORY</span><select id="compare-period"><option value="30">Last 30 days</option><option value="7">Last 7 days</option><option value="90">Last 90 days</option><option value="all">All dates</option></select></label></div>
-   <div class="trend-mode-row"><label class="field"><span>曲线类型</span><select id="trend-mode"><option value="market">单一市场 · 可比价格曲线</option><option value="state">州属调查均价 · 市场覆盖会变</option></select></label><label class="field" id="trend-market-wrap"><span>选定调查市场</span><select id="trend-market" aria-label="Select one FAMA survey market"></select></label></div>
-   <div class="compare-grid"><section class="panel trend-panel"><div class="panel-heading"><div><h2>历史价格趋势</h2><p id="trend-description">Source observations by survey date and state</p></div><span class="light-label">RM / unit</span></div><div class="legend" id="chart-legend"></div><div class="chart-area"><svg id="trend-chart" viewBox="0 0 730 310" role="img" aria-label="Historical price chart"><g id="chart-grid"></g><g id="chart-paths"></g></svg><div class="no-chart" id="chart-empty" hidden>No historical observations for this selection.</div></div><p class="panel-caption">单一市场模式：同一个地点的调查价随日期变化，最适合看类似股票的走势。州属均价模式：不同日期调查的市场可能不同，切勿视为同一市场的涨跌。</p></section><section class="panel states-panel"><div class="panel-heading"><div><h2>各州价格比较</h2><p id="state-description">Same survey date and product specification</p></div></div><div class="state-bars" id="state-rows"></div><p class="panel-caption">State average is shown with market count. Surveyed markets can vary across dates.</p></section></div>
+   <div class="trend-mode-row"><label class="field"><span>数据比较模式</span><select id="trend-mode"><option value="market">单一市场 · 每日价格柱状图</option><option value="state">州属调查均价 · 市场覆盖会变</option></select></label><label class="field" id="trend-market-wrap"><span>选定调查市场</span><select id="trend-market" aria-label="Select one FAMA survey market"></select></label></div>
+   <div class="compare-grid"><section class="panel trend-panel"><div class="panel-heading"><div><h2>历史价格趋势 · Bar Chart</h2><p id="trend-description">Source observations by survey date and state</p></div><span class="light-label">RM / unit</span></div><div class="legend" id="chart-legend"></div><div class="chart-area"><svg id="trend-chart" viewBox="0 0 730 310" role="img" aria-label="Historical FAMA survey prices as grouped bars"><g id="chart-grid"></g><g id="chart-paths"></g></svg><div class="no-chart" id="chart-empty" hidden>No historical observations for this selection.</div></div><p class="panel-caption">柱状图从 RM0 起算；每根柱子对应真实 FAMA 调查记录，缺失日期留空。单一市场模式看同一地点；州均价模式可能包含不同市场，不应直接等同市场价格涨跌。日期多时可横向滚动。</p></section><section class="panel states-panel"><div class="panel-heading"><div><h2>各州价格比较</h2><p id="state-description">Same survey date and product specification</p></div></div><div class="state-bars" id="state-rows"></div><p class="panel-caption">State average is shown with market count. Surveyed markets can vary across dates.</p></section></div>
    <section class="panel market-panel">
     <div class="panel-heading"><div><h2>地区与市场原始价格</h2><p>Browse every original observation for the selected product, not just the first few rows.</p></div><span class="count-pill" id="market-count">0 records</span></div>
     <div class="market-filters">
@@ -1373,21 +1375,42 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   function closeDrawer(){$('drawer').hidden=true;$('drawer-overlay').hidden=true;document.body.style.overflow='';}
   function onTab(name){state.tab=name;document.querySelectorAll('.nav-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.dataset.screen===name));closeDrawer();if(name==='home')renderHome();if(name==='prices')renderPrices();if(name==='compare')ensureCompareContext().catch(e=>toast(e.message));if(name==='watchlist')renderWatchlist();if(name==='data')renderRaw();window.scrollTo({top:0,behavior:'smooth'});}
   function chartSVG(points,activeStates,from,to){
-    const pad={l:50,t:21,r:16,b:43},width=730,height=310,plotW=width-pad.l-pad.r,plotH=height-pad.t-pad.b;
-    const ms=t=>Date.parse(t+'T12:00:00Z'),minX=ms(from),maxX=ms(to),spanX=Math.max(86400000,maxX-minX);
-    const all=points.filter(p=>activeStates.includes(p.state));const prices=all.map(p=>p.value);
-    $('chart-empty').hidden=prices.length>0;
-    const minY=prices.length?Math.min(...prices):0,maxY=prices.length?Math.max(...prices):1,padY=Math.max(.35,(maxY-minY)*.16),floor=Math.max(0,minY-padY),ceil=maxY+padY,spanY=Math.max(.1,ceil-floor);
-    const X=d=>pad.l+(ms(d)-minX)/spanX*plotW,Y=v=>pad.t+(1-(v-floor)/spanY)*plotH;
-    $('chart-grid').innerHTML=Array.from({length:5},(_,i)=>{const v=floor+(spanY*(4-i)/4),y=pad.t+i*plotH/4;return '<line x1="'+pad.l+'" y1="'+y+'" x2="'+(width-pad.r)+'" y2="'+y+'" stroke="#e2eae3"/><text x="'+(pad.l-9)+'" y="'+(y+4)+'" fill="#647d6e" text-anchor="end" font-size="12">'+v.toFixed(1)+'</text>';}).join('')+[0,.25,.5,.75,1].map(f=>{const d=new Date(minX+spanX*f),x=pad.l+plotW*f;return '<text x="'+x+'" y="'+(height-10)+'" fill="#647d6e" text-anchor="middle" font-size="12">'+(d.getUTCDate())+' '+d.toLocaleString('en-MY',{month:'short',timeZone:'UTC'})+'</text>';}).join('');
-    $('chart-paths').innerHTML=activeStates.map((s,si)=>{
-      const color=COLORS[Math.max(0,states().indexOf(s))%COLORS.length],byDate=new Map(points.filter(p=>p.state===s).map(p=>[p.date,p.value]));let path='',pen=false,circles='';
-      for(let d=from;d<=to;d=dayOffset(d,1)){
-        if(!byDate.has(d)){pen=false;continue;}
-        const x=X(d),y=Y(byDate.get(d));path+=(pen?' L ':' M ')+x.toFixed(1)+' '+y.toFixed(1);pen=true;
-        circles+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3.2" fill="'+color+'"><title>'+escapeHtml(s)+' · '+d+' · '+fmt(byDate.get(d))+'</title></circle>';
-      }
-      return '<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>'+circles;
+    // Grouped bar chart: one real FAMA survey date per slot; never fill missing dates.
+    // All bars use a zero baseline so price differences are not visually exaggerated.
+    const pad={l:49,t:20,r:18,b:45},height=310,plotH=height-pad.t-pad.b,dayMS=86400000;
+    const ms=date=>Date.parse(date+'T12:00:00Z'),first=ms(from),last=ms(to);
+    const days=Math.max(1,Math.round((last-first)/dayMS)+1),active=activeStates.slice();
+    const slotMin=Math.max(28,active.length*8+12),width=Math.max(730,Math.ceil(pad.l+pad.r+days*slotMin));
+    const slot=(width-pad.l-pad.r)/days,plotBottom=pad.t+plotH;
+    const chart=$('trend-chart');
+    chart.setAttribute('viewBox','0 0 '+width+' '+height);
+    chart.style.width=width+'px';
+    const valid=points.filter(p=>active.includes(p.state)&&Number.isFinite(p.value)&&p.value>=0&&ms(p.date)>=first&&ms(p.date)<=last);
+    $('chart-empty').hidden=valid.length>0;
+    const maxPrice=Math.max(0,...valid.map(p=>p.value)),ceil=Math.max(1,maxPrice*1.13);
+    const Y=value=>pad.t+(1-value/ceil)*plotH;
+    const center=date=>pad.l+((ms(date)-first)/dayMS+.5)*slot;
+    const step=days<=10?1:days<=35?7:days<=100?14:30;
+    const grid=Array.from({length:5},(_,i)=>{
+      const price=ceil*(4-i)/4,y=pad.t+i*plotH/4;
+      return '<line x1="'+pad.l+'" y1="'+y+'" x2="'+(width-pad.r)+'" y2="'+y+'" stroke="#e1eae3"/>'+
+        '<text x="'+(pad.l-9)+'" y="'+(y+4)+'" fill="#647d6e" text-anchor="end" font-size="12">'+(price<1?price.toFixed(2):price.toFixed(1))+'</text>';
+    });
+    for(let i=0;i<days;i+=step){
+      const t=new Date(first+i*dayMS),x=pad.l+(i+.5)*slot;
+      grid.push('<text x="'+x.toFixed(1)+'" y="'+(height-10)+'" fill="#647d6e" text-anchor="middle" font-size="12">'+
+        t.getUTCDate()+' '+t.toLocaleString('en-MY',{month:'short',timeZone:'UTC'})+'</text>');
+    }
+    $('chart-grid').innerHTML=grid.join('');
+    const barWidth=Math.min(22,Math.max(5,(slot-10-Math.max(0,active.length-1)*2)/Math.max(1,active.length)));
+    const groupW=active.length*barWidth+Math.max(0,active.length-1)*2;
+    $('chart-paths').innerHTML=valid.map(p=>{
+      const index=active.indexOf(p.state),color=COLORS[Math.max(0,states().indexOf(p.state))%COLORS.length];
+      const x=center(p.date)-groupW/2+index*(barWidth+2),y=Y(p.value);
+      const heightBar=Math.max(1,plotBottom-y);
+      return '<rect class="chart-bar" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+
+        '" width="'+barWidth.toFixed(1)+'" height="'+heightBar.toFixed(1)+'" rx="2" fill="'+color+'">'+
+        '<title>'+escapeHtml(p.state)+' · '+escapeHtml(p.date)+' · '+fmt(p.value)+' · 原始 FAMA 调查价</title></rect>';
     }).join('');
   }
   function renderMarketRows(){
@@ -1460,7 +1483,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
       const series=[...byDate].map(([date,rows])=>({state:'单一市场',date,value:amount(rows)?.mean})).filter(x=>Number.isFinite(x.value));
       const info=marketInfo.get(c.trendMarket);
       $('chart-legend').innerHTML=info?'<span class="market-chart-label">'+escapeHtml(info.label)+'</span>':'';
-      $('trend-description').textContent=c.level+' · '+min+' 至 '+max+' · '+(info?info.label+' · '+series.length+' 个真实调查日':'无可用市场')+' · 缺失日期不连线';
+      $('trend-description').textContent=c.level+' · '+min+' 至 '+max+' · '+(info?info.label+' · '+series.length+' 个真实调查日':'无可用市场')+' · 缺失日期不补值';
       chartSVG(series,info?['单一市场']:[],min,max);
     }else{
       const grouped=new Map();
@@ -1470,7 +1493,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
       if(!chartSelected.size||![...chartSelected].some(s=>choices.includes(s)))chartSelected=new Set(choices.slice(0,3));
       $('chart-legend').innerHTML=choices.map(s=>'<button type="button" data-state="'+escapeHtml(s)+'" class="'+(chartSelected.has(s)?'':'inactive')+'"><span class="legend-dot" style="background:'+COLORS[states().indexOf(s)%COLORS.length]+'"></span>'+escapeHtml(titleCase(s))+'</button>').join('');
       $('chart-legend').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{if(chartSelected.has(b.dataset.state))chartSelected.delete(b.dataset.state);else chartSelected.add(b.dataset.state);renderCompare();}));
-      $('trend-description').textContent=c.level+' · '+min+' 至 '+max+' · 按当日市场等权均价，覆盖市场可变';
+      $('trend-description').textContent=c.level+' · '+min+' 至 '+max+' · 按当日市场等权均价，覆盖市场可变 · 日期无记录则留空';
       chartSVG(series,[...chartSelected],min,max);
     }
   }

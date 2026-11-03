@@ -106,3 +106,30 @@ test('stock-style market history control and 17 original export fields remain in
   assert.match(html,/const COLUMNS=\['priceid','tarikh_harga','systemdate'/);
   assert.match(html,/marketAverage\(rows\)/);
 });
+
+test('historical graph uses zero-baseline grouped bars and leaves unreported days empty',()=>{
+  const start=html.indexOf('  function chartSVG(points,activeStates,from,to){');
+  const end=html.indexOf('  function renderMarketRows(){',start);
+  assert.ok(start>=0&&end>start);
+  const fake={};
+  for(const key of ['trend-chart','chart-grid','chart-paths','chart-empty']){
+    fake[key]={innerHTML:'',hidden:true,style:{},setAttribute(name,value){this[name]=value;}};
+  }
+  const renderer=vm.runInNewContext(html.slice(start,end)+'; chartSVG',{
+    $:key=>fake[key],COLORS:['#ab6f39','#0a7555'],states:()=>['PERAK','SELANGOR'],
+    escapeHtml:x=>String(x),fmt:x=>'RM '+x.toFixed(2)
+  });
+  renderer([
+    {state:'PERAK',date:'2026-10-05',value:3.5},
+    {state:'PERAK',date:'2026-10-07',value:2.25},
+    {state:'SELANGOR',date:'2026-10-06',value:2.9}
+  ],['PERAK','SELANGOR'],'2026-10-05','2026-10-07');
+  const bars=fake['chart-paths'].innerHTML;
+  assert.equal((bars.match(/<rect class="chart-bar"/g)||[]).length,3);
+  assert.doesNotMatch(bars,/<path/); // No fabricated interpolation or connecting lines
+  assert.equal((bars.match(/PERAK · 2026-10-06/g)||[]).length,0); // Missing survey not filled
+  assert.ok(fake['chart-grid'].innerHTML.includes('>0.00</text>')); // Every bar begins at RM0
+  assert.equal(fake['chart-empty'].hidden,true);
+  renderer([{state:'PERAK',date:'2026-11-03',value:3}],['PERAK'],'2026-08-06','2026-11-03');
+  assert.ok(parseFloat(fake['trend-chart'].style.width)>730); // Scrollable 90D history
+});
