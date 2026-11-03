@@ -639,9 +639,9 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   <section class="screen" data-screen="prices">
    <div class="page-intro"><div><span class="eyebrow">MARKET DATA / PRICE LOOKUP</span><h1>完整价格明细</h1><p>按产品、州属及调查日期，核对农场、批发和零售市场的真实记录。</p></div><div class="date-stamp"><span>当前调查日期</span><strong id="price-date-stamp">—</strong><small>FAMA survey date</small></div></div>
    <div class="filter-box"><label class="field field-search"><span>SEARCH PRODUCT</span><input id="price-search" type="search" placeholder="BAYAM, CILI MERAH, KUBIS…"></label><label class="field"><span>CATEGORY</span><select id="price-category"></select></label><label class="field"><span>STATE</span><select id="price-state"></select></label><label class="field"><span>PRICE DATE</span><select id="price-date"></select></label></div>
-   <section class="panel movers-panel"><div class="panel-heading movers-heading"><div><h2>涨跌幅最大的农产品</h2><p>按涨跌百分比绝对值排序 · 两天使用同一个市场集合 · 至少 3 个配对市场</p></div><div class="movers-tabs" role="group" aria-label="Top movers comparison period"><button class="mover-period active" data-days="1">昨天对比</button><button class="mover-period" data-days="7">7天对比</button><button class="mover-period" data-days="30">30天对比</button></div></div><div class="mover-content" id="mover-content"></div><div class="mover-foot" id="mover-foot">Calculated from matching market observations only.</div></section>
+   <section class="panel movers-panel"><div class="panel-heading movers-heading"><div><h2>涨跌幅最大的农产品</h2><p>按涨跌百分比绝对值排序 · 两天使用同一个市场集合 · 至少 3 个配对市场、双方 ≥50% 覆盖</p></div><div class="movers-tabs" role="group" aria-label="Top movers comparison period"><button class="mover-period active" data-days="1">昨天对比</button><button class="mover-period" data-days="7">7天对比</button><button class="mover-period" data-days="30">30天对比</button></div></div><div class="mover-content" id="mover-content"></div><div class="mover-foot" id="mover-foot">Calculated from matching market observations only.</div></section>
    <section class="panel"><div class="panel-heading"><div><h2>全部农产品调查价格</h2><p>各层级为当日市场等权均价；1／7／30 天涨跌另列两日固定市场配对价格。</p></div><div class="panel-tools"><label class="minor-field">GRADE <select id="price-grade"></select></label><div class="level-pills" role="group" aria-label="Price level for change comparison"><button class="level-option" data-level="Ladang">Ladang</button><button class="level-option" data-level="Borong">Borong</button><button class="level-option active" data-level="Runcit">Runcit</button></div><span class="count-pill" id="price-count">— products</span></div></div><div class="table-scroll"><table class="data-table price-table"><thead><tr><th>PRODUCT / VARIETY</th><th>GRADE</th><th>UNIT</th><th class="price-col">LADANG<small>Farm</small></th><th class="price-col">BORONG<small>Wholesale</small></th><th class="price-col">RUNCIT<small>Retail</small></th><th class="delta-col">Δ 1D<small>vs yesterday</small></th><th class="delta-col">Δ 7D<small>vs 7 days ago</small></th><th class="delta-col">Δ 30D<small>vs 30 days ago</small></th><th>SURVEY DATE</th><th></th></tr></thead><tbody id="price-rows"></tbody></table></div><div class="table-footer"><span id="price-table-foot">Click a vegetable to see its original market observations.</span><span>涨跌使用同市场配对价 · 明细价格为当日市场均价</span></div></section>
-   <p class="footnote">ⓘ Algorithm V2：1D 取最近 7 日内有相同市场的上次调查；7D 为距今 7～11 日；30D 为距今 30～37 日。每个涨跌值都标注配对市场数量、基准日期及两天的实际可比价格。1～2 个市场会标样本少，不参与涨跌榜。各层级显示的是当日所有已调查市场的等权均价，可能与涨跌计算使用的固定市场价格不同。缺失值不补 0。</p>
+   <p class="footnote">ⓘ Algorithm V2：1D 取最近 7 日内有相同市场的上次调查；7D 为距今 7～11 日；30D 为距今 30～37 日。每个涨跌值都标注配对市场数量、基准日期及两天的实际可比价格。1～2 个市场会标样本少；配对市场未覆盖双方各至少 50% 也不参与涨跌榜。各层级显示的是当日所有已调查市场的等权均价，可能与涨跌计算使用的固定市场价格不同。缺失值不补 0。</p>
   </section>
   <section class="screen" data-screen="compare">
    <div class="page-intro"><div><span class="eyebrow">MARKET DATA / REGIONAL COMPARISON</span><h1>各州比较与历史趋势</h1><p>只比较相同品种、等级、单位和价格层级，避免混合不同规格。</p></div><span class="light-label">Simple, verifiable comparisons</span></div>
@@ -918,12 +918,16 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
         const todayMean=nowTotal/matched,priorMean=oldTotal/matched;
         if(priorMean<=0)continue;
         const diff=todayMean-priorMean;
+        const rawPercent=diff/priorMean*100;
+        const percent=Math.abs(rawPercent)<0.05?0:rawPercent;
+        const currentCoverage=matched/current.size,previousCoverage=matched/previous.size;
         result={
           current:todayMean,previous:priorMean,rmDifference:diff,
-          percent:diff/priorMean*100,markets:matched,
+          percent,markets:matched,
           currentDate:date,previousDate:prior,days,actualDays:dayDifference(prior,date),
           currentMarkets:current.size,previousMarkets:previous.size,
-          eligible:matched>=3
+          currentCoverage,previousCoverage,
+          eligible:matched>=3&&currentCoverage>=0.5&&previousCoverage>=0.5
         };
         break;
       }
@@ -1150,7 +1154,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   function homeSigned(v){return !Number.isFinite(v)?'—':(v>0?'+':v<0?'−':'')+'RM '+Math.abs(v).toFixed(2);}
   function changeDetail(c){
     if(!c)return '未找到可比市场与基准日';
-    return '同市场 '+fmt(c.previous)+' → '+fmt(c.current)+' · '+c.markets+' 市场 · '+c.previousDate+' → '+c.currentDate+(c.eligible?'':' · 样本少');
+    return '同市场 '+fmt(c.previous)+' → '+fmt(c.current)+' · '+c.markets+' 市场 · '+c.previousDate+' → '+c.currentDate+(c.eligible?'':c.markets<3?' · 样本少':' · 市场覆盖率低');
   }
   function homeDelta(c){
     if(!c)return '<span class="delta-missing" title="没有可比原始数据">—</span>';
@@ -1225,8 +1229,8 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     $('home-metrics').innerHTML=[
       ['可查询产品规格',items.length.toLocaleString()+' 种','相同品种、等级、单位单独计算'],
       ['调查市场',markets.toLocaleString()+' 个',selected.length.toLocaleString()+' 条原始记录'],
-      ['单日上涨',rises.toLocaleString()+' 种','在 '+comparable.length+' 种同市场可比规格中'],
-      ['单日下跌',falls.toLocaleString()+' 种',h.level+' · 最近有可比调查日 · ≥3 市场']
+      ['单日上涨',rises.toLocaleString()+' 种','在 '+comparable.length+' 种可比较规格中（≥3 市场、≥50% 覆盖）'],
+      ['单日下跌',falls.toLocaleString()+' 种',h.level+' · 最近可比调查日 · ≥3 市场、≥50% 覆盖']
     ].map(([label,value,foot])=>'<div class="home-metric"><span>'+label+'</span><strong>'+value+'</strong><small>'+foot+'</small></div>').join('');
     const strongest=days=>[...items].filter(item=>item.changes[days]?.eligible&&Number.isFinite(item.changes[days].percent))
       .sort((a,b)=>Math.abs(b.changes[days].percent)-Math.abs(a.changes[days].percent))[0];
@@ -1234,10 +1238,10 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     const phrase=(item,days)=>{const change=item.changes[days];return days+'D · '+(chineseName(item.r.varieti)||item.r.varieti)+' '+(change.percent>0?'上涨 ':change.percent<0?'下跌 ':'持平 ')+Math.abs(change.percent).toFixed(1)+'% ('+change.previousDate+' → '+change.currentDate+'，'+change.markets+' 市场)';};
     if(topDay||topWeek){
       $('home-insight-title').textContent=[topDay?phrase(topDay,1):'1D 暂无 ≥3 个同市场记录',topWeek?phrase(topWeek,7):'7D 暂无 ≥3 个同市场记录'].join('　｜　');
-      $('home-insight-desc').textContent='截至 '+h.date+' · '+h.level+'。涨跌榜至少 3 个相同市场；1D 采用最近可比调查日，7D／30D 采用有记录的历史基准日。';
+      $('home-insight-desc').textContent='截至 '+h.date+' · '+h.level+'。涨跌榜至少 3 个相同市场及双方 ≥50% 覆盖；1D 采用最近可比调查日，7D／30D 采用有记录的历史基准日。';
     }else{
       $('home-insight-title').textContent=items.length?'已载入 '+items.length+' 种产品规格':'请调整日期或搜索条件';
-      $('home-insight-desc').textContent='当前条件下没有满足至少 3 个同市场的涨跌排名。1～2 个市场仍可在明细查看，缺失值不会变成 0。';
+      $('home-insight-desc').textContent='当前条件下没有满足 3 个同市场且双方覆盖率 ≥50% 的涨跌排名。1～2 个市场仍可在明细查看，缺失值不会变成 0。';
     }
     $('home-card-count').textContent='显示 '+Math.min(h.visible,items.length)+' / '+items.length+' 种产品规格 · 调查日期 '+(h.date||'—');
     $('home-more').hidden=items.length<=h.visible;
@@ -1287,8 +1291,8 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
       const sign=change.percent>0?'+':'';
       const rmSign=change.rmDifference>0?'+':change.rmDifference<0?'−':'';
       return '<button type="button" class="mover-card" data-key="'+escapeHtml(key)+'" title="Open original market observations"><span class="mover-name">'+escapeHtml(product.varieti)+'</span><span class="mover-meta">'+escapeHtml(product.gred)+' · '+escapeHtml(product.unit)+' · '+escapeHtml(level)+'</span><span class="mover-price-context">Average across matched markets</span><strong class="mover-price">'+fmt(change.current)+'</strong><span class="mover-change '+direction+'">'+arrow+' '+sign+change.percent.toFixed(1)+'% · '+rmSign+'RM'+Math.abs(change.rmDifference).toFixed(2)+'</span><span class="mover-dates">'+change.currentDate+' vs '+change.previousDate+'</span><span class="mover-dates">'+change.markets+' matching markets</span></button>';
-    }).join(''):'<div class="mover-empty">No change meets the ≥3 matched-market requirement for '+escapeHtml(state.price.date)+' ('+period+'D). Smaller samples remain visible in the table.</div>';
-    $('mover-foot').textContent='Top '+ranked.length+' of '+groups.length+' selected products · '+level+' · '+period+'D · ≥3 identical markets · actual baseline dates shown.';
+    }).join(''):'<div class="mover-empty">No change meets the ≥3 matched markets and ≥50% coverage requirement for '+escapeHtml(state.price.date)+' ('+period+'D). Smaller samples remain visible in the table.</div>';
+    $('mover-foot').textContent='Top '+ranked.length+' of '+groups.length+' selected products · '+level+' · '+period+'D · ≥3 identical markets and ≥50% coverage · actual baseline dates shown.';
     $('mover-content').querySelectorAll('button[data-key]').forEach(b=>b.addEventListener('click',()=>showDrawer(b.dataset.key)));
   }
   function renderPrices(){

@@ -72,7 +72,18 @@ test('Top Movers eligibility needs at least three distinct matching markets',()=
   assert.equal(strong.markets,3);
   assert.equal(strong.eligible,true);
   assert.equal(strong.percent,50);
+  assert.equal(strong.currentCoverage,1);
   assert.equal(cmp(rows.filter(r=>r.lokasi!=='C')).eligible,false);
+});
+test('high percentage from sparse coverage is excluded, and near-zero moves show 0.0%',()=>{
+  const current=['A','B','C','D','E','F','G','H','I','J'].map(k=>row('2026-11-02',k,10));
+  const old=['A','B','C'].map(k=>row('2026-11-01',k,5));
+  const low=cmp([...current,...old]);
+  assert.equal(low.markets,3);
+  assert.ok(low.currentCoverage<0.5);
+  assert.equal(low.eligible,false);
+  const tiny=cmp([row('2026-11-02','A',9.999),row('2026-11-01','A',10)]);
+  assert.equal(tiny.percent,0);
 });
 test('archive manifest distinguishes known missing files and legitimate non-reporting dates',async()=>{
   let requests=0;
