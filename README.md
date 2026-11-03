@@ -8,6 +8,20 @@ An independent BG Agro dashboard built from publicly available **FAMA (Federal A
 
 > **中文简介：** BG Agro 将 FAMA 的农业市场调查价格整理成简洁的 Dashboard。你可以按蔬菜、州属、日期和价格层级查询，比较历史变化，也可以将指定日期范围的原始数据下载成 Excel。数据按计划自动更新，**不是即时交易报价**。
 
+## Algorithm V2 — consistent FAMA comparisons
+
+The dashboard uses a transparent, stock-style **survey price** model, not an exchange-traded price feed:
+
+- **Product identity:** variety, grade and unit are kept separate. Price level (Ladang, Borong, Runcit) and selected state are matched separately.
+- **Daily market price:** equal-weight mean of observed FAMA market averages; repeated survey rows at one market do not give that market more influence.
+- **1D:** compare with the most recent prior day that has observations in the **same markets**, searching at most 7 calendar days back. The actual baseline date is displayed.
+- **7D / 30D:** use the nearest earlier comparable survey on or before the 7/30-day target, no more than 4/7 days older respectively. Actual dates and both matched prices are displayed.
+- **Price change:** `(current matched-market mean − previous matched-market mean) / previous matched-market mean × 100%`. A comparison requires at least one identical market; any change from fewer than 3 matched markets is marked **low sample** and excluded from Top Movers.
+- **Top Movers:** sort absolute changes among products with **3+ matching markets**, so one unusual market cannot dominate the ranking.
+- **Trend modes:** *Single Market* draws one market's actual readings (most stock-like, no basket changes); *State Survey Average* is an indicative cross-sectional mean and can be affected by changes in surveyed market coverage.
+- **Archive completeness:** generated metadata includes an explicit list of archived CSV dates. A missing expected file is treated as a download error, while non-reporting dates remain genuinely absent.
+- **Exports:** Full Raw Excel continues to include the original 17 CSV fields; missing prices are never fabricated. Survey data are not stock trades, so no artificial OHLC candlesticks or volumes are generated.
+
 ## What you can do
 
 | Feature | Description |

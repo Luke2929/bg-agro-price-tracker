@@ -649,6 +649,7 @@ def test_meta_window_and_row_count(tmp_path):
     meta = load(out_dir, "meta.json")
     assert meta["window"] == {"min": "2026-07-19", "max": "2026-07-20"}
     assert meta["row_count"] == 3
+    assert meta["archive_dates"] == ["2026-07-19", "2026-07-20"]
 
     catalog = load(out_dir, "catalog.json")
     assert catalog["dates"] == {"min": "2026-07-19", "max": "2026-07-20"}

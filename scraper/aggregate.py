@@ -615,6 +615,9 @@ def aggregate(daily_dir: Path, out_dir: Path) -> dict:
     removed_states = prune_dir(state_dir, {f"{s}.json" for s in states_sorted})
 
     meta = build_meta(systemdate_dts, row_count, min_date, latest_date)
+    # Explicit archive manifest: distinguish survey dates without CSVs from missing expected files.
+    meta["archive_dates"] = sorted(path.stem for path in daily_dir.glob("*.csv")
+                                   if re.fullmatch(r"\d{4}-\d{2}-\d{2}", path.stem))
     with open(out_dir / "meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, separators=(",", ":"))
 
