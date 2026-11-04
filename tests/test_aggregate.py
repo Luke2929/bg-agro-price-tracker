@@ -650,6 +650,34 @@ def test_meta_window_and_row_count(tmp_path):
     assert meta["window"] == {"min": "2026-07-19", "max": "2026-07-20"}
     assert meta["row_count"] == 3
     assert meta["archive_dates"] == ["2026-07-19", "2026-07-20"]
+    assert set(meta["archive_versions"]) == set(meta["archive_dates"])
+    assert all(len(version) == 16 for version in meta["archive_versions"].values())
 
     catalog = load(out_dir, "catalog.json")
     assert catalog["dates"] == {"min": "2026-07-19", "max": "2026-07-20"}
+
+
+def test_archive_versions_change_only_when_a_daily_csv_changes(tmp_path):
+    daily_dir, out_dir = dirs(tmp_path)
+    write_daily_csv(daily_dir, "2026-07-19", [make_row("1", "2026-07-19")])
+    write_daily_csv(daily_dir, "2026-07-20", [make_row("2", "2026-07-20", harga="1.00")])
+    aggregate.aggregate(daily_dir, out_dir)
+    first = load(out_dir, "meta.json")["archive_versions"]
+    aggregate.aggregate(daily_dir, out_dir)
+    assert load(out_dir, "meta.json")["archive_versions"] == first
+
+    write_daily_csv(daily_dir, "2026-07-20", [make_row("2", "2026-07-20", harga="1.25")])
+    aggregate.aggregate(daily_dir, out_dir)
+    current = load(out_dir, "meta.json")["archive_versions"]
+    assert current["2026-07-19"] == first["2026-07-19"]
+    assert current["2026-07-20"] != first["2026-07-20"]
+
+
+def test_fast_date_parsing_preserves_existing_formats_and_missing_values():
+    assert str(aggregate.parse_day("2026-07-20")) == "2026-07-20"
+    assert str(aggregate.parse_day("2026-7-2")) == "2026-07-02"
+    assert aggregate.parse_day("invalid") is None
+    assert aggregate.parse_systemdate("2026-07-20 09:15:00.000000").microsecond == 0
+    assert aggregate.parse_systemdate("2026-07-20 09:15:00.500000").microsecond == 500000
+    assert aggregate.parse_systemdate("2026-07-20 09:15:00").hour == 9
+    assert aggregate.parse_systemdate("invalid") is None

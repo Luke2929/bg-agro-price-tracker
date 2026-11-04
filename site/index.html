@@ -965,10 +965,12 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     return days;
   }
   class ArchiveLoader{
-    constructor({fetcher,parseCSV,baseUrl,revision='',availableDates=null,maxConcurrency=5}){
+    constructor({fetcher,parseCSV,baseUrl,revision='',revisions=null,availableDates=null,maxConcurrency=5}){
       if(typeof fetcher!=='function'||typeof parseCSV!=='function')throw Error('ArchiveLoader requires fetch and CSV parser.');
       this.fetcher=fetcher;this.parseCSV=parseCSV;this.baseUrl=baseUrl.replace(/\/+$/,'')+'/';
-      this.revision=revision;this.maxConcurrency=maxConcurrency;
+      this.revision=revision;
+      this.revisions=revisions&&typeof revisions==='object'&&!Array.isArray(revisions)?revisions:{};
+      this.maxConcurrency=maxConcurrency;
       this.availableDates=Array.isArray(availableDates)?new Set(availableDates):null;
       this.loaded=new Set();this.absent=new Set();this.pending=new Map();this.records=new Map();
     }
@@ -984,7 +986,10 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
       return promise;
     }
     async download(date){
-      const url=this.baseUrl+encodeURIComponent(date)+'.csv?rev='+encodeURIComponent(this.revision);
+      // A late correction invalidates only its own CSV. Unchanged days keep a
+      // stable URL across scheduled runs and can use the browser's HTTP cache.
+      const revision=this.revisions[date]||this.revision;
+      const url=this.baseUrl+encodeURIComponent(date)+'.csv'+(revision?'?rev='+encodeURIComponent(revision):'');
       let lastError;
       for(let attempt=0;attempt<3;attempt++){
         try{
@@ -1048,6 +1053,23 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   let records=[],sourceMode='loading',comparator=null,archiveLoader=null,archiveMeta=null,loadInProgress=0,loadErrors=[],drawerKey='',drawerContext={date:'',negeri:'',level:'Runcit'},rawPage=0,chartSelected=new Set(),toastTimer;
   const state={tab:'home',home:{category:'Sayur-Sayuran',negeri:'',date:'',level:'Borong',stateLevel:'Ladang',search:'',sort:'default',visible:12,compareProduct:''},price:{category:'Sayur-Sayuran',negeri:'',date:'',grade:'',search:'',changeLevel:'Runcit',moverPeriod:1},compare:{product:'',level:'Borong',date:'',period:'30',trendMode:'market',trendMarket:''},market:{negeri:'',daerah:'',search:'',page:0},raw:{from:'',to:'',state:'',level:'',search:'',category:'',grade:'',market:''}};
   const WATCH_STORAGE='bg-agro-fama-watchlist-v1',WATCH_MAX=20;
+  function buildRecordCache(rows){
+    const byDate=new Map(),byProduct=new Map(),categories=new Set(),grades=new Set(),states=new Set();
+    for(const r of rows){
+      if(r.tarikh_harga){if(!byDate.has(r.tarikh_harga))byDate.set(r.tarikh_harga,[]);byDate.get(r.tarikh_harga).push(r);}
+      const key=productKey(r);
+      if(!byProduct.has(key))byProduct.set(key,[]);
+      byProduct.get(key).push(r);
+      if(r.kategori)categories.add(r.kategori);
+      if(r.gred)grades.add(r.gred);
+      if(r.negeri)states.add(r.negeri);
+    }
+    return {byDate,byProduct,dates:unique([...byDate.keys()]).reverse(),categories:unique([...categories]),grades:unique([...grades]),states:unique([...states]),
+      products:[...byProduct.values()].map(group=>group[group.length-1]).sort((a,b)=>a.varieti.localeCompare(b.varieti))};
+  }
+  let recordCache=buildRecordCache([]);
+  function rebuildRecordCache(){recordCache=buildRecordCache(records);}
+  function dateRows(date){return recordCache.byDate.get(date)||[];}
   function readWatchlist(){
     try{const data=JSON.parse(localStorage.getItem(WATCH_STORAGE)||'[]');
       return Array.isArray(data)?data.filter(item=>item&&typeof item.key==='string'&&item.key.length<300&&typeof item.state==='string'&&item.state.length<100&&LEVELS.includes(item.level)).slice(0,WATCH_MAX):[];
@@ -1062,15 +1084,15 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     select.innerHTML=opts.map(([value,label])=>'<option value="'+escapeHtml(value)+'">'+escapeHtml(label)+'</option>').join('');
     select.value=opts.some(x=>x[0]===choice)?choice:opts[0]?.[0]||'';
   }
-  function dates(){return unique(records.map(r=>r.tarikh_harga)).reverse();}
+  function dates(){return recordCache.dates;}
   function dateChoices(){
     return sourceMode!=='local'&&archiveMeta?.window?.min&&archiveMeta?.window?.max
       ?BGAgroArchive.range(archiveMeta.window.min,archiveMeta.window.max).reverse():dates();
   }
-  function categories(){return unique(records.map(r=>r.kategori));}
-  function grades(){return unique(records.map(r=>r.gred));}
-  function states(){return unique(records.map(r=>r.negeri));}
-  function products(){return [...new Map(records.map(r=>[productKey(r),r])).values()].sort((a,b)=>a.varieti.localeCompare(b.varieti));}
+  function categories(){return recordCache.categories;}
+  function grades(){return recordCache.grades;}
+  function states(){return recordCache.states;}
+  function products(){return recordCache.products;}
   function amount(rows){return BGAgroCompare.marketAverage(rows);}
   function initFilters(){
     const actual=dates(),ds=dateChoices(),latest=actual[0]||ds[0]||'';
@@ -1084,7 +1106,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     fillSelect('home-category',categories(),'全部类别',state.home.category);
     $('home-state').value=state.home.negeri;
     $('home-category').value=state.home.category||'';
-    const todayFarmKeys=new Set(records.filter(r=>r.tarikh_harga===latest&&r.peringkat==='Ladang').map(productKey));
+    const todayFarmKeys=new Set(dateRows(latest).filter(r=>r.peringkat==='Ladang').map(productKey));
     const farmProducts=products().filter(r=>todayFarmKeys.has(productKey(r)));
     const preferredHome=farmProducts.find(r=>/KACANG BENDI/i.test(r.varieti))||farmProducts[0]||products()[0];
     fillSelect('home-compare-product',products().map(productKey),null,state.home.compareProduct||productKey(preferredHome||{}));
@@ -1185,7 +1207,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   }
   function homeData(){
     const h=state.home,needle=h.search.trim().toLowerCase();
-    const selected=records.filter(r=>r.tarikh_harga===h.date&&(!h.negeri||r.negeri===h.negeri)&&(!h.category||r.kategori===h.category)
+    const selected=dateRows(h.date).filter(r=>(!h.negeri||r.negeri===h.negeri)&&(!h.category||r.kategori===h.category)
       &&(!needle||(r.varieti+' '+chineseName(r.varieti)).toLowerCase().includes(needle)));
     const grouped=new Map();
     for(const r of selected){
@@ -1217,7 +1239,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   }
   function renderHomeStateBars(){
     const h=state.home;
-    const rows=records.filter(r=>r.tarikh_harga===h.date&&productKey(r)===h.compareProduct&&r.peringkat===h.stateLevel);
+    const rows=dateRows(h.date).filter(r=>productKey(r)===h.compareProduct&&r.peringkat===h.stateLevel);
     const byState=new Map();
     for(const r of rows){if(!byState.has(r.negeri))byState.set(r.negeri,[]);byState.get(r.negeri).push(r);}
     const ranked=[...byState].map(([name,subset])=>({name,price:amount(subset)})).filter(x=>x.price).sort((a,b)=>b.price.mean-a.price.mean);
@@ -1318,7 +1340,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     $('mover-content').querySelectorAll('button[data-key]').forEach(b=>b.addEventListener('click',()=>showDrawer(b.dataset.key)));
   }
   function renderPrices(){
-    const filters=state.price;const selected=records.filter(r=>r.tarikh_harga===filters.date&&(!filters.category||r.kategori===filters.category)&&(!filters.negeri||r.negeri===filters.negeri)&&(!filters.grade||r.gred===filters.grade)&&(!filters.search||r.varieti.toLowerCase().includes(filters.search.toLowerCase())));
+    const filters=state.price;const selected=dateRows(filters.date).filter(r=>(!filters.category||r.kategori===filters.category)&&(!filters.negeri||r.negeri===filters.negeri)&&(!filters.grade||r.gred===filters.grade)&&(!filters.search||r.varieti.toLowerCase().includes(filters.search.toLowerCase())));
     const map=new Map();
     for(const r of selected){const k=productKey(r);if(!map.has(k))map.set(k,{r,levels:{Ladang:[],Borong:[],Runcit:[]}});if(map.get(k).levels[r.peringkat])map.get(k).levels[r.peringkat].push(r);}
     const groups=[...map.entries()].sort((a,b)=>a[1].r.varieti.localeCompare(b[1].r.varieti));
@@ -1356,7 +1378,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     }
     $('watch-rows').innerHTML=watchlist.map((item,index)=>{
       const [variety,grade,unit]=item.key.split('||');
-      const matching=records.filter(r=>productKey(r)===item.key&&r.peringkat===item.level&&(!item.state||r.negeri===item.state));
+      const matching=(recordCache.byProduct.get(item.key)||[]).filter(r=>r.peringkat===item.level&&(!item.state||r.negeri===item.state));
       const latest=matching.reduce((date,r)=>r.tarikh_harga>date?r.tarikh_harga:date,'');
       const sourceRows=latest?matching.filter(r=>r.tarikh_harga===latest):[];
       const value=amount(sourceRows);
@@ -1370,7 +1392,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     }).join('');
   }
   function openWatchItem(item){
-    const datesForItem=records.filter(r=>productKey(r)===item.key&&r.peringkat===item.level&&(!item.state||r.negeri===item.state)).map(r=>r.tarikh_harga).sort();
+    const datesForItem=(recordCache.byProduct.get(item.key)||[]).filter(r=>r.peringkat===item.level&&(!item.state||r.negeri===item.state)).map(r=>r.tarikh_harga).sort();
     const latest=datesForItem.at(-1);
     if(!latest){toast('No currently loaded source observations for this saved item.');return;}
     state.price.date=latest;state.price.negeri=item.state;state.price.category='';state.price.grade=item.key.split('||')[1]||'';state.price.search=item.key.split('||')[0];state.price.changeLevel=item.level;
@@ -1383,7 +1405,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     drawerKey=key;
     drawerContext={date:context.date||state.price.date,negeri:context.negeri===undefined?state.price.negeri:context.negeri,level:context.level||state.price.changeLevel};
     const [name,grade,unit]=key.split('||');
-    const rows=records.filter(r=>productKey(r)===key&&r.tarikh_harga===drawerContext.date&&(!drawerContext.negeri||r.negeri===drawerContext.negeri));
+    const rows=dateRows(drawerContext.date).filter(r=>productKey(r)===key&&(!drawerContext.negeri||r.negeri===drawerContext.negeri));
     $('drawer-name').textContent=chineseName(name)?chineseName(name)+' · '+name:name;
     $('drawer-meta').textContent=[grade,unit,drawerContext.negeri||'全国',drawerContext.date].join(' · ');
     $('drawer-levels').innerHTML=LEVELS.map(level=>{const a=amount(rows.filter(r=>r.peringkat===level));return '<div class="drawer-level"><span>'+level+'</span><strong>'+(a?fmt(a.mean):'—')+'</strong><small>'+(a?a.n+' 条原始记录':'该层级没有记录')+'</small></div>';}).join('');
@@ -1435,7 +1457,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   }
   function renderMarketRows(){
     const c=state.compare,m=state.market;
-    const all=records.filter(r=>r.tarikh_harga===c.date&&productKey(r)===c.product&&r.peringkat===c.level);
+    const all=dateRows(c.date).filter(r=>productKey(r)===c.product&&r.peringkat===c.level);
     const availableStates=unique(all.map(r=>r.negeri));
     if(m.negeri&&!availableStates.includes(m.negeri))m.negeri='';
     fillSelect('market-state-filter',availableStates,'All states');
@@ -1457,7 +1479,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     $('market-prev').disabled=m.page===0;$('market-next').disabled=m.page>=pages-1;
   }
   function renderCompare(){
-    const c=state.compare;const relevant=records.filter(r=>productKey(r)===c.product&&r.peringkat===c.level);
+    const c=state.compare;const relevant=(recordCache.byProduct.get(c.product)||[]).filter(r=>r.peringkat===c.level);
     if(!c.date||!c.product||!records.length){
       $('state-description').textContent='Waiting for original FAMA observations';
       $('state-rows').innerHTML='<p class="empty-cell">Loading original FAMA data…</p>';
@@ -1520,7 +1542,8 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   function rawMatches(){
     const f=state.raw,s=f.search.trim().toLowerCase(),m=f.market.trim().toLowerCase();
     if(f.from&&f.to&&f.from>f.to)return [];
-    return records.filter(r=>(!f.from||r.tarikh_harga>=f.from)&&(!f.to||r.tarikh_harga<=f.to)&&(!f.state||r.negeri===f.state)&&(!f.level||r.peringkat===f.level)&&(!f.category||r.kategori===f.category)&&(!f.grade||r.gred===f.grade)&&(!s||r.varieti.toLowerCase().includes(s))&&(!m||(r.daerah+' '+r.lokasi).toLowerCase().includes(m)));
+    const candidates=f.from&&f.to?recordCache.dates.filter(d=>d>=f.from&&d<=f.to).flatMap(dateRows):records;
+    return candidates.filter(r=>(!f.from||r.tarikh_harga>=f.from)&&(!f.to||r.tarikh_harga<=f.to)&&(!f.state||r.negeri===f.state)&&(!f.level||r.peringkat===f.level)&&(!f.category||r.kategori===f.category)&&(!f.grade||r.gred===f.grade)&&(!s||r.varieti.toLowerCase().includes(s))&&(!m||(r.daerah+' '+r.lokasi).toLowerCase().includes(m)));
   }
   function renderRaw(){
     const rows=rawMatches(),all=$('all-columns').checked,columns=all?COLUMNS:VISIBLE;
@@ -1539,19 +1562,32 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   function toast(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),4200);}
 
   function parseCSV(text){
-    text=String(text).replace(/^\uFEFF/,'');const data=[];let row=[],field='',quoted=false;
+    text=String(text).replace(/^\uFEFF/,'');const recordsOut=[];
+    let row=[],field='',quoted=false,headers=null,columnIndices=null;
+    const required=['priceid','tarikh_harga','negeri','lokasi','peringkat','varieti','gred','unit','harga'];
+    const finishRow=()=>{
+      row.push(field);field='';
+      if(row.some(value=>value!=='')){
+        if(headers===null){
+          headers=row.map(value=>value.trim().toLowerCase());
+          if(required.some(name=>!headers.includes(name)))throw Error('Missing original FAMA columns. Please select data/daily/*.csv, not summary exports.');
+          columnIndices=COLUMNS.map(name=>headers.indexOf(name));
+        }else if(row.length>1){
+          const record={};
+          COLUMNS.forEach((name,i)=>{const position=columnIndices[i];record[name]=position<0?'':String(row[position]??'').trim();});
+          recordsOut.push(record);
+        }
+      }
+      row=[];
+    };
     for(let i=0;i<text.length;i++){
       const char=text[i];if(quoted){if(char==='"'&&text[i+1]==='"'){field+='"';i++;}else if(char==='"')quoted=false;else field+=char;}
       else if(char==='"')quoted=true;else if(char===','){row.push(field);field='';}
-      else if(char==='\n'||char==='\r'){row.push(field);field='';if(row.some(x=>x!==''))data.push(row);row=[];if(char==='\r'&&text[i+1]==='\n')i++;}
+      else if(char==='\n'||char==='\r'){finishRow();if(char==='\r'&&text[i+1]==='\n')i++;}
       else field+=char;
     }
-    if(field!==''||row.length){row.push(field);if(row.some(x=>x!==''))data.push(row);}
-    if(!data.length)return [];
-    const headers=data.shift().map(x=>x.trim().toLowerCase());
-    const required=['priceid','tarikh_harga','negeri','lokasi','peringkat','varieti','gred','unit','harga'];
-    if(required.some(x=>!headers.includes(x)))throw Error('Missing original FAMA columns. Please select data/daily/*.csv, not summary exports.');
-    return data.filter(r=>r.length>1).map(values=>{const obj={};COLUMNS.forEach(c=>{const i=headers.indexOf(c);obj[c]=i<0?'':String(values[i]??'').trim();});return obj;});
+    if(field!==''||row.length)finishRow();
+    return recordsOut;
   }
   function setLoadingMessage(label,completed=0,total=0){
     $('source-badge').textContent='● SYNCING FAMA';$('source-badge').classList.remove('loaded');
@@ -1560,17 +1596,18 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   }
   function replaceRecordsFromArchive(){
     records=archiveLoader.rows();
+    rebuildRecordCache();
     comparator=new BGAgroCompare.MatchedMarketComparator(records);
   }
   async function loadLive(){
-    const previous={mode:sourceMode,records,comparator,loader:archiveLoader,meta:archiveMeta};
+    const previous={mode:sourceMode,records,recordCache,comparator,loader:archiveLoader,meta:archiveMeta};
     sourceMode='loading';displaySource();$('refresh-live').disabled=true;
     try{
       const response=await fetch('./data/meta.json?ts='+Date.now(),{cache:'no-store'});
       if(!response.ok)throw Error('Dashboard metadata is unavailable (HTTP '+response.status+').');
       const meta=await response.json();
       if(!/^\d{4}-\d{2}-\d{2}$/.test(meta?.window?.min||'')||!/^\d{4}-\d{2}-\d{2}$/.test(meta?.window?.max||'')||meta.window.min>meta.window.max)throw Error('FAMA archive date window is invalid.');
-      const loader=new BGAgroArchive.ArchiveLoader({fetcher:fetch.bind(window),parseCSV,baseUrl:FAMA_DAILY,revision:meta.generated_at_utc||'',availableDates:meta.archive_dates});
+      const loader=new BGAgroArchive.ArchiveLoader({fetcher:fetch.bind(window),parseCSV,baseUrl:FAMA_DAILY,revision:meta.generated_at_utc||'',revisions:meta.archive_versions,availableDates:meta.archive_dates});
       const from=dayOffset(meta.window.max,-37)<meta.window.min?meta.window.min:dayOffset(meta.window.max,-37);
       setLoadingMessage('Loading FAMA observations and 1D／7D／30D baseline dates');
       const result=await loader.loadRange(from,meta.window.max,{onProgress:p=>setLoadingMessage('Loading FAMA observations and 1D／7D／30D baseline dates',p.completed,p.total)});
@@ -1582,7 +1619,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
       if(result.errors.length)toast('Live data loaded, but '+result.errors.length+' dates failed. Retry before exporting those dates.');
     }catch(error){
       if(previous.mode==='live'){
-        sourceMode='live';records=previous.records;comparator=previous.comparator;archiveLoader=previous.loader;archiveMeta=previous.meta;
+        sourceMode='live';records=previous.records;recordCache=previous.recordCache;comparator=previous.comparator;archiveLoader=previous.loader;archiveMeta=previous.meta;
         toast('Refresh failed; keeping the last loaded FAMA data. '+error.message);
       }else{
         sourceMode='error';toast('Unable to load live FAMA archive: '+error.message);
@@ -1645,7 +1682,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     for(const r of combined){if(!/^\d{4}-\d{2}-\d{2}$/.test(r.tarikh_harga)||!Number.isFinite(number(r.harga)))continue;
       const key=r.priceid||COLUMNS.map(c=>r[c]).join('|');if(seen.has(key))continue;seen.add(key);valid.push(r);}
     if(!valid.length){displaySource();toast('No records with valid date and price found.');return;}
-    records=valid;comparator=new BGAgroCompare.MatchedMarketComparator(records);sourceMode='local';state.home.date='';state.home.compareProduct='';state.home.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';state.home.visible=12;state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';state.raw.category='';state.raw.grade='';state.raw.state='';state.price.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';chartSelected.clear();rawPage=0;
+    records=valid;rebuildRecordCache();comparator=new BGAgroCompare.MatchedMarketComparator(records);sourceMode='local';state.home.date='';state.home.compareProduct='';state.home.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';state.home.visible=12;state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';state.raw.category='';state.raw.grade='';state.raw.state='';state.price.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';chartSelected.clear();rawPage=0;
     initFilters();displaySource();onTab('home');toast(valid.length.toLocaleString()+' original records loaded locally.'+(errors.length?' '+errors.length+' files skipped.':''));
   }
   async function exportExcel(raw){
@@ -1675,10 +1712,16 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
       toast('Excel prepared: '+result.rows.toLocaleString()+' rows across '+result.sheets+' sheets.');
     }catch(e){toast('Excel could not be generated: '+e.message);}finally{button.disabled=false;button.textContent=original;}
   }
+  function debounce(task,delay=180){
+    let timer;
+    return ()=>{clearTimeout(timer);timer=setTimeout(task,delay);};
+  }
   function bind(){
+    const debouncedHome=debounce(renderHome),debouncedPrices=debounce(renderPrices);
+    const debouncedMarket=debounce(renderMarketRows),debouncedRaw=debounce(renderRaw);
     document.querySelectorAll('.nav-tab').forEach(b=>b.addEventListener('click',()=>onTab(b.dataset.tab)));
     for(const [id,key] of [['home-state','negeri'],['home-category','category'],['home-level','level'],['home-sort','sort'],['home-search','search']]){
-      $(id).addEventListener(id==='home-search'?'input':'change',e=>{state.home[key]=e.target.value;state.home.visible=12;renderHome();});
+      $(id).addEventListener(id==='home-search'?'input':'change',e=>{state.home[key]=e.target.value;state.home.visible=12;if(key==='search')debouncedHome();else renderHome();});
     }
     $('home-date').addEventListener('change',e=>{state.home.date=e.target.value;state.home.visible=12;ensureHomeContext().catch(err=>toast('无法加载指定日期：'+err.message));});
     $('home-more').addEventListener('click',()=>{state.home.visible+=12;renderHome();});
@@ -1699,7 +1742,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     $('import-button').addEventListener('click',()=>$('csv-picker').click());
     $('refresh-live').addEventListener('click',()=>loadLive());
     $('csv-picker').addEventListener('change',async e=>{await importFiles(e.target.files);e.target.value='';});
-    for(const [id,key] of [['price-category','category'],['price-state','negeri'],['price-date','date'],['price-grade','grade'],['price-search','search']]){$(id).addEventListener(id==='price-search'?'input':'change',e=>{state.price[key]=e.target.value;if(key==='date')ensurePriceContext().catch(err=>toast(err.message));else renderPrices();});}
+    for(const [id,key] of [['price-category','category'],['price-state','negeri'],['price-date','date'],['price-grade','grade'],['price-search','search']]){$(id).addEventListener(id==='price-search'?'input':'change',e=>{state.price[key]=e.target.value;if(key==='date')ensurePriceContext().catch(err=>toast(err.message));else if(key==='search')debouncedPrices();else renderPrices();});}
     for(const [id,key] of [['compare-product','product'],['compare-level','level'],['compare-date','date'],['compare-period','period']]){$(id).addEventListener('change',e=>{state.compare[key]=e.target.value;if(key==='product'||key==='level'){chartSelected.clear();state.compare.trendMarket='';}if(key==='date'||key==='period')ensureCompareContext().catch(err=>toast(err.message));else renderCompare();});}
     $('trend-mode').addEventListener('change',e=>{state.compare.trendMode=e.target.value;renderCompare();});
     $('trend-market').addEventListener('change',e=>{state.compare.trendMarket=e.target.value;renderCompare();});
@@ -1712,10 +1755,10 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     });
     $('market-state-filter').addEventListener('change',e=>{state.market.negeri=e.target.value;state.market.daerah='';state.market.page=0;renderMarketRows();});
     $('market-district-filter').addEventListener('change',e=>{state.market.daerah=e.target.value;state.market.page=0;renderMarketRows();});
-    $('market-search').addEventListener('input',e=>{state.market.search=e.target.value;state.market.page=0;renderMarketRows();});
+    $('market-search').addEventListener('input',e=>{state.market.search=e.target.value;state.market.page=0;debouncedMarket();});
     $('market-prev').addEventListener('click',()=>{state.market.page--;renderMarketRows();});
     $('market-next').addEventListener('click',()=>{state.market.page++;renderMarketRows();});
-    for(const [id,key] of [['raw-from','from'],['raw-to','to'],['raw-state','state'],['raw-level','level'],['raw-search','search'],['raw-category','category'],['raw-grade','grade'],['raw-market','market']]){$(id).addEventListener(['raw-search','raw-market'].includes(id)?'input':'change',e=>{state.raw[key]=e.target.value;rawPage=0;renderRaw();});}
+    for(const [id,key] of [['raw-from','from'],['raw-to','to'],['raw-state','state'],['raw-level','level'],['raw-search','search'],['raw-category','category'],['raw-grade','grade'],['raw-market','market']]){$(id).addEventListener(['raw-search','raw-market'].includes(id)?'input':'change',e=>{state.raw[key]=e.target.value;rawPage=0;if(key==='search'||key==='market')debouncedRaw();else renderRaw();});}
     $('raw-reset').addEventListener('click',()=>{const latest=dates()[0]||'';state.raw={from:latest?dayOffset(latest,-6):'',to:latest,state:'',level:'',search:'',category:'',grade:'',market:''};initFilters();rawPage=0;renderRaw();});
     $('load-raw-range').addEventListener('click',async()=>{const b=$('load-raw-range');b.disabled=true;b.textContent='Loading original CSVs…';try{await ensureRawRange();initFilters();renderRaw();toast('Selected date range is ready for Excel export.');}catch(error){toast(error.message);}finally{b.disabled=false;b.textContent='Load selected range';}});
     $('all-columns').addEventListener('change',()=>{rawPage=0;renderRaw();});

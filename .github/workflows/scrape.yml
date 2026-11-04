@@ -64,23 +64,53 @@ jobs:
           echo "Started MYT: $(TZ=Asia/Kuala_Lumpur date '+%Y-%m-%d %H:%M:%S MYT')"
 
       - name: Run backend tests
+        # Source-data polls reuse the already-tested code; code pushes and
+        # manual runs execute the entire regression suite.
+        if: github.event_name != 'schedule'
         run: |
           python -m pip install -r requirements.txt
           python -m pytest -q
 
       - name: Setup Node.js for dashboard tests
+        if: github.event_name != 'schedule'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
       - name: Run Algorithm V2 browser-logic tests
+        if: github.event_name != 'schedule'
         run: node --test tests/test_dashboard_algorithm.cjs
 
       - name: Scrape rolling FAMA price window
-        run: python -m scraper.scrape
+        env:
+          TRIGGER_CRON: ${{ github.event.schedule }}
+        run: |
+          # Check recent survey days frequently. The late-night full scan
+          # still captures older backfills and corrections within FAMA's
+          # rolling source window. Manual/push runs always scan everything.
+          if [ -z "$TRIGGER_CRON" ] || [ "$TRIGGER_CRON" = "15 15 * * *" ]; then
+            echo "Full rolling-window verification."
+            python -m scraper.scrape
+          else
+            echo "Fast update: latest five available FAMA survey dates."
+            python -m scraper.scrape --limit-dates 5
+          fi
 
-      - name: Rebuild dashboard JSON
-        run: python -m scraper.aggregate
+      - name: Rebuild dashboard JSON when needed
+        env:
+          TRIGGER_EVENT: ${{ github.event_name }}
+        run: |
+          # No CSV changes means all existing aggregate values are unchanged.
+          # Never skip a code push/manual rebuild, or the initial rollout of
+          # per-file content versions in meta.json.
+          if [ "$TRIGGER_EVENT" = "schedule" ] && \
+             git diff --quiet -- data/daily && \
+             [ -z "$(git ls-files --others --exclude-standard -- data/daily)" ] && \
+             python -c 'import json,pathlib,sys; p=pathlib.Path("site/data/meta.json"); data=json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}; sys.exit(0 if data.get("archive_versions") else 1)'; then
+            echo "Archive CSVs unchanged; reusing tested JSON aggregates."
+          else
+            python -m scraper.aggregate
+          fi
 
       # A successful scrape is not necessarily a new daily price publication.
       # Show a warning and a separate GitHub summary when FAMA's data is old,

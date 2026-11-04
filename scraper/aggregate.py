@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import re
 import statistics
@@ -128,6 +129,11 @@ def parse_date(raw: str) -> Optional[str]:
 def parse_day(raw: str) -> Optional[_date]:
     """'YYYY-MM-DD' -> date, or None when unparseable."""
     try:
+        # ISO parsing avoids the much slower locale-aware strptime path for
+        # the hundreds of thousands of FAMA dates processed every run.
+        if isinstance(raw, str) and len(raw) == 10:
+            return _date.fromisoformat(raw)
+        # Keep the old parser for non-zero-padded legacy input.
         return datetime.strptime(raw, "%Y-%m-%d").date()
     except (TypeError, ValueError):
         return None
@@ -137,6 +143,13 @@ def parse_systemdate(raw: str) -> Optional[datetime]:
     raw = (raw or "").strip()
     if not raw:
         return None
+    # FAMA exports ISO-like timestamps (with or without fractional seconds).
+    # Only use the fast path for formats previously accepted by strptime.
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,6})?", raw):
+        try:
+            return datetime.fromisoformat(raw)
+        except ValueError:
+            return None
     for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
         try:
             return datetime.strptime(raw, fmt)
@@ -615,9 +628,18 @@ def aggregate(daily_dir: Path, out_dir: Path) -> dict:
     removed_states = prune_dir(state_dir, {f"{s}.json" for s in states_sorted})
 
     meta = build_meta(systemdate_dts, row_count, min_date, latest_date)
-    # Explicit archive manifest: distinguish survey dates without CSVs from missing expected files.
-    meta["archive_dates"] = sorted(path.stem for path in daily_dir.glob("*.csv")
-                                   if re.fullmatch(r"\d{4}-\d{2}-\d{2}", path.stem))
+    # Per-file content versions let browsers reuse an unchanged daily CSV even
+    # when a scheduled check updates the archive-generation timestamp. A late
+    # correction changes only that day's revision, not every historical URL.
+    daily_files = sorted(
+        path for path in daily_dir.glob("*.csv")
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", path.stem)
+    )
+    meta["archive_dates"] = [path.stem for path in daily_files]
+    meta["archive_versions"] = {
+        path.stem: hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+        for path in daily_files
+    }
     with open(out_dir / "meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, separators=(",", ":"))
 

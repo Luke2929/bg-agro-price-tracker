@@ -43,6 +43,40 @@ test('freshness badge uses Malaysia local date and distinguishes survey age from
   assert.match(html,/不会立即从 FAMA 抓取/);
   assert.doesNotMatch(html,/● LIVE FAMA DATA/);
 });
+test('browser caches record indexes by date and product without changing visible facets',()=>{
+  const start=html.indexOf('  function buildRecordCache(rows){');
+  const end=html.indexOf('  let recordCache=buildRecordCache([]);',start);
+  assert.ok(start>=0&&end>start);
+  const build=vm.runInNewContext(html.slice(start,end)+'; buildRecordCache',{
+    productKey:r=>[r.varieti,r.gred,r.unit].join('||'),
+    unique:values=>[...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b))
+  });
+  const first={...row('2026-11-02','A',3),kategori:'Sayur-Sayuran'};
+  const second={...row('2026-11-01','B',4),kategori:'Sayur-Sayuran'};
+  const result=build([first,second]);
+  assert.equal(result.byDate.get('2026-11-02').length,1);
+  assert.equal(result.byProduct.get(productKey(first)).length,2);
+  assert.equal([...result.dates].join(','),'2026-11-02,2026-11-01');
+  assert.equal([...result.categories].join(','),'Sayur-Sayuran');
+  assert.equal(result.products.length,1);
+});
+test('streaming CSV parser preserves 17 columns, quoted fields, newlines and missing columns',()=>{
+  const start=html.indexOf('  function parseCSV(text){');
+  const end=html.indexOf('  function setLoadingMessage(',start);
+  assert.ok(start>=0&&end>start);
+  const columns='priceid,tarikh_harga,systemdate,negeri,daerah,lokasi,peringkat,sublevel,kategori,kumpulan,jenis,varieti,gred,unit,harga,average14,supply'.split(',');
+  const parse=vm.runInNewContext(html.slice(start,end)+'; parseCSV',{COLUMNS:columns});
+  const csv='\uFEFFharga,unit,gred,varieti,peringkat,lokasi,negeri,tarikh_harga,priceid,daerah\r\n'+
+    '"4.20",Kilogram,A,"KACANG ""BENDI""",Runcit,"PASAR\nTAMAN",PERAK,2026-11-02,42,KINTA\r\n\r\n';
+  const result=parse(csv);
+  assert.equal(result.length,1);
+  assert.deepEqual(Object.keys(result[0]),columns);
+  assert.equal(result[0].varieti,'KACANG "BENDI"');
+  assert.equal(result[0].lokasi,'PASAR\nTAMAN');
+  assert.equal(result[0].harga,'4.20');
+  assert.equal(result[0].supply,'');
+  assert.throws(()=>parse('priceid,harga\n1,2'),/Missing original FAMA columns/);
+});
 test('equal-weight market average is not distorted by duplicate rows',()=>{
   const values=[row('2026-11-02','A',4),row('2026-11-02','A',6),row('2026-11-02','B',10)];
   const result=marketAverage(values);
@@ -112,6 +146,19 @@ test('archive manifest distinguishes known missing files and legitimate non-repo
   assert.ok(loader.absent.has('2026-11-01'));
   await assert.rejects(loader.fetchDate('2026-11-02'),/Expected FAMA CSV missing/);
   assert.equal(requests,3);
+});
+test('each daily CSV uses a stable content revision and only its correction changes URL',async()=>{
+  const urls=[];
+  const loader=new ArchiveLoader({
+    fetcher:async url=>{urls.push(url);return {ok:true,status:200,text:async()=>''};},
+    parseCSV:()=>[],baseUrl:'https://example.test/daily/',revision:'old-build-time',
+    revisions:{'2026-11-01':'content-a','2026-11-02':'content-b'},
+    availableDates:['2026-11-01','2026-11-02','2026-11-03']
+  });
+  await loader.loadDates(['2026-11-01','2026-11-02','2026-11-03']);
+  assert.ok(urls.some(url=>url.endsWith('2026-11-01.csv?rev=content-a')));
+  assert.ok(urls.some(url=>url.endsWith('2026-11-02.csv?rev=content-b')));
+  assert.ok(urls.some(url=>url.endsWith('2026-11-03.csv?rev=old-build-time')));
 });
 test('stock-style market history control and 17 original export fields remain in dashboard',()=>{
   assert.match(html,/id="trend-mode"/);
