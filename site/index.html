@@ -364,10 +364,12 @@ footer{font-size:11px;color:#647a6c;border-top-color:#dce7df}
 
 
 /* Daily monitoring improvements — compact provenance, watchlist and full market browsing. */
-.freshness-strip{width:min(100%,1550px);margin:0 auto;padding:15px clamp(20px,4vw,66px) 0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.freshness-strip{width:min(100%,1550px);margin:0 auto;padding:15px clamp(20px,4vw,66px) 0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 .freshness-strip>div{padding:13px 16px;border:1px solid #dce8df;border-radius:12px;background:#fff;min-width:0}
 .freshness-strip span{display:block;color:#70867a;font-weight:750;font-size:10px;letter-spacing:.75px}
 .freshness-strip strong{display:block;margin-top:5px;font-size:16px;color:#225642;font-weight:760;line-height:1.35;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.freshness-strip strong[data-freshness="pending"]{color:#8b6b22}
+.freshness-strip strong[data-freshness="delayed"],.freshness-strip strong[data-freshness="older"]{color:#b46335}
 .freshness-strip+main{padding-top:29px}
 .market-filters{padding:0 24px 21px;display:grid;grid-template-columns:1fr 1fr minmax(220px,1.6fr);gap:13px}
 .market-filters .field>span{font-size:10px}
@@ -589,7 +591,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
  <header class="topbar">
   <div class="brand"><span class="brand-symbol">✳</span><span><strong>BG Agro</strong><small>农产品价格透明系统 <b>FAMA DATA</b></small></span></div>
   <nav class="nav-tabs" aria-label="Dashboard pages"><button class="nav-tab active" data-tab="home">农价首页</button><button class="nav-tab" data-tab="prices">价格明细</button><button class="nav-tab" data-tab="compare">州际比较 · 趋势</button><button class="nav-tab" data-tab="watchlist">我的关注</button><button class="nav-tab" data-tab="data">数据 · Excel</button></nav>
-  <div class="header-actions"><span id="source-badge" class="source-badge">● CONNECTING</span><button class="outline-button" id="import-button">↥ 导入 CSV</button><button class="dark-button" id="refresh-live">↻ 刷新数据</button></div>
+  <div class="header-actions"><span id="source-badge" class="source-badge">● CONNECTING</span><button class="outline-button" id="import-button">↥ 导入 CSV</button><button class="dark-button" id="refresh-live" title="重新读取 GitHub 上已收集的资料；不会立即从 FAMA 抓取">↻ 重新载入档案</button></div>
  </header>
  <input type="file" id="csv-picker" accept=".csv,text/csv" multiple hidden>
  <div class="source-banner"><span class="status-pip"></span><p id="source-message" aria-live="polite"><b>Connecting to FAMA archive…</b> Loading original CSV records from your GitHub repository.</p><span id="source-date" class="source-date">Checking latest FAMA survey date…</span></div>
@@ -597,7 +599,8 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   <div><span>最新调查日期</span><strong id="fresh-latest">—</strong></div>
   <div><span>已载入原始记录</span><strong id="fresh-loaded">—</strong></div>
   <div><span>已载入日期范围</span><strong id="fresh-range">—</strong></div>
-  <div><span>档案更新时间 (MYT)</span><strong id="fresh-built">—</strong></div>
+  <div><span>最后整理档案 (MYT)</span><strong id="fresh-built">—</strong></div>
+  <div><span>最新资料状态 (MYT)</span><strong id="fresh-status">—</strong></div>
  </div>
  <main>
   <section class="screen active home-screen" data-screen="home">
@@ -1112,21 +1115,38 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     $('raw-level').value=state.raw.level;$('raw-search').value=state.raw.search;$('raw-market').value=state.raw.market;
     $('price-search').value=state.price.search;
   }
+  function dataFreshness(latest,now=new Date()){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(latest||''))return {kind:'unavailable',label:'尚无日期资料'};
+    const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{
+      timeZone:'Asia/Kuala_Lumpur',year:'numeric',month:'2-digit',day:'2-digit',
+      hour:'2-digit',hourCycle:'h23'
+    }).formatToParts(now).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));
+    const today=`${parts.year}-${parts.month}-${parts.day}`;
+    const daysBehind=Math.round((Date.parse(today+'T00:00:00Z')-Date.parse(latest+'T00:00:00Z'))/86400000);
+    if(!Number.isFinite(daysBehind))return {kind:'unavailable',label:'日期格式错误'};
+    if(daysBehind<=0)return {kind:'current',label:'当日已有调查记录'};
+    if(daysBehind===1&&Number(parts.hour)<14)return {kind:'pending',label:'等待今日调查记录'};
+    if(daysBehind===1)return {kind:'delayed',label:'今日尚未同步'};
+    return {kind:'older',label:`资料落后 ${daysBehind} 天`};
+  }
   function displaySource(){
     const observedDates=dates(),last=observedDates[0]||'—',count=records.length.toLocaleString();
     const built=sourceMode==='live'&&archiveMeta?.generated_at_utc?new Date(archiveMeta.generated_at_utc).toLocaleString('en-MY',{timeZone:'Asia/Kuala_Lumpur',dateStyle:'medium',timeStyle:'short'})+' MYT':sourceMode==='local'?'Local CSV':'—';
+    const freshness=sourceMode==='live'?dataFreshness(last):sourceMode==='local'?{kind:'local',label:'本地 CSV'}:{kind:'unavailable',label:'—'};
     $('fresh-latest').textContent=last;
     $('fresh-loaded').textContent=(sourceMode==='live'||sourceMode==='local')?count:'—';
     $('fresh-range').textContent=observedDates.length?observedDates.at(-1)+' → '+observedDates[0]:'—';
     $('fresh-built').textContent=built;
+    $('fresh-status').textContent=freshness.label;
+    $('fresh-status').dataset.freshness=freshness.kind;
     $('home-latest').textContent=last;
-    $('home-status').textContent=sourceMode==='live'?'真实 FAMA CSV · 已载入':sourceMode==='local'?'本地导入的原始 CSV':sourceMode==='error'?'来源暂时不可用':'正在载入原始记录…';
+    $('home-status').textContent=sourceMode==='live'?'FAMA 原始 CSV · '+freshness.label:sourceMode==='local'?'本地导入的原始 CSV':sourceMode==='error'?'来源暂时不可用':'正在载入原始记录…';
     $('source-badge').classList.toggle('loaded',sourceMode==='live'||sourceMode==='local');
     if(sourceMode==='live'){
-      $('source-badge').textContent='● LIVE FAMA DATA';
+      $('source-badge').textContent='● FAMA ARCHIVE';
       $('source-date').textContent='Latest FAMA survey: '+last;
       const stamp=archiveMeta?.generated_at_utc?new Date(archiveMeta.generated_at_utc).toLocaleString('en-MY',{timeZone:'Asia/Kuala_Lumpur',dateStyle:'medium',timeStyle:'short'})+' MYT':'unknown';
-      $('source-message').innerHTML='<b>Original FAMA records.</b> '+count+' source rows loaded from your GitHub archive · latest archive update '+escapeHtml(stamp)+'.'+(loadErrors.length?' <b>Warning:</b> '+loadErrors.length+' dates failed to load; retry before exporting those dates.':'');
+      $('source-message').innerHTML='<b>FAMA 档案日期：'+escapeHtml(last)+' · '+escapeHtml(freshness.label)+'</b>。已从 GitHub 载入 '+count+' 条原始记录；最后整理档案：'+escapeHtml(stamp)+'。档案更新时间不代表 FAMA 当日已发布新价格。'+(loadErrors.length?' <b>注意：</b>'+loadErrors.length+' 个日期载入失败，导出前请重试。':'');
     }else if(sourceMode==='local'){
       $('source-badge').textContent='● LOCAL CSV LOADED';
       $('source-date').textContent='Latest imported survey: '+last;
@@ -1134,7 +1154,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     }else if(sourceMode==='error'){
       $('source-badge').textContent='● DATA UNAVAILABLE';
       $('source-date').textContent='No live FAMA prices loaded';
-      $('source-message').innerHTML='<b>Live archive could not be loaded.</b> Click Refresh Live to retry, or Import CSV. No example prices are shown.';
+      $('source-message').innerHTML='<b>GitHub 档案暂时无法载入。</b> 请点击「重新载入档案」或导入 CSV。页面不会使用示例价格。';
     }else{
       $('source-badge').textContent='● LOADING FAMA';
       $('source-date').textContent='Connecting to the original FAMA archive…';

@@ -29,6 +29,20 @@ test('all four embedded browser scripts parse without syntax errors',()=>{
   assert.equal(scripts.length,4);
   for(const code of scripts)assert.doesNotThrow(()=>new vm.Script(code));
 });
+test('freshness badge uses Malaysia local date and distinguishes survey age from archive refresh',()=>{
+  const start=html.indexOf('  function dataFreshness(latest,now=new Date()){');
+  const end=html.indexOf('  function displaySource(){',start);
+  assert.ok(start>=0&&end>start);
+  const check=vm.runInNewContext(html.slice(start,end)+'; dataFreshness',{Date,Intl});
+  assert.equal(check('2026-11-04',new Date('2026-11-03T17:00:00Z')).kind,'current');
+  assert.equal(check('2026-11-03',new Date('2026-11-04T01:00:00Z')).kind,'pending');
+  assert.equal(check('2026-11-03',new Date('2026-11-04T08:00:00Z')).kind,'delayed');
+  assert.equal(check('2026-11-02',new Date('2026-11-04T08:00:00Z')).kind,'older');
+  assert.equal(check('—',new Date('2026-11-04T08:00:00Z')).kind,'unavailable');
+  assert.match(html,/id="fresh-status"/);
+  assert.match(html,/不会立即从 FAMA 抓取/);
+  assert.doesNotMatch(html,/● LIVE FAMA DATA/);
+});
 test('equal-weight market average is not distorted by duplicate rows',()=>{
   const values=[row('2026-11-02','A',4),row('2026-11-02','A',6),row('2026-11-02','B',10)];
   const result=marketAverage(values);
