@@ -76,6 +76,36 @@ def latest_row(out_dir: Path, slug: str, level: str = "Runcit", state=None) -> d
     return next(r for r in doc["rows"] if r["id"] == slug and r["level"] == level)
 
 
+def test_redated_priceid_is_excluded_from_current_series_but_archived(tmp_path):
+    daily_dir, out_dir = dirs(tmp_path)
+    write_daily_csv(daily_dir, "2026-07-20", [
+        make_row("42", "2026-07-20", harga="10.00"),
+        make_row("43", "2026-07-20", harga="20.00"),
+    ])
+    write_daily_csv(daily_dir, "2026-07-21", [
+        make_row("42", "2026-07-21", harga="12.00"),
+    ])
+
+    result = aggregate.aggregate(daily_dir, out_dir)
+    series = load(out_dir, "series", "bayam.json")
+    meta = load(out_dir, "meta.json")
+    assert series["national"]["Runcit"] == [20.0, 12.0]
+    assert result["archive_row_count"] == 3
+    assert result["row_count"] == 2
+    assert meta["row_count"] == 3
+    assert meta["canonical_row_count"] == 2
+    assert meta["superseded_priceids"] == {"2026-07-20": ["42"]}
+    # No original source row is deleted or rewritten by aggregation.
+    assert len(aggregate.read_rows(daily_dir)) == 3
+
+
+def test_nonfinite_source_price_is_treated_as_missing():
+    assert aggregate.parse_decimal("NaN") is None
+    assert aggregate.parse_decimal("Infinity") is None
+    assert aggregate.parse_decimal("-Infinity") is None
+    assert aggregate.parse_decimal("2.50") == aggregate.Decimal("2.50")
+
+
 # ---------------------------------------------------------------------
 # National average = mean over ALL rows, not mean of per-state means
 # ---------------------------------------------------------------------

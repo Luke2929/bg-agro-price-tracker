@@ -84,9 +84,13 @@ priceid,tarikh_harga,systemdate,negeri,daerah,lokasi,peringkat,sublevel,kategori
 ```
 
 - `tarikh_harga` as `YYYY-MM-DD`; `harga`/`average14` as decimal strings; empty for null.
-- Scraper re-fetches the **entire available window** each run and merges by `priceid`
-  (new rows added, existing rows overwritten with latest values) — idempotent,
-  self-healing for missed days, captures late corrections.
+- Scheduled daytime polls scan the latest five available survey dates; the nightly,
+  manual and code-push runs scan the entire upstream rolling window. Per-date CSVs
+  merge by `priceid`, preserving older source snapshots for auditability.
+- **V2.2 canonicalization:** an existing `priceid` can move to a different FAMA
+  survey date. The archived rows are never deleted solely for that reason, but
+  the latest dated version is the only one included in current-price calculations.
+  `meta.json.superseded_priceids` identifies prior versions for the browser.
 
 ## 4. Contract B — dashboard JSONs (`site/data/`)
 
@@ -100,9 +104,10 @@ priceid,tarikh_harga,systemdate,negeri,daerah,lokasi,peringkat,sublevel,kategori
   - `wow` = `price` minus nearest non-null point on or before `date - 7 days`; `wow_from` = its date; null if none.
   - `reliable` = false when the dod comparison is distorted by basket change: prev point's `n` differs by >50% or the contributing state sets' Jaccard overlap < 50% (exact set equality proved too strict — FAMA rotates surveyed states week to week); UI must exclude `reliable:false` rows from Top Movers (still shown in the table).
 - `latest_state/<STATE>.json` — same shape as `latest.json` plus a `"state"` key, computed over
-  that state's rows only (one file per state in catalog `states`, raw state string as filename,
-  URL-encoded by the client). UI state scopes MUST use these, not client-side series scans.
-- `meta.json` — `{ "generated_at_utc", "window": {...}, "row_count", "update_times": {"by_hour": {"00".."23": count}, "median_entry_local": "HH:MM", "note"}, "source": "..." }`
+  that state's rows only (one file per state in catalog `states`, raw state string as filename).
+  These are legacy derived API artifacts; the current browser Dashboard calculates
+  state prices and matched-market movements from canonical original CSV records.
+- `meta.json` — `{ "generated_at_utc", "window": {...}, "row_count", "canonical_row_count", "superseded_row_count", "superseded_priceids": {date: [priceid, ...]}, "archive_dates": [...], "archive_versions": {...}, "update_times": {...}, "source": "..." }`. `row_count` includes every archived CSV row; canonical counts exclude older re-dated versions.
 - Slug: lowercase varieti + grade when needed for uniqueness, non-alnum → `-`.
 - Product identity = (`varieti`, `gred`) when a varieti has >1 grade (e.g. TELUR AYAM A/B/C),
   else `varieti` alone.
@@ -113,9 +118,12 @@ priceid,tarikh_harga,systemdate,negeri,daerah,lokasi,peringkat,sublevel,kategori
   catalog are deleted from `site/data/series/`.
 - `catalog.json` products carry only fields the UI reads: `id,name,kategori,unit,grades`
   (drop `levels`/`latest` — dead payload).
-- Comparison-date semantics are UNIFIED across aggregator and UI: any DoD/WoW figure is
-  disclosed with its actual comparison date (`dod_from`/`wow_from`); the UI must label
-  "vs <date>" rather than claiming "day on day" when the gap ≠ 1 day.
+- Comparison-date semantics: every DoD/WoW figure is disclosed with its actual
+  baseline date, not misrepresented as an exact one-day gap. **Important:** the
+  legacy generated JSONs still use row-weighted cross-sectional means; the
+  current Dashboard calculates equal-market weights and matched-market changes
+  directly from canonical original CSVs. These methods must not be presented as
+  the same series until the JSON API has been versioned and migrated.
 
 ## 5. Dashboard (Phase 4)
 
@@ -134,9 +142,12 @@ Mobile-friendly (user will check prices on phone).
 ## 6. Automation (Phase 5)
 
 `.github/workflows/scrape.yml`:
-- `schedule`: `30 4 * * *` (12:30 MYT) and `0 15 * * *` (23:00 MYT) + `workflow_dispatch`.
-- Steps: checkout → setup-python → `python -m scraper.scrape` → `python -m scraper.aggregate`
-  → commit & push if changed → deploy Pages (actions/deploy-pages from `site/`).
+- `schedule`: 09:37–21:37 every two hours MYT (recent five dates), plus a full
+  23:37 MYT scan; `workflow_dispatch` remains available. GitHub's timezone is
+  explicitly `Asia/Kuala_Lumpur`. Scheduled triggers may still be delayed/dropped.
+- Steps: checkout → setup-python → `python -m scraper.scrape` → conditional
+  aggregate → freshness audit → commit & push if changed → deploy Pages only
+  when data/code changed.
 - Concurrency group to avoid overlapping runs; commit as github-actions bot.
 
 ## 7. Verification requirements (every phase)

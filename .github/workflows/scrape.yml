@@ -6,13 +6,13 @@ name: BG Agro - Auto Update FAMA Prices
 
 on:
   schedule:
-    # Malaysia Time (UTC+8): 1:15 PM, 5:15 PM, 9:15 PM, 11:15 PM.
-    # GitHub's scheduler may delay any of these runs; retries give late FAMA
-    # entries another chance to reach the dashboard on the same day.
-    - cron: "15 5 * * *"
-    - cron: "15 9 * * *"
-    - cron: "15 13 * * *"
-    - cron: "15 15 * * *"
+    # MYT: poll at off-peak minutes throughout the publication day. GitHub
+    # may still delay or drop schedule events; this is best-effort polling.
+    - cron: "37 9,11,13,15,17,19,21 * * *"
+      timezone: "Asia/Kuala_Lumpur"
+    # Verify the entire upstream rolling window once nightly.
+    - cron: "37 23 * * *"
+      timezone: "Asia/Kuala_Lumpur"
 
   # Allow manual execution
   workflow_dispatch:
@@ -40,6 +40,8 @@ jobs:
   scrape:
     name: Scrape FAMA Data
     runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ github.event_name != 'schedule' || steps.commit_data.outputs.has_changes == 'true' }}
 
     steps:
 
@@ -88,7 +90,7 @@ jobs:
           # Check recent survey days frequently. The late-night full scan
           # still captures older backfills and corrections within FAMA's
           # rolling source window. Manual/push runs always scan everything.
-          if [ -z "$TRIGGER_CRON" ] || [ "$TRIGGER_CRON" = "15 15 * * *" ]; then
+          if [ -z "$TRIGGER_CRON" ] || [ "$TRIGGER_CRON" = "37 23 * * *" ]; then
             echo "Full rolling-window verification."
             python -m scraper.scrape
           else
@@ -119,6 +121,7 @@ jobs:
         run: python -m scripts.check_freshness
 
       - name: Commit updated FAMA data
+        id: commit_data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -130,6 +133,7 @@ jobs:
 
             echo "No new FAMA price changes detected."
             echo "Skipping data commit."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
 
             git reset -q
 
@@ -159,14 +163,18 @@ jobs:
               exit 1
             fi
 
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
           fi
 
       # Prepare GitHub Pages
       - name: Configure GitHub Pages
+        if: github.event_name != 'schedule' || steps.commit_data.outputs.has_changes == 'true'
         uses: actions/configure-pages@v5
 
       # Upload dashboard and generated JSON
       - name: Upload GitHub Pages artifact
+        if: github.event_name != 'schedule' || steps.commit_data.outputs.has_changes == 'true'
         uses: actions/upload-pages-artifact@v4
         with:
           path: site
@@ -179,6 +187,7 @@ jobs:
     name: Deploy BG Agro Dashboard
 
     needs: scrape
+    if: needs.scrape.outputs.should_deploy == 'true'
 
     runs-on: ubuntu-latest
 
