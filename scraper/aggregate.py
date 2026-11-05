@@ -116,7 +116,11 @@ def parse_decimal(raw: str) -> Optional[Decimal]:
     if raw == "":
         return None
     try:
-        return Decimal(raw)
+        value = Decimal(raw)
+        # An upstream text "NaN"/"Infinity" is not a survey price. The Power
+        # BI decoder already blanks float NaNs, but the aggregate layer must
+        # remain safe if a non-finite string slips through.
+        return value if value.is_finite() else None
     except Exception:
         return None
 
@@ -170,6 +174,44 @@ def read_rows(daily_dir: Path) -> List[dict]:
             for r in reader:
                 rows.append(r)
     return rows
+
+
+def canonicalize_rows(rows: List[dict]) -> Tuple[List[dict], Dict[str, List[str]]]:
+    """Select one current observation per FAMA priceid without erasing history.
+
+    FAMA occasionally changes ``tarikh_harga`` for an existing priceid. The
+    append-preserving CSV archive then contains both the previous and corrected
+    dates. The newer survey date wins for price calculations; the older rows
+    remain in data/daily for a faithful archival export. A compact manifest
+    lets the browser apply the same decision even when only part of the
+    historical window has been downloaded.
+    """
+    winner: Dict[str, int] = {}
+    for index, row in enumerate(rows):
+        priceid = (row.get("priceid") or "").strip()
+        if not priceid:
+            continue
+        previous = winner.get(priceid)
+        if previous is None:
+            winner[priceid] = index
+            continue
+        # Date changes have precedence; later rows win on an exact-date tie.
+        if (row.get("tarikh_harga") or "") >= (
+            rows[previous].get("tarikh_harga") or ""
+        ):
+            winner[priceid] = index
+
+    current: List[dict] = []
+    superseded: Dict[str, List[str]] = defaultdict(list)
+    for index, row in enumerate(rows):
+        priceid = (row.get("priceid") or "").strip()
+        if priceid and winner[priceid] != index:
+            superseded[row.get("tarikh_harga") or ""].append(priceid)
+        else:
+            current.append(row)
+    return current, {
+        date: sorted(set(ids)) for date, ids in sorted(superseded.items())
+    }
 
 
 # --------------------------------------------------------------------------
@@ -466,7 +508,8 @@ def aggregate(daily_dir: Path, out_dir: Path) -> dict:
     series_dir.mkdir(parents=True, exist_ok=True)
     state_dir.mkdir(parents=True, exist_ok=True)
 
-    rows = read_rows(daily_dir)
+    archived_rows = read_rows(daily_dir)
+    rows, superseded = canonicalize_rows(archived_rows)
     split_varieti = compute_split_varieti(rows)
 
     all_dates: set = set()
@@ -627,7 +670,10 @@ def aggregate(daily_dir: Path, out_dir: Path) -> dict:
     removed_series = prune_dir(series_dir, {f"{s}.json" for s in live_slugs})
     removed_states = prune_dir(state_dir, {f"{s}.json" for s in states_sorted})
 
-    meta = build_meta(systemdate_dts, row_count, min_date, latest_date)
+    meta = build_meta(systemdate_dts, len(archived_rows), min_date, latest_date)
+    meta["canonical_row_count"] = row_count
+    meta["superseded_row_count"] = len(archived_rows) - row_count
+    meta["superseded_priceids"] = superseded
     # Per-file content versions let browsers reuse an unchanged daily CSV even
     # when a scheduled check updates the archive-generation timestamp. A late
     # correction changes only that day's revision, not every historical URL.
@@ -645,6 +691,8 @@ def aggregate(daily_dir: Path, out_dir: Path) -> dict:
 
     return {
         "row_count": row_count,
+        "archive_row_count": len(archived_rows),
+        "superseded_row_count": len(archived_rows) - row_count,
         "product_count": len(catalog_products),
         "dates": catalog["dates"],
         "states": states_sorted,

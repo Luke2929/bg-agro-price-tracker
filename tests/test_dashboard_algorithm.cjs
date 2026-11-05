@@ -160,6 +160,44 @@ test('each daily CSV uses a stable content revision and only its correction chan
   assert.ok(urls.some(url=>url.endsWith('2026-11-02.csv?rev=content-b')));
   assert.ok(urls.some(url=>url.endsWith('2026-11-03.csv?rev=old-build-time')));
 });
+test('re-dated price IDs and blank prices remain in raw archive but not active prices',async()=>{
+  const entries={
+    '2026-11-01':[ {...row('2026-11-01','A',5),priceid:'42'} ],
+    '2026-11-02':[ {...row('2026-11-02','A',7),priceid:'42'}, {...row('2026-11-02','B',''),priceid:'43'} ]
+  };
+  const loader=new ArchiveLoader({
+    fetcher:async url=>({ok:true,status:200,text:async()=>url.includes('2026-11-01')?'old':'new'}),
+    parseCSV:text=>entries[text==='old'?'2026-11-01':'2026-11-02'],
+    baseUrl:'https://example.test/daily/',
+    availableDates:Object.keys(entries),
+    supersededPriceids:{'2026-11-01':['42']}
+  });
+  const result=await loader.loadDates(['2026-11-02','2026-11-01']);
+  assert.equal(result.errors.length,0);
+  assert.equal(loader.rawRows().length,3);
+  assert.equal(loader.rows().length,2);
+  assert.equal(loader.rows().find(r=>r.priceid==='42').tarikh_harga,'2026-11-02');
+  assert.equal(loader.rawRows().find(r=>r.priceid==='43').harga,'');
+});
+test('date selectors list actual archived survey files only',()=>{
+  const start=html.indexOf('  function dateChoices(){');
+  const end=html.indexOf('  function categories(){',start);
+  assert.ok(start>=0&&end>start);
+  const choices=html.slice(start,end);
+  assert.match(choices,/archiveMeta\.archive_dates/);
+  assert.doesNotMatch(choices,/BGAgroArchive\.range/);
+});
+test('recent observations render first and 30-day history follows in background',()=>{
+  assert.match(html,/const initialFrom=dayOffset\(meta\.window\.max,-7\)/);
+  assert.match(html,/const historyFrom=dayOffset\(meta\.window\.max,-37\)/);
+  assert.match(html,/loader\.loadRange\(initialFrom,meta\.window\.max/);
+  assert.match(html,/loadRequiredDates\(older,'Background: loading/);
+});
+test('Excel exports explain archived revisions and equal-market averages',()=>{
+  assert.match(html,/Superseded records are retained here for audit/);
+  assert.match(html,/An empty harga is preserved as missing/);
+  assert.match(html,/Mean of equally weighted survey-market prices/);
+});
 test('stock-style market history control and 17 original export fields remain in dashboard',()=>{
   assert.match(html,/id="trend-mode"/);
   assert.match(html,/id="trend-market"/);

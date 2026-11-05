@@ -56,14 +56,16 @@ These are FAMA survey observations, **not offers, guaranteed transaction prices 
 
 | Excel export | Intended use | What's inside |
 | --- | --- | --- |
-| **Summary Data** | Quick review and internal analysis | Observed daily averages grouped by date, produce, state, price level, grade and unit, with counts. |
-| **Full Raw Data** | Sharing original observations with customers or partners | Individual source records with the original 17 data fields (no summary averages replacing source prices). |
+| **Summary Data** | Quick review and internal analysis | Current canonical observations, grouped by date, produce, state, price level, grade and unit, with counts. |
+| **Full Raw Data** | Sharing the original archive with customers or partners | All archived source observations, including records with blank prices and old dates subsequently corrected by FAMA; original 17 fields are retained. |
 
 Full Raw Data fields:
 
 `priceid`, `tarikh_harga`, `systemdate`, `negeri`, `daerah`, `lokasi`, `peringkat`, `sublevel`, `kategori`, `kumpulan`, `jenis`, `varieti`, `gred`, `unit`, `harga`, `average14`, `supply`.
 
-The dashboard initially loads up to **38 calendar days** of original CSV records to support recent comparisons. Unchanged daily CSV files keep a stable content-based cache revision; corrected files receive a new revision. Date and product indexes reduce repeated searches across the loaded records. Older dates in the repository are fetched **on demand** when you select them. A selected-range export checks that the requested dates have been retrieved; it does not silently produce a partial customer file when a download fails.
+The dashboard first loads up to **8 calendar days** of original CSV records so recent prices appear faster, then loads the remaining **30-day comparison baseline** in the background (up to 38 calendar days in total). Comparison figures may be temporarily incomplete until background loading finishes. Unchanged daily CSV files keep a stable content-based cache revision; corrected files receive a new revision. Date and product indexes reduce repeated searches across the loaded records. Older dates in the repository are fetched **on demand** when you select them. A selected-range export checks that the requested dates have been retrieved; it does not silently produce a partial customer file when a download fails.
+
+**Record corrections:** FAMA can assign a new survey date to an existing `priceid`. We preserve both archived versions in `data/daily/`, but only the version with the latest survey date enters current Dashboard calculations and Summary Data. `site/data/meta.json` carries the small `superseded_priceids` manifest so browsers reach the same result regardless of file download order. Full Raw Data intentionally includes every archived revision and missing-price row for auditability; do not mistake superseded archived rows for separate current market quotations.
 
 ## Data source and coverage
 
@@ -87,14 +89,13 @@ flowchart TD
 
 The [GitHub Actions workflow](.github/workflows/scrape.yml) runs automatically at:
 
-| Malaysia Time (MYT, UTC+8) | UTC cron |
+| Malaysia Time (MYT) | Scan type |
 | --- | --- |
-| **1:15 PM** (recent 5 survey dates) | `15 5 * * *` |
-| **5:15 PM** (recent 5 survey dates) | `15 9 * * *` |
-| **9:15 PM** (recent 5 survey dates) | `15 13 * * *` |
-| **11:15 PM** (full rolling window) | `15 15 * * *` |
+| **9:37 AM, 11:37 AM, 1:37 PM, 3:37 PM** | Latest 5 survey dates |
+| **5:37 PM, 7:37 PM, 9:37 PM** | Latest 5 survey dates |
+| **11:37 PM** | Full rolling-window scan |
 
-It can also be triggered manually. Manual executions and code pushes always verify the complete source window, run both test suites, and rebuild the dashboard JSON; routine scheduled checks skip the unchanged-code regression suite and reuse existing aggregates when the CSV archive has not changed. The full nightly scan still captures older corrections and late records. The workflow deploys `site/` to GitHub Pages. This is **scheduled, automatically refreshed data**, not a second-by-second live feed; GitHub Actions may start later than its nominal schedule.
+These schedules explicitly use `Asia/Kuala_Lumpur`. The workflow can also be triggered manually. Manual executions and code pushes always verify the complete source window, run both test suites, and rebuild the dashboard JSON; routine scheduled checks skip the unchanged-code regression suite and reuse existing aggregates when CSVs have not changed. The full nightly scan still captures older corrections and late records. Scheduled runs with no data changes skip redundant Pages deployments. This is **best-effort scheduled data**, not a second-by-second live feed: GitHub Actions can delay or drop scheduled triggers, so strict publication-time guarantees require an independent monitor or scheduler.
 
 ## Project structure
 

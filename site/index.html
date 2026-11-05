@@ -813,8 +813,8 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     if(total===0)throw new Error('No observed prices in this date range. Try a wider range or another filter.');
     const isRaw=metadata.granularity==='raw';
     const about=isRaw
-      ? [['BG AGRO - ORIGINAL FAMA SURVEY RECORDS',''],['Reporting period',metadata.from+' to '+metadata.to],['Data source',metadata.source],['Coverage',metadata.coverage],['Product selection',metadata.selection],['Granularity','Original source rows (not state averages, market averages, or transactions).'],['Price field','harga is the original reported FAMA survey price. Compare only matching unit, grade, product and price level.'],['Price date','tarikh_harga is the survey price date, not the downloaded date.'],['FAMA system entry','systemdate is supplied by the source; it is NOT BG Agro import time.'],['Data completeness','Only original records present in the selected files are exported. Missing days are not invented.'],['Data fields','All 17 original CSV columns in their original order.'],['Filters',metadata.filters||'As selected in BG Agro'],['Rows exported',total],['Available source dates',metadata.min+' to '+metadata.max],['Exported at (MYT)',new Date().toLocaleString('en-MY',{timeZone:'Asia/Kuala_Lumpur',hour12:false})],['Verification','This is a local archive snapshot, not a real-time official FAMA quotation.']]
-      : [['BG AGRO - VEGETABLE PRICE EXPORT',''],['Reporting period',metadata.from+' to '+metadata.to],['Data source',metadata.source],['Coverage',metadata.coverage],['Vegetable selection',metadata.selection],['Price definition','Arithmetic mean of recorded FAMA survey prices, by variety, date, level and state.'],['Data completeness','Only dates with a recorded price are included. Missing observations are not filled or estimated.'],['Granularity','Aggregated daily averages, NOT individual markets, districts, sellers or transactions.'],['Unit','Source unit differs by vegetable. Refer to the Source Unit column.'],['National average','Included as ALL MALAYSIA where requested. It is a separate aggregation, not an extra state survey.'],['Rows exported',total],['Archived date range',metadata.min+' to '+metadata.max],['Exported at (MYT)',new Date().toLocaleString('en-MY',{timeZone:'Asia/Kuala_Lumpur',hour12:false})],['File integrity',metadata.source === 'DEMO ONLY - NOT REAL FAMA DATA' ? 'DEMONSTRATION VALUES. DO NOT PRESENT AS REAL MARKET QUOTATIONS.' : 'Imported file snapshot. Not a live FAMA API quotation.']];
+      ? [['BG AGRO - ORIGINAL FAMA SURVEY RECORDS',''],['Reporting period',metadata.from+' to '+metadata.to],['Data source',metadata.source],['Coverage',metadata.coverage],['Product selection',metadata.selection],['Granularity','Original source rows (not state averages, market averages, or transactions).'],['Price field','harga is the original reported FAMA survey price. Compare only matching unit, grade, product and price level.'],['Price date','tarikh_harga is the survey price date, not the downloaded date.'],['FAMA system entry','systemdate is supplied by the source; it is NOT BG Agro import time.'],['Archived revisions','FAMA may re-date a priceid. Superseded records are retained here for audit, not counted as separate live quotations.'],['Blank price','An empty harga is preserved as missing; it does not mean RM0.'],['Data completeness','Only original records present in the selected files are exported. Missing days are not invented.'],['Data fields','All 17 original CSV columns in their original order.'],['Filters',metadata.filters||'As selected in BG Agro'],['Rows exported',total],['Available source dates',metadata.min+' to '+metadata.max],['Exported at (MYT)',new Date().toLocaleString('en-MY',{timeZone:'Asia/Kuala_Lumpur',hour12:false})],['Verification','This is a local archive snapshot, not a real-time official FAMA quotation.']]
+      : [['BG AGRO - COMMODITY PRICE EXPORT',''],['Reporting period',metadata.from+' to '+metadata.to],['Data source',metadata.source],['Coverage',metadata.coverage],['Product selection',metadata.selection],['Price definition','Mean of equally weighted survey-market prices, by product, grade, unit, date, price level and state.'],['Archived revisions','Older FAMA dates replaced by a later date for the same priceid are excluded.'],['Data completeness','Only dates with a recorded price are included. Missing observations are not filled or estimated.'],['Granularity','Aggregated daily averages, NOT individual markets, districts, sellers or transactions.'],['Unit','Source units vary by commodity. Refer to the Unit column.'],['Rows exported',total],['Archived date range',metadata.min+' to '+metadata.max],['Exported at (MYT)',new Date().toLocaleString('en-MY',{timeZone:'Asia/Kuala_Lumpur',hour12:false})],['File integrity','Imported archive snapshot. Not a live FAMA API quotation.']];
     const notesIndex=sheetNames.length+1;
     const noteXml=sheetStart([43,115],['Field','Value'])+about.map((row,i)=>rowXml(row,i+2,false)).join('')+sheetEnd(about.length,2,false);
     files.push(await zipMember('xl/worksheets/sheet'+notesIndex+'.xml',noteXml));
@@ -965,18 +965,23 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     return days;
   }
   class ArchiveLoader{
-    constructor({fetcher,parseCSV,baseUrl,revision='',revisions=null,availableDates=null,maxConcurrency=5}){
+    constructor({fetcher,parseCSV,baseUrl,revision='',revisions=null,availableDates=null,supersededPriceids=null,maxConcurrency=5}){
       if(typeof fetcher!=='function'||typeof parseCSV!=='function')throw Error('ArchiveLoader requires fetch and CSV parser.');
       this.fetcher=fetcher;this.parseCSV=parseCSV;this.baseUrl=baseUrl.replace(/\/+$/,'')+'/';
       this.revision=revision;
       this.revisions=revisions&&typeof revisions==='object'&&!Array.isArray(revisions)?revisions:{};
       this.maxConcurrency=maxConcurrency;
       this.availableDates=Array.isArray(availableDates)?new Set(availableDates):null;
+      this.superseded=new Set();
+      for(const [date,ids] of Object.entries(supersededPriceids||{})){
+        if(Array.isArray(ids))for(const id of ids)this.superseded.add(date+'|'+id);
+      }
       this.loaded=new Set();this.absent=new Set();this.pending=new Map();this.records=new Map();
     }
     hasDate(date){return this.loaded.has(date)||this.absent.has(date);}
     missingDates(from,to){return range(from,to).filter(d=>!this.hasDate(d));}
-    rows(){return [...this.records.values()];}
+    rows(){return [...this.records].filter(([key])=>!this.superseded.has(key)).map(([,row])=>row);}
+    rawRows(){return [...this.records.values()];}
     async fetchDate(date){
       if(this.hasDate(date))return;
       if(this.availableDates&&!this.availableDates.has(date)){this.absent.add(date);return;}
@@ -1000,8 +1005,10 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
           if(rows.some(r=>r.tarikh_harga!==date))throw Error('Date mismatch in original CSV for '+date);
           for(const r of rows){
             if(!/^\d{4}-\d{2}-\d{2}$/.test(r.tarikh_harga))continue;
-            if(!String(r.harga).trim()||!Number.isFinite(Number(r.harga)))continue;
-            const key=r.priceid||[r.tarikh_harga,r.negeri,r.lokasi,r.varieti,r.gred,r.peringkat].join('|');
+            // The original archive includes blank prices and re-dated IDs.
+            // Preserve them for audit/export; rows() excludes superseded IDs
+            // from active Dashboard calculations using the server manifest.
+            const key=r.tarikh_harga+'|'+(r.priceid||[r.negeri,r.daerah,r.lokasi,r.varieti,r.gred,r.peringkat].join('|'));
             this.records.set(key,r);
           }
           this.loaded.add(date);
@@ -1050,7 +1057,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   const productKey=r=>[r.varieti,r.gred,r.unit].join('||');
   const dateIso=d=>d.toISOString().slice(0,10);
   const dayOffset=(date,days)=>{const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+days);return dateIso(d);};
-  let records=[],sourceMode='loading',comparator=null,archiveLoader=null,archiveMeta=null,loadInProgress=0,loadErrors=[],drawerKey='',drawerContext={date:'',negeri:'',level:'Runcit'},rawPage=0,chartSelected=new Set(),toastTimer;
+  let records=[],localArchiveRecords=[],sourceMode='loading',comparator=null,archiveLoader=null,archiveMeta=null,loadInProgress=0,loadErrors=[],historyLoading=false,drawerKey='',drawerContext={date:'',negeri:'',level:'Runcit'},rawPage=0,chartSelected=new Set(),toastTimer;
   const state={tab:'home',home:{category:'Sayur-Sayuran',negeri:'',date:'',level:'Borong',stateLevel:'Ladang',search:'',sort:'default',visible:12,compareProduct:''},price:{category:'Sayur-Sayuran',negeri:'',date:'',grade:'',search:'',changeLevel:'Runcit',moverPeriod:1},compare:{product:'',level:'Borong',date:'',period:'30',trendMode:'market',trendMarket:''},market:{negeri:'',daerah:'',search:'',page:0},raw:{from:'',to:'',state:'',level:'',search:'',category:'',grade:'',market:''}};
   const WATCH_STORAGE='bg-agro-fama-watchlist-v1',WATCH_MAX=20;
   function buildRecordCache(rows){
@@ -1086,8 +1093,8 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
   }
   function dates(){return recordCache.dates;}
   function dateChoices(){
-    return sourceMode!=='local'&&archiveMeta?.window?.min&&archiveMeta?.window?.max
-      ?BGAgroArchive.range(archiveMeta.window.min,archiveMeta.window.max).reverse():dates();
+    return sourceMode!=='local'&&Array.isArray(archiveMeta?.archive_dates)
+      ?[...archiveMeta.archive_dates].sort().reverse():dates();
   }
   function categories(){return recordCache.categories;}
   function grades(){return recordCache.grades;}
@@ -1287,6 +1294,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
       $('home-insight-title').textContent=items.length?'已载入 '+items.length+' 种产品规格':'请调整日期或搜索条件';
       $('home-insight-desc').textContent='当前条件下没有满足 3 个同市场且双方覆盖率 ≥50% 的涨跌排名。1～2 个市场仍可在明细查看，缺失值不会变成 0。';
     }
+    if(historyLoading)$('home-insight-desc').textContent+=' · 正在后台补载 30 天历史基准，暂时缺失的涨跌幅仍在核验中。';
     $('home-card-count').textContent='显示 '+Math.min(h.visible,items.length)+' / '+items.length+' 种产品规格 · 调查日期 '+(h.date||'—');
     $('home-more').hidden=items.length<=h.visible;
     const cards=items.slice(0,h.visible);
@@ -1539,14 +1547,15 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
       chartSVG(series,[...chartSelected],min,max);
     }
   }
-  function rawMatches(){
+  function rawMatches(includeArchive=false){
     const f=state.raw,s=f.search.trim().toLowerCase(),m=f.market.trim().toLowerCase();
     if(f.from&&f.to&&f.from>f.to)return [];
-    const candidates=f.from&&f.to?recordCache.dates.filter(d=>d>=f.from&&d<=f.to).flatMap(dateRows):records;
+    const raw=includeArchive?(sourceMode==='live'&&archiveLoader?archiveLoader.rawRows():sourceMode==='local'?localArchiveRecords:records):records;
+    const candidates=!includeArchive&&f.from&&f.to?recordCache.dates.filter(d=>d>=f.from&&d<=f.to).flatMap(dateRows):raw;
     return candidates.filter(r=>(!f.from||r.tarikh_harga>=f.from)&&(!f.to||r.tarikh_harga<=f.to)&&(!f.state||r.negeri===f.state)&&(!f.level||r.peringkat===f.level)&&(!f.category||r.kategori===f.category)&&(!f.grade||r.gred===f.grade)&&(!s||r.varieti.toLowerCase().includes(s))&&(!m||(r.daerah+' '+r.lokasi).toLowerCase().includes(m)));
   }
   function renderRaw(){
-    const rows=rawMatches(),all=$('all-columns').checked,columns=all?COLUMNS:VISIBLE;
+    const rows=rawMatches(true),all=$('all-columns').checked,columns=all?COLUMNS:VISIBLE;
     let incomplete=0;
     if(sourceMode==='live'&&archiveLoader&&state.raw.from&&state.raw.to&&state.raw.from<=state.raw.to&&state.raw.from>=archiveMeta.window.min&&state.raw.to<=archiveMeta.window.max){
       incomplete=archiveLoader.missingDates(state.raw.from,state.raw.to).length;
@@ -1600,26 +1609,43 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     comparator=new BGAgroCompare.MatchedMarketComparator(records);
   }
   async function loadLive(){
-    const previous={mode:sourceMode,records,recordCache,comparator,loader:archiveLoader,meta:archiveMeta};
+    const previous={mode:sourceMode,records,recordCache,comparator,loader:archiveLoader,meta:archiveMeta,historyLoading};
     sourceMode='loading';displaySource();$('refresh-live').disabled=true;
     try{
       const response=await fetch('./data/meta.json?ts='+Date.now(),{cache:'no-store'});
       if(!response.ok)throw Error('Dashboard metadata is unavailable (HTTP '+response.status+').');
       const meta=await response.json();
       if(!/^\d{4}-\d{2}-\d{2}$/.test(meta?.window?.min||'')||!/^\d{4}-\d{2}-\d{2}$/.test(meta?.window?.max||'')||meta.window.min>meta.window.max)throw Error('FAMA archive date window is invalid.');
-      const loader=new BGAgroArchive.ArchiveLoader({fetcher:fetch.bind(window),parseCSV,baseUrl:FAMA_DAILY,revision:meta.generated_at_utc||'',revisions:meta.archive_versions,availableDates:meta.archive_dates});
-      const from=dayOffset(meta.window.max,-37)<meta.window.min?meta.window.min:dayOffset(meta.window.max,-37);
-      setLoadingMessage('Loading FAMA observations and 1D／7D／30D baseline dates');
-      const result=await loader.loadRange(from,meta.window.max,{onProgress:p=>setLoadingMessage('Loading FAMA observations and 1D／7D／30D baseline dates',p.completed,p.total)});
+      const loader=new BGAgroArchive.ArchiveLoader({fetcher:fetch.bind(window),parseCSV,baseUrl:FAMA_DAILY,revision:meta.generated_at_utc||'',revisions:meta.archive_versions,availableDates:meta.archive_dates,supersededPriceids:meta.superseded_priceids});
+      const historyFrom=dayOffset(meta.window.max,-37)<meta.window.min?meta.window.min:dayOffset(meta.window.max,-37);
+      const initialFrom=dayOffset(meta.window.max,-7)<meta.window.min?meta.window.min:dayOffset(meta.window.max,-7);
+      setLoadingMessage('Loading latest FAMA observations for a faster first view');
+      const result=await loader.loadRange(initialFrom,meta.window.max,{onProgress:p=>setLoadingMessage('Loading latest FAMA observations for a faster first view',p.completed,p.total)});
       if(!loader.records.size)throw Error('No original FAMA price rows could be retrieved.');
-      archiveMeta=meta;archiveLoader=loader;loadErrors=result.errors;
+      archiveMeta=meta;archiveLoader=loader;localArchiveRecords=[];loadErrors=result.errors;
       sourceMode='live';replaceRecordsFromArchive();
+      historyLoading=historyFrom<initialFrom;
       state.home.date='';state.home.compareProduct='';state.home.visible=12;state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';
       chartSelected.clear();rawPage=0;initFilters();displaySource();onTab('home');
       if(result.errors.length)toast('Live data loaded, but '+result.errors.length+' dates failed. Retry before exporting those dates.');
+      if(historyLoading){
+        const older=BGAgroArchive.range(historyFrom,dayOffset(initialFrom,-1));
+        // Let the first, useful screen paint before processing older history.
+        setTimeout(()=>{
+          loadRequiredDates(older,'Background: loading the 7D／30D comparison baselines').then(()=>{
+            if(archiveLoader!==loader||sourceMode!=='live')return;
+            historyLoading=false;initFilters();
+            if(state.tab==='home')renderHome();else if(state.tab==='prices')renderPrices();
+            else if(state.tab==='compare')renderCompare();else if(state.tab==='watchlist')renderWatchlist();else if(state.tab==='data')renderRaw();
+          }).catch(e=>{
+            if(archiveLoader!==loader)return;
+            historyLoading=false;toast('Historical comparison load failed: '+e.message);
+          });
+        },0);
+      }
     }catch(error){
       if(previous.mode==='live'){
-        sourceMode='live';records=previous.records;recordCache=previous.recordCache;comparator=previous.comparator;archiveLoader=previous.loader;archiveMeta=previous.meta;
+        sourceMode='live';records=previous.records;recordCache=previous.recordCache;comparator=previous.comparator;archiveLoader=previous.loader;archiveMeta=previous.meta;historyLoading=previous.historyLoading;
         toast('Refresh failed; keeping the last loaded FAMA data. '+error.message);
       }else{
         sourceMode='error';toast('Unable to load live FAMA archive: '+error.message);
@@ -1634,7 +1660,9 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     loadInProgress++;
     setLoadingMessage(label);
     try{
-      const result=await archiveLoader.loadDates(valid,{onProgress:p=>setLoadingMessage(label,p.completed,p.total)});
+      const loader=archiveLoader;
+      const result=await loader.loadDates(valid,{onProgress:p=>{if(archiveLoader===loader)setLoadingMessage(label,p.completed,p.total);}});
+      if(archiveLoader!==loader||sourceMode!=='live')return result;
       if(result.requested)replaceRecordsFromArchive();
       if(result.errors.length){
         loadErrors=result.errors;
@@ -1679,10 +1707,14 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     for(const file of list){try{combined.push(...parseCSV(await file.text()));}catch(e){errors.push(file.name+': '+e.message);}}
     if(!combined.length){displaySource();toast(errors[0]||'No usable source records found.');return;}
     const seen=new Set(),valid=[];
-    for(const r of combined){if(!/^\d{4}-\d{2}-\d{2}$/.test(r.tarikh_harga)||!Number.isFinite(number(r.harga)))continue;
-      const key=r.priceid||COLUMNS.map(c=>r[c]).join('|');if(seen.has(key))continue;seen.add(key);valid.push(r);}
-    if(!valid.length){displaySource();toast('No records with valid date and price found.');return;}
-    records=valid;rebuildRecordCache();comparator=new BGAgroCompare.MatchedMarketComparator(records);sourceMode='local';state.home.date='';state.home.compareProduct='';state.home.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';state.home.visible=12;state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';state.raw.category='';state.raw.grade='';state.raw.state='';state.price.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';chartSelected.clear();rawPage=0;
+    for(const r of combined){if(!/^\d{4}-\d{2}-\d{2}$/.test(r.tarikh_harga))continue;
+      const key=r.tarikh_harga+'|'+(r.priceid||COLUMNS.map(c=>r[c]).join('|'));if(seen.has(key))continue;seen.add(key);valid.push(r);}
+    if(!valid.length){displaySource();toast('No original records with valid survey dates found.');return;}
+    const latestById=new Map();
+    for(const r of valid)if(r.priceid&&(!latestById.has(r.priceid)||r.tarikh_harga>latestById.get(r.priceid)))latestById.set(r.priceid,r.tarikh_harga);
+    localArchiveRecords=valid;historyLoading=false;
+    records=valid.filter(r=>!r.priceid||latestById.get(r.priceid)===r.tarikh_harga);
+    rebuildRecordCache();comparator=new BGAgroCompare.MatchedMarketComparator(records);sourceMode='local';state.home.date='';state.home.compareProduct='';state.home.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';state.home.visible=12;state.price.date='';state.compare.date='';state.compare.product='';state.raw.from='';state.raw.to='';state.raw.category='';state.raw.grade='';state.raw.state='';state.price.category=categories().includes('Sayur-Sayuran')?'Sayur-Sayuran':'';chartSelected.clear();rawPage=0;
     initFilters();displaySource();onTab('home');toast(valid.length.toLocaleString()+' original records loaded locally.'+(errors.length?' '+errors.length+' files skipped.':''));
   }
   async function exportExcel(raw){
@@ -1690,7 +1722,7 @@ body{font-family:Inter,"Noto Sans SC","Microsoft YaHei","Segoe UI",Arial,sans-se
     const button=$(raw?'export-raw':'export-summary'),original=button.textContent;button.disabled=true;button.textContent='Preparing Excel…';
     try{
       if(sourceMode==='live'){await ensureRawRange();renderRaw();}
-      const rows=rawMatches();if(!rows.length)throw Error('No original source rows match your selected dates and filters.');
+      const rows=rawMatches(raw);if(!rows.length)throw Error('No original source rows match your selected dates and filters.');
       if(!window.BGAgroExcel)throw Error('Excel module is unavailable.');
       const f=state.raw;const meta={granularity:raw?'raw':'summary',from:f.from,to:f.to,min:archiveMeta&&sourceMode==='live'?archiveMeta.window.min:dates().at(-1),max:archiveMeta&&sourceMode==='live'?archiveMeta.window.max:dates()[0],source:sourceMode==='live'?'BG Agro original FAMA daily CSV archive (GitHub)':'User-imported original FAMA daily CSV archive',coverage:f.state||'All states',selection:f.search||'All products',filters:JSON.stringify(f)};
       let sheetRows,headers,widths,base;
