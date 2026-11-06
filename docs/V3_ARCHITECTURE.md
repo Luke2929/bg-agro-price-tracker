@@ -1,7 +1,8 @@
 # BG Agro V3 — architecture audit and staged rebuild
 
-Status: **Phase 1 complete; Phase 2 ingestion safety underway**, isolated from
-the production `master` branch.
+Status: **Phases 1–3 foundations underway**, isolated from the production
+`master` branch. The complete V3 application and external scheduler are not
+yet released.
 Baseline commit: `2f56ae94` (2026-11-06). This document is a migration contract,
 not a claim that the entire V3 rebuild has shipped.
 
@@ -108,3 +109,16 @@ active without an end-to-end scheduled trigger test.
   `os.replace`. Remote publication is atomic at Git commit granularity.
 - Remaining Phase 2 work: structured run status and bounded-memory disk staging;
   the current in-memory preparation covers FAMA's approximately 30-day window.
+
+## Phase 3 — initial calculation parity milestone
+
+- `scraper/market_math.py` is a read-only reference implementation of the
+  browser's Algorithm V2 (equal-market averages, same-market 1D/7D/30D
+  changes, bounded lookback, grade/unit/state separation and Top Movers
+  eligibility).
+- Python and Node.js independently execute the same versioned fixtures in
+  `tests/fixtures/market_math_v3.json`. This catches accidental divergence
+  before the generated data contract or production UI is switched.
+- Existing legacy JSON files are **not replaced** during this milestone.
+  Remaining Phase 3 work includes real-archive cross-language samples,
+  versioned generated endpoints and a staged consumer migration.

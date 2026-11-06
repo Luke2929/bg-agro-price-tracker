@@ -121,6 +121,7 @@ For development and verification:
 python -m pytest tests/
 python -m scraper.scrape
 python -m scraper.aggregate
+node --test tests/test_dashboard_algorithm.cjs tests/test_market_math_v3.cjs
 cd site && python -m http.server 8000
 ```
 

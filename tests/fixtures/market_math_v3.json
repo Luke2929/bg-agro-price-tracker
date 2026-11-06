@@ -1,0 +1,102 @@
+{
+  "schema": "bg-agro/matched-markets/v3-fixture-1",
+  "cases": [
+    {
+      "name": "equal market weighting",
+      "operation": "average",
+      "observations": [
+        {"date": "2026-11-02", "market": "A", "price": "4"},
+        {"date": "2026-11-02", "market": "A", "price": "6"},
+        {"date": "2026-11-02", "market": "B", "price": "10"},
+        {"date": "2026-11-02", "market": "C", "price": ""}
+      ],
+      "expected": {"mean": 7.5, "n": 3, "markets": 2}
+    },
+    {
+      "name": "1D finds same markets two calendar days earlier",
+      "operation": "compare",
+      "date": "2026-11-02",
+      "days": 1,
+      "observations": [
+        {"date": "2026-11-02", "market": "A", "price": "6"},
+        {"date": "2026-11-02", "market": "B", "price": "10"},
+        {"date": "2026-11-01", "market": "OTHER", "price": "100"},
+        {"date": "2026-10-31", "market": "A", "price": "4"},
+        {"date": "2026-10-31", "market": "B", "price": "8"}
+      ],
+      "expected": {
+        "current": 8, "previous": 6, "rmDifference": 2,
+        "percent": 33.333333333333336, "markets": 2,
+        "currentDate": "2026-11-02", "previousDate": "2026-10-31",
+        "actualDays": 2, "currentCoverage": 1, "previousCoverage": 1,
+        "eligible": false
+      }
+    },
+    {
+      "name": "7D requires three overlapping markets and sufficient coverage",
+      "operation": "compare",
+      "date": "2026-11-02",
+      "days": 7,
+      "observations": [
+        {"date": "2026-11-02", "market": "A", "price": "20"},
+        {"date": "2026-11-02", "market": "B", "price": "20"},
+        {"date": "2026-11-02", "market": "C", "price": "20"},
+        {"date": "2026-11-02", "market": "D", "price": "20"},
+        {"date": "2026-10-26", "market": "A", "price": "10"},
+        {"date": "2026-10-26", "market": "B", "price": "10"},
+        {"date": "2026-10-26", "market": "C", "price": "10"}
+      ],
+      "expected": {
+        "current": 20, "previous": 10, "percent": 100, "markets": 3,
+        "currentCoverage": 0.75, "previousCoverage": 1,
+        "previousDate": "2026-10-26", "actualDays": 7, "eligible": true
+      }
+    },
+    {
+      "name": "30D uses nearest earlier date within tolerance",
+      "operation": "compare",
+      "date": "2026-11-02",
+      "days": 30,
+      "observations": [
+        {"date": "2026-11-02", "market": "A", "price": "11"},
+        {"date": "2026-10-03", "market": "A", "price": "10"},
+        {"date": "2026-10-02", "market": "A", "price": "5"}
+      ],
+      "expected": {"previousDate": "2026-10-03", "actualDays": 30, "percent": 10, "markets": 1}
+    },
+    {
+      "name": "grade mismatch never produces a comparison",
+      "operation": "compare",
+      "date": "2026-11-02",
+      "days": 1,
+      "observations": [
+        {"date": "2026-11-02", "market": "A", "price": "8", "grade": "A"},
+        {"date": "2026-11-01", "market": "A", "price": "5", "grade": "B"}
+      ],
+      "expected": null
+    },
+    {
+      "name": "zero previous price is not a valid percentage baseline",
+      "operation": "compare",
+      "date": "2026-11-02",
+      "days": 1,
+      "observations": [
+        {"date": "2026-11-02", "market": "A", "price": "10"},
+        {"date": "2026-11-01", "market": "A", "price": "0"},
+        {"date": "2026-10-31", "market": "A", "price": "5"}
+      ],
+      "expected": {"previousDate": "2026-10-31", "percent": 100, "actualDays": 2}
+    },
+    {
+      "name": "tiny movement rounds to zero at display threshold",
+      "operation": "compare",
+      "date": "2026-11-02",
+      "days": 1,
+      "observations": [
+        {"date": "2026-11-02", "market": "A", "price": "9.999"},
+        {"date": "2026-11-01", "market": "A", "price": "10"}
+      ],
+      "expected": {"percent": 0, "markets": 1, "eligible": false}
+    }
+  ]
+}

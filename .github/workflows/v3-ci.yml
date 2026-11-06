@@ -37,7 +37,7 @@ jobs:
           node-version: "22"
 
       - name: Run dashboard comparison tests
-        run: node --test tests/test_dashboard_algorithm.cjs
+        run: node --test tests/test_dashboard_algorithm.cjs tests/test_market_math_v3.cjs
 
       - name: Verify original FAMA history against production
         run: python -m scripts.archive_guard --against-ref origin/master

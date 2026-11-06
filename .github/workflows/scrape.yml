@@ -80,7 +80,7 @@ jobs:
 
       - name: Run Algorithm V2 browser-logic tests
         if: github.event_name != 'schedule'
-        run: node --test tests/test_dashboard_algorithm.cjs
+        run: node --test tests/test_dashboard_algorithm.cjs tests/test_market_math_v3.cjs
 
       - name: Scrape rolling FAMA price window
         env:
