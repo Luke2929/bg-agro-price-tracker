@@ -106,12 +106,16 @@ jobs:
         env:
           TRIGGER_EVENT: ${{ github.event_name }}
         run: |
-          # No CSV changes means all existing aggregate values are unchanged.
-          # Never skip a code push/manual rebuild, or the initial rollout of
-          # per-file content versions in meta.json.
-          if [ "$TRIGGER_EVENT" = "schedule" ] && \
+          # An automated data commit triggers this workflow again through
+          # `push`. Do not rebuild on every push just to change timestamps:
+          # that would create an endless commit -> push -> commit loop.
+          # Rebuild whenever archived CSVs changed, an aggregate engine changed
+          # in this commit, generated V3 files are absent, or a human explicitly
+          # requested a workflow_dispatch refresh.
+          if [ "$TRIGGER_EVENT" != "workflow_dispatch" ] && \
              git diff --quiet -- data/daily && \
              [ -z "$(git ls-files --others --exclude-standard -- data/daily)" ] && \
+             git diff --quiet HEAD^ HEAD -- scraper/aggregate.py scraper/aggregate_v3.py scraper/market_math.py && \
              python -c 'import json,pathlib,sys; p=pathlib.Path("site/data/meta.json"); data=json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}; required=("site/data/v3/overview.json","site/data/v3/history-index.json","site/data/v3/health.json"); sys.exit(0 if data.get("archive_versions") and all(pathlib.Path(f).is_file() for f in required) else 1)'; then
             echo "Archive CSVs unchanged; reusing tested JSON aggregates."
           else
