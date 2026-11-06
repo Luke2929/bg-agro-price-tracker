@@ -9,6 +9,7 @@ const RAW_BASE='https://raw.githubusercontent.com/Luke2929/bg-agro-price-tracker
 const PAGE_NAMES={overview:'农价总览',prices:'价格明细',history:'历史与州别',watchlist:'我的关注',export:'Excel 导出',system:'运行状态'};
 const store={overview:null,index:null,meta:null,health:null,history:new Map(),page:'overview',
   period:1,visible:40,watch:[],fetching:false,rawCache:new Map()};
+let historyRequestSequence=0;
 
 async function fetchJson(path,refresh=false){
   const response=await fetch(path+(refresh?(path.includes('?')?'&':'?')+'t='+Date.now():''),
@@ -212,13 +213,15 @@ function drawChart(points,start,end){
 }
 
 async function renderHistory(){
+  const requestSequence=++historyRequestSequence;
   if(!store.overview||!store.index)return;
   const product=$('history-product').value,level=$('history-level').value,state=$('history-state').value,
     days=Number($('history-window').value),end=store.overview.survey_date;
   if(!product)return;
   $('chart-caption').textContent='正在载入历史观察记录…';
   const history=await loadHistory(product);
-  if(product!==$('history-product').value)return;
+  // A slower previous request must never overwrite a newer level/state/window selection.
+  if(requestSequence!==historyRequestSequence)return;
   const points=historySeries(history,{level,state,days,endDate:end});
   const start=new Date(Date.parse(end+'T00:00:00Z')-(days-1)*86400000).toISOString().slice(0,10);
   $('chart-title').textContent=`${history.varieti} · ${level} · ${state||'全马'}`;
