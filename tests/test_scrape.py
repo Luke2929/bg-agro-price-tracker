@@ -457,3 +457,70 @@ def test_run_warns_but_succeeds_when_archived_fields_are_preserved(
     assert code == 0
     assert "kept 2 archived field value(s)" in err
     assert read_csv(path)["1"]["harga"] == "1.00"
+
+
+# --------------------------------------------------------------------------
+# V3 transactional fetch: no earlier date may be published when a later date
+# is unverified, including transport failures and duplicate price identities.
+# --------------------------------------------------------------------------
+def test_run_preserves_all_files_if_second_date_transport_fails(tmp_path, monkeypatch):
+    old_path = str(tmp_path / "2026-07-25.csv")
+    write_csv(old_path, [make_record("1", harga="1.00")])
+    original = open(old_path, "rb").read()
+
+    def fetch(client, date_str, **kwargs):
+        if date_str == "2026-07-26":
+            raise PowerBIError("upstream connection lost")
+        return _fetch_ok([make_record("1", harga="2.00")])(client, date_str, **kwargs)
+
+    stub_run(monkeypatch, [("2026-07-25", 1), ("2026-07-26", 1)], fetch)
+    assert scrape.run(["--out-dir", str(tmp_path)]) == 2
+    assert open(old_path, "rb").read() == original
+    assert not (tmp_path / "2026-07-26.csv").exists()
+
+
+def test_run_preserves_first_date_if_second_date_count_mismatches(tmp_path, monkeypatch):
+    original = make_record("1", harga="1.00")
+    path = str(tmp_path / "2026-07-25.csv")
+    write_csv(path, [original])
+
+    def fetch(client, date_str, **kwargs):
+        rows = ([make_record("1", harga="2.00")] if date_str == "2026-07-25"
+                else [make_record("2", tarikh_harga="2026-07-26")])
+        return _fetch_ok(rows)(client, date_str, **kwargs)
+
+    stub_run(monkeypatch, [("2026-07-25", 1), ("2026-07-26", 3)], fetch)
+    assert scrape.run(["--out-dir", str(tmp_path)]) == 1
+    assert read_csv(path)["1"]["harga"] == "1.00"
+    assert not (tmp_path / "2026-07-26.csv").exists()
+
+
+def test_run_publishes_multiple_dates_only_after_complete_verification(tmp_path, monkeypatch):
+    old_path = str(tmp_path / "2026-07-25.csv")
+    write_csv(old_path, [make_record("1", harga="1.00")])
+
+    def fetch(client, date_str, **kwargs):
+        if date_str == "2026-07-25":
+            rows = [make_record("1", harga="1.50")]
+        else:
+            rows = [make_record("2", tarikh_harga="2026-07-26", harga="2.50")]
+        return _fetch_ok(rows)(client, date_str, **kwargs)
+
+    stub_run(monkeypatch, [("2026-07-25", 1), ("2026-07-26", 1)], fetch)
+    assert scrape.run(["--out-dir", str(tmp_path)]) == 0
+    assert read_csv(old_path)["1"]["harga"] == "1.50"
+    assert read_csv(str(tmp_path / "2026-07-26.csv"))["2"]["harga"] == "2.50"
+
+
+@pytest.mark.parametrize("bad_rows", [
+    [make_record("1"), make_record("1")],
+    [make_record("1"), make_record("")],
+    [make_record("1", tarikh_harga="2026-07-24"), make_record("2")],
+])
+def test_run_rejects_bad_source_identity_without_publishing(
+    tmp_path, monkeypatch, bad_rows, capsys
+):
+    stub_run(monkeypatch, [("2026-07-25", 2)], _fetch_ok(bad_rows))
+    assert scrape.run(["--out-dir", str(tmp_path)]) == 1
+    assert "invalid source record identity" in capsys.readouterr().err
+    assert not (tmp_path / "2026-07-25.csv").exists()

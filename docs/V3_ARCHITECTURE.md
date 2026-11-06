@@ -1,6 +1,7 @@
 # BG Agro V3 — architecture audit and staged rebuild
 
-Status: **Phase 1 implementation**, isolated from the production `master` branch.
+Status: **Phase 1 complete; Phase 2 ingestion safety underway**, isolated from
+the production `master` branch.
 Baseline commit: `2f56ae94` (2026-11-06). This document is a migration contract,
 not a claim that the entire V3 rebuild has shipped.
 
@@ -94,3 +95,16 @@ active without an end-to-end scheduled trigger test.
   updated alongside the corresponding feature phases.
 - No external backup scheduler has been provisioned yet. That work is isolated
   to Phase 5 because it needs a provider and authorized credentials.
+
+## Phase 2 — first ingestion safety milestone
+
+- All selected survey dates are fetched, checked against source control counts,
+  checked for duplicate/empty `priceid` and mismatched survey dates, and merged
+  **in memory** before any changed CSV is written.
+- If any later date fails to fetch, mismatches the control count, or has bad
+  identities, **no earlier day's prepared update is written**. Six new offline
+  regression cases cover these scenarios and successful multi-day publication.
+- Changed individual CSVs still use same-directory temporary files and atomic
+  `os.replace`. Remote publication is atomic at Git commit granularity.
+- Remaining Phase 2 work: structured run status and bounded-memory disk staging;
+  the current in-memory preparation covers FAMA's approximately 30-day window.

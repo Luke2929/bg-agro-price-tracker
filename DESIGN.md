@@ -143,8 +143,9 @@ Mobile-friendly (user will check prices on phone).
 
 `.github/workflows/scrape.yml`:
 - `schedule`: 09:37–21:37 every two hours MYT (recent five dates), plus a full
-  23:37 MYT scan; `workflow_dispatch` remains available. GitHub's timezone is
-  explicitly `Asia/Kuala_Lumpur`. Scheduled triggers may still be delayed/dropped.
+  23:37 MYT scan; `workflow_dispatch` remains available. The current workflow
+  expresses MYT as explicit UTC cron offsets. Scheduled triggers may still be
+  delayed/dropped; an independent scheduler is a separate V3 release gate.
 - Steps: checkout → setup-python → `python -m scraper.scrape` → conditional
   aggregate → freshness audit → commit & push if changed → deploy Pages only
   when data/code changed.
@@ -159,3 +160,9 @@ Mobile-friendly (user will check prices on phone).
 - Dashboard: renders from real generated JSONs; check a known value end-to-end
   (e.g. TELUR AYAM gred A ≈ RM0.47 on 2026-07-25, national).
 - Honest reporting: any mismatch is surfaced, not smoothed over.
+
+## V3 migration note
+
+This document describes the legacy V2 data contracts and some historical
+decisions. The staged full-project rebuild, its non-negotiable preservation
+rules and release gates are tracked in [docs/V3_ARCHITECTURE.md](docs/V3_ARCHITECTURE.md).
