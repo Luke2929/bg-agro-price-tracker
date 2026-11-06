@@ -6,13 +6,14 @@
   <meta name="theme-color" content="#ecf3ef">
   <meta name="description" content="BG Agro · 农产品价格透明系统 V3 — FAMA 原始调查价格、同市场涨跌比较、历史趋势及 Excel 数据导出。">
   <title>BG Agro · 农产品价格透明系统 V3</title>
+  <link rel="icon" type="image/png" href="../assets/agro-logo.png">
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.mjs"></script>
 </head>
 <body>
 <div class="shell">
   <aside class="sidebar" aria-label="主导航">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><strong>BG Agro</strong><small>PRICE INTELLIGENCE · V3</small></div></div>
+    <div class="brand"><img class="brand-logo" src="../assets/agro-logo.png" alt="Agro 叶子标志"><div><strong>BG Agro</strong><small>PRICE INTELLIGENCE · V3</small></div></div>
     <p class="nav-label">WORKSPACE</p>
     <nav class="navigation" aria-label="功能页面">
       <button type="button" class="nav-item selected" data-page="overview"><span>◫</span> 农价总览</button>
@@ -26,7 +27,7 @@
   </aside>
 
   <div class="workspace">
-    <header class="topbar"><div class="topbar-trail">BG Agro <span>/</span> <strong id="trail">农价总览</strong></div><div class="top-actions"><span class="tag" id="source-badge">正在载入数据</span><button type="button" class="quiet-button" id="reload">↻ 刷新</button><a href="../index.html" class="legacy-link">经典版 ↗</a></div></header>
+    <header class="topbar"><div class="topbar-trail">BG Agro <span>/</span> <strong id="trail">农价总览</strong></div><div class="top-actions"><span class="tag" id="source-badge">正在载入数据</span><button type="button" class="quiet-button" id="reload">↻ 刷新</button><a href="../v3.1/" class="legacy-link">产品详情 V3.1 ↗</a></div></header>
     <main class="main" id="main">
       <div class="notice" id="error-banner" role="alert" hidden></div>
       <section data-screen="overview" class="screen active" aria-labelledby="overview-title">
@@ -58,7 +59,7 @@
 
       <section data-screen="export" class="screen" aria-labelledby="export-title"><div class="page-intro"><span class="eyebrow green">DATA EXPORTS</span><h1 id="export-title">Excel 数据导出</h1><p>为你整理 Summary；给客户的 Full Raw 则保留所有 17 个 FAMA 原始字段，包括缺失值及历史修订记录。</p></div><section class="panel"><div class="filters four"><label>起始日期<input id="export-from" type="date"></label><label>结束日期<input id="export-to" type="date"></label><label>州／直辖区<select id="export-state"><option value="">全马</option></select></label><label>价格层级<select id="export-level"><option value="">全部层级</option><option>Ladang</option><option>Borong</option><option>Runcit</option></select></label></div><div class="export-options"><div class="export-card"><span class="export-icon">▦</span><div><h2>Summary Data <small>自用分析版</small></h2><p>按真实调查日期、产品规格、州别及价格层级整理市场等权均价。排除已被更新的旧版 priceid。</p><button type="button" class="primary-button" id="export-summary">下载 Summary Excel</button></div></div><div class="export-card"><span class="export-icon">▤</span><div><h2>Full Raw Data <small>原始资料版</small></h2><p>保留 FAMA 的 17 个字段及原始记录；不将没有报价的空白值改成 RM0，适合向客户说明来源。</p><button type="button" class="secondary-button" id="export-raw">下载 Full Raw Excel</button></div></div></div><p id="export-progress" class="progress" aria-live="polite">建议按月份下载，减少浏览器内存占用。</p><p class="method-note">导出使用 GitHub 内的原始 FAMA CSV 存档。若任何已登记日期下载失败，整次导出会停止，避免提供残缺文件。客户版也包含已被替代的旧日期记录供追溯。</p></section></section>
 
-      <section data-screen="system" class="screen" aria-labelledby="system-title"><div class="page-intro"><span class="eyebrow green">SYSTEM HEALTH</span><h1 id="system-title">运行状态与数据质量</h1><p>区分“GitHub 执行成功”和“FAMA 已发布新价格”；两者不是同一件事。</p></div><div class="health-grid"><article class="panel"><h2>数据完整性</h2><dl id="archive-health"></dl></article><article class="panel"><h2>自动化监控</h2><dl id="job-health"><div><dt>运行状态</dt><dd>等待检测…</dd></div></dl></article></div><section class="panel"><h2>数据处理规则</h2><ul class="explanation"><li>原始 <code>data/daily/*.csv</code> 是审计档案，不会因 V3 迁移而删除或覆盖。</li><li>同一天同产品先按市场计算平均；各市场在州或全国平均中等权。</li><li>涨跌比较只匹配相同产品、等级、单位、价格层级与市场。</li><li>最新调查日期和程序运行时间分别显示；缺失数据不会被估算。</li><li>GitHub Actions 预约执行不是强保证。备用调度与外部告警需要另行授权配置。</li></ul><a href="../index.html" class="text-button">返回经典版 Dashboard →</a></section></section>
+      <section data-screen="system" class="screen" aria-labelledby="system-title"><div class="page-intro"><span class="eyebrow green">SYSTEM HEALTH</span><h1 id="system-title">运行状态与数据质量</h1><p>区分“GitHub 执行成功”和“FAMA 已发布新价格”；两者不是同一件事。</p></div><div class="health-grid"><article class="panel"><h2>数据完整性</h2><dl id="archive-health"></dl></article><article class="panel"><h2>自动化监控</h2><dl id="job-health"><div><dt>运行状态</dt><dd>等待检测…</dd></div></dl></article></div><section class="panel"><h2>数据处理规则</h2><ul class="explanation"><li>原始 <code>data/daily/*.csv</code> 是审计档案，不会因 V3 迁移而删除或覆盖。</li><li>同一天同产品先按市场计算平均；各市场在州或全国平均中等权。</li><li>涨跌比较只匹配相同产品、等级、单位、价格层级与市场。</li><li>最新调查日期和程序运行时间分别显示；缺失数据不会被估算。</li><li>GitHub Actions 预约执行不是强保证。备用调度与外部告警需要另行授权配置。</li></ul><a href="../v3.1/" class="text-button">打开 V3.1 农产品详情 →</a></section></section>
     </main>
     <footer class="footer">BG Agro · 农产品价格透明系统 V3 <span>来源：FAMA AMI · 本站仅供资讯参考，并非交易报价 · Luke Ng</span></footer>
   </div>

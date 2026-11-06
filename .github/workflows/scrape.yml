@@ -78,9 +78,9 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Run Algorithm V2 browser-logic tests
+      - name: Run V3 and V3.1 browser-logic tests
         if: github.event_name != 'schedule'
-        run: node --test tests/test_dashboard_algorithm.cjs tests/test_market_math_v3.cjs tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs
+        run: node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs
 
       - name: Scrape rolling FAMA price window
         env:

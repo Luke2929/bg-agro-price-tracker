@@ -36,8 +36,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Run dashboard comparison tests
-        run: node --test tests/test_dashboard_algorithm.cjs tests/test_market_math_v3.cjs tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs
+      - name: Run V3 and V3.1 dashboard comparison tests
+        run: node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs
 
       - name: Build complete V3 contracts from real, unchanged archive
         run: |
@@ -50,6 +50,9 @@ jobs:
           node --check site/v3/engine.mjs
           node --check site/v3/excel.mjs
           node --check site/v3/app.mjs
+          node --check site/v3.1/engine.mjs
+          node --check site/v3.1/excel.mjs
+          node --check site/v3.1/app.mjs
 
       - name: Upload staged V3 preview (not deployed to public Pages)
         uses: actions/upload-artifact@v4

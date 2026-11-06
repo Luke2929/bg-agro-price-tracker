@@ -4,11 +4,14 @@
 
 An independent BG Agro dashboard built from publicly available **FAMA (Federal Agricultural Marketing Authority)** market price observations. Search produce prices, compare Malaysian states, inspect price changes and export original records for review.
 
-**[Open Live Dashboard](https://luke2929.github.io/bg-agro-price-tracker/)** · [Browse Original CSV Archive](data/daily/) · [View Automated Updates](https://github.com/Luke2929/bg-agro-price-tracker/actions/workflows/scrape.yml)
+**[Open V3 Dashboard](https://luke2929.github.io/bg-agro-price-tracker/v3/)** · **[V3.1 Product Details](https://luke2929.github.io/bg-agro-price-tracker/v3.1/)** · [Original CSV Archive](data/daily/) · [Automated Updates](https://github.com/Luke2929/bg-agro-price-tracker/actions/workflows/scrape.yml)
 
 > **中文简介：** BG Agro 将 FAMA 的农业市场调查价格整理成简洁的 Dashboard。你可以按蔬菜、州属、日期和价格层级查询，比较历史变化，也可以将指定日期范围的原始数据下载成 Excel。数据按计划自动更新，**不是即时交易报价**。
 
-## Algorithm V2 — consistent FAMA comparisons
+The site root (`/`) redirects to V3. The classic dashboard was retired after
+Luke approved this release; its implementation remains recoverable in Git history.
+
+## V3 / V3.1 — consistent FAMA comparisons
 
 The dashboard uses a transparent, stock-style **survey price** model, not an exchange-traded price feed:
 
@@ -18,7 +21,8 @@ The dashboard uses a transparent, stock-style **survey price** model, not an exc
 - **7D / 30D:** use the nearest earlier comparable survey on or before the 7/30-day target, no more than 4/7 days older respectively. Actual dates and both matched prices are displayed.
 - **Price change:** `(current matched-market mean − previous matched-market mean) / previous matched-market mean × 100%`. A comparison requires at least one identical market. Changes from fewer than 3 matched markets are marked **low sample**. Comparisons covering less than half the current or historical markets are marked **low coverage**. Both are excluded from Top Movers.
 - **Top Movers:** sort absolute changes among products with **3+ matching markets and at least 50% coverage on both dates**, so one unusual market cannot dominate the ranking.
-- **Trend modes:** *Single Market* draws one market's actual readings (most stock-like, no basket changes); *State Survey Average* is an indicative cross-sectional mean and can be affected by changes in surveyed market coverage.
+- **History:** the 30/90/180-day chart displays recorded national/state averages only. Survey-market coverage can change, and missing days are never backfilled.
+- **V3.1 locality:** choose `Negeri → Daerah → Lokasi` to see actual latest-day quotations. A district or location is calculated from its own surveyed markets, never substituted with a state mean. Historical district averages are not fabricated.
 - **Archive completeness:** generated metadata includes an explicit list of archived CSV dates. A missing expected file is treated as a download error, while non-reporting dates remain genuinely absent. Per-day CSV content revisions prevent unrelated archive refreshes from invalidating every cached download.
 - **Exports:** Full Raw Excel continues to include the original 17 CSV fields; missing prices are never fabricated. Survey data are not stock trades, so no artificial OHLC candlesticks or volumes are generated.
 
@@ -30,17 +34,18 @@ The dashboard uses a transparent, stock-style **survey price** model, not an exc
 | **Three Price Levels** | Compare **Ladang** (farm-gate), **Borong** (wholesale) and **Runcit** (retail) observations. |
 | **1D / 7D / 30D Changes** | Compare the same product, grade, unit, price level and market on exact calendar dates. |
 | **Top Movers** | See the largest comparable price increases and decreases for the selected price level. |
-| **Compare & Trends** | Explore state-level prices, recorded history and individual market observations. |
+| **Compare & Trends** | Explore state-level prices and recorded national/state historical prices. |
+| **V3.1 Product Detail** | Inspect one product's three price levels, history, state comparison and original market records by Negeri → Daerah → Lokasi. |
 | **Data & Export** | Filter original observations by date range, product, state, level, grade and market. |
 | **Excel Downloads** | Export **Summary Data** for analysis or **Full Raw Data** with all 17 original FAMA fields. |
 | **Automatic Updates** | GitHub Actions schedules eight checks daily, including a full rolling-window verification each night (best-effort timing). |
 
 ## Using the Dashboard
 
-1. Open the **[BG Agro Dashboard](https://luke2929.github.io/bg-agro-price-tracker/)**. The latest available original CSV observations load automatically; you do not need to import a file.
-2. In **Prices**, choose a vegetable, state or date. Switch between Ladang, Borong and Runcit to inspect price changes.
-3. In **Compare & Trends**, select one product and price level to compare states and recorded historical prices.
-4. In **Data & Export**, select the date range and filters. Use **Load selected range** for older archived dates, then download the Excel file you need.
+1. Open **[V3 Dashboard](https://luke2929.github.io/bg-agro-price-tracker/v3/)**. The latest survey date is shown explicitly; automatic data updates are independent of the UI version.
+2. In **价格明细**, filter products, state and price level. In **历史与州别**, inspect the 30/90/180-day recorded trends.
+3. Open **[V3.1](https://luke2929.github.io/bg-agro-price-tracker/v3.1/)** and select any product to inspect Ladang, Borong and Runcit cards, then filter by actual Negeri / Daerah / Lokasi.
+4. Use **Excel 导出** to download Summary Data or the full 17-field raw FAMA archive for a selected date range.
 
 ### Understanding the numbers
 
@@ -63,7 +68,7 @@ Full Raw Data fields:
 
 `priceid`, `tarikh_harga`, `systemdate`, `negeri`, `daerah`, `lokasi`, `peringkat`, `sublevel`, `kategori`, `kumpulan`, `jenis`, `varieti`, `gred`, `unit`, `harga`, `average14`, `supply`.
 
-The dashboard first loads up to **8 calendar days** of original CSV records so recent prices appear faster, then loads the remaining **30-day comparison baseline** in the background (up to 38 calendar days in total). Comparison figures may be temporarily incomplete until background loading finishes. Unchanged daily CSV files keep a stable content-based cache revision; corrected files receive a new revision. Date and product indexes reduce repeated searches across the loaded records. Older dates in the repository are fetched **on demand** when you select them. A selected-range export checks that the requested dates have been retrieved; it does not silently produce a partial customer file when a download fails.
+The V3 and V3.1 dashboards fetch precomputed source-preserving JSON summaries and load original daily CSVs only when raw market records or Excel exports are requested. Archived daily CSVs keep stable revision identifiers; if any required date fails to load, the export stops instead of silently returning partial data.
 
 **Record corrections:** FAMA can assign a new survey date to an existing `priceid`. We preserve both archived versions in `data/daily/`, but only the version with the latest survey date enters current Dashboard calculations and Summary Data. `site/data/meta.json` carries the small `superseded_priceids` manifest so browsers reach the same result regardless of file download order. Full Raw Data intentionally includes every archived revision and missing-price row for auditability; do not mistake superseded archived rows for separate current market quotations.
 
@@ -82,7 +87,7 @@ flowchart TD
     A["FAMA public AMI / Power BI data"] --> B["Python scraper"]
     B --> C["Original daily CSV archive"]
     C --> D["Aggregated site/data JSON"]
-    C --> E["BG Agro V2 Dashboard"]
+    C --> E["BG Agro V3 and V3.1"]
     D --> E
     E --> F["GitHub Pages"]
 ```
@@ -97,13 +102,12 @@ The [GitHub Actions workflow](.github/workflows/scrape.yml) runs automatically a
 
 The current workflow expresses these MYT times using equivalent UTC cron values (MYT = UTC+8). It can also be triggered manually. Manual executions and code pushes always verify the complete source window, run both test suites, and rebuild the dashboard JSON; routine scheduled checks skip the unchanged-code regression suite and reuse existing aggregates when CSVs have not changed. The full nightly scan still captures older corrections and late records. Scheduled runs with no data changes skip redundant Pages deployments. This is **best-effort scheduled data**, not a second-by-second live feed: GitHub Actions can delay or drop scheduled triggers, so strict publication-time guarantees require an independent monitor or scheduler.
 
-## V3 rebuild (in progress)
+## V3.1 product profile
 
-The complete-project rebuild is being developed separately from production.
-See [V3 architecture and release gates](docs/V3_ARCHITECTURE.md) for the raw
-archive preservation rules, staged ingestion, comparison parity, modular UI,
-independent scheduling and safe GitHub Pages cutover plan. Do not treat a V3
-draft branch as a replacement for the live dashboard until its gates pass.
+V3 remains at `/v3/`, while the independent detail-enabled dashboard lives at
+`/v3.1/`. See the [V3.1 architecture and algorithm audit](docs/V3_1_PRODUCT_DETAIL.md).
+The classic root page now redirects to V3. The UI migration does not modify
+the historical FAMA CSVs, scraper, price identity or update schedule.
 
 ## Project structure
 
@@ -111,7 +115,7 @@ draft branch as a replacement for the live dashboard until its gates pass.
 | --- | --- |
 | [`scraper/`](scraper/) | FAMA data retrieval and aggregation logic. |
 | [`data/daily/`](data/daily/) | Archived original daily CSV observations. |
-| [`site/`](site/) | BG Agro V2 Dashboard and prepared JSON data. |
+| [`site/`](site/) | Root redirect, V3, V3.1, shared logo and prepared JSON data. |
 | [`.github/workflows/scrape.yml`](.github/workflows/scrape.yml) | Automated scraping and GitHub Pages deployment. |
 | [`tests/`](tests/) | Existing scraper and aggregation tests. |
 
@@ -121,7 +125,7 @@ For development and verification:
 python -m pytest tests/
 python -m scraper.scrape
 python -m scraper.aggregate
-node --test tests/test_dashboard_algorithm.cjs tests/test_market_math_v3.cjs
+node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs
 cd site && python -m http.server 8000
 ```
 
