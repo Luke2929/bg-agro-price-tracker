@@ -1,0 +1,43 @@
+# Read-only checks for V3 rebuild branches and PRs. This workflow must never
+# scrape, commit source CSVs, or deploy the production GitHub Pages dashboard.
+name: BG Agro V3 - Architecture and Data Integrity CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches:
+      - "rebuild/v3-*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run Python unit tests
+        run: python -m pytest -q
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run dashboard comparison tests
+        run: node --test tests/test_dashboard_algorithm.cjs
+
+      - name: Verify original FAMA history against production
+        run: python -m scripts.archive_guard --against-ref origin/master

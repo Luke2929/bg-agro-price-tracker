@@ -97,6 +97,11 @@ jobs:
             python -m scraper.scrape --limit-dates 5
           fi
 
+      # V3 Phase 1: prevent any malformed archive or accidental historical
+      # priceid/file deletion from entering the published Git history.
+      - name: Verify original FAMA CSV archive and preservation
+        run: python -m scripts.archive_guard --against-ref HEAD
+
       - name: Rebuild dashboard JSON when needed
         env:
           TRIGGER_EVENT: ${{ github.event_name }}
