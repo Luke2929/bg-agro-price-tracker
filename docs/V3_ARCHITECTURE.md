@@ -122,3 +122,62 @@ active without an end-to-end scheduled trigger test.
 - Existing legacy JSON files are **not replaced** during this milestone.
   Remaining Phase 3 work includes real-archive cross-language samples,
   versioned generated endpoints and a staged consumer migration.
+
+## V3 stage 2 — versioned data engine, interface, backup adapter (2026-11-06)
+
+This section supersedes the older status notes above without implying that
+the **unmerged** PR has shipped to production.
+
+- `scraper/aggregate_v3.py` builds **new and separate** `site/data/v3/overview.json`,
+  `history-index.json` and 291 per-product history JSON files. The archive is
+  canonicalized first; every market votes equally and superseded IDs remain
+  archived but do not distort current prices or history.
+- The complete 131-file source archive has been processed in a temporary output
+  directory: 470,480 raw rows, 470,260 canonical, 220 historical revisions,
+  795 fresh latest-day price combinations, 16 states and federal territories.
+  291 product history contracts are independently validated. Nothing in
+  `data/daily/*.csv` was rewritten by the V3 build.
+- `site/v3/` contains a separate responsive frontend, with latest prices,
+  same-market 1D/7D/30D ranked movers, market-level source browsing, date/state
+  filters, 30/90/180-day history, state comparisons, browser-local Watchlist,
+  and Summary/Full Raw `.xlsx` exports. The full raw export retains all 17
+  original columns and revisions; Summary uses equal-weight markets and the
+  global superseded priceid manifest.
+- The original `site/index.html` is preserved for advanced classic features
+  and remains the public production route. Before cutover, additionally test
+  single-market chart parity, long-range export performance, and mobile layout
+  in a real browser; the standalone V3 chart currently displays national/state
+  series, while the classic dashboard still offers single-market chart mode.
+- `ops/cloudflare-backup/` contains an **uninstalled** independent scheduler
+  using GitHub workflow run timestamps and `workflow_dispatch`. It runs only if
+  Luke explicitly approves a Cloudflare account/provider and installs the
+  restricted GitHub token through encrypted Worker secrets. No token is in Git.
+- V3 CI now builds contracts from the real archive, validates product history,
+  runs Python/Node tests, checks source archive integrity, and packages a
+  review artifact. It **does not deploy** or commit master data. Upon future
+  authorized merge, the existing master-only scrape workflow can publish the
+  additive V3 contracts while leaving classic routes in place.
+
+### Current gates and remaining work
+
+| Gate | State | Evidence / next action |
+| --- | --- | --- |
+| Preserve full original FAMA history | PASS locally | 131 CSVs untouched; archive validator + real-archive reconciliation |
+| Python/JS comparison correctness | PASS locally | 150 Python + 42 Node tests; same-market fixtures |
+| Versioned generated API | PASS locally | 795 latest price groups, 291 history files, no synthetic dates |
+| Modular V3 UI and Excel | IMPLEMENTED, browser QA pending | Real Chrome/mobile smoke, correct exports and long-range memory |
+| GitHub production scheduled update | NOT PROVEN | Wait for real unattended `schedule` executions after merge |
+| Independent cloud fallback | CODE ONLY | Choose provider, configure secret, observe two genuine runs |
+| Production go-live | NOT AUTHORIZED | Review PR, end-to-end regression, compare with classic, approve rollout |
+
+### Preview and recovery
+
+1. Run `python -m scraper.aggregate_v3 --history-dir site/data/v3/history`.
+2. Run `python -m scripts.validate_v3`, `python -m pytest -q`, and
+   `node --test tests/test_*.mjs tests/test_dashboard_algorithm.cjs tests/test_market_math_v3.cjs`.
+3. Serve the repo's `site/` directory through an HTTP server; open `/v3/`.
+   Live raw CSV browsing/exports require internet access to the repository's
+   original `master/data/daily` files.
+4. The V3 implementation stays behind `/v3/`; revert the code PR if needed.
+   Do **not** revert any later legitimate raw FAMA data commits or delete
+   historic original CSVs. The original `/` page remains available.
