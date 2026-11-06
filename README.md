@@ -24,7 +24,7 @@ The dashboard uses a transparent, stock-style **survey price** model, not an exc
 - **History:** the 30/90/180-day chart displays recorded national/state averages only. Survey-market coverage can change, and missing days are never backfilled.
 - **V3.1 locality:** choose `Negeri → Daerah → Lokasi` to see actual latest-day quotations. A district or location is calculated from its own surveyed markets, never substituted with a state mean. Historical district averages are not fabricated.
 - **Archive completeness:** generated metadata includes an explicit list of archived CSV dates. A missing expected file is treated as a download error, while non-reporting dates remain genuinely absent. Per-day CSV content revisions prevent unrelated archive refreshes from invalidating every cached download.
-- **Exports:** Full Raw Excel continues to include the original 17 CSV fields; missing prices are never fabricated. Survey data are not stock trades, so no artificial OHLC candlesticks or volumes are generated.
+- **Exports:** Excel keeps the original 17 CSV fields; PDF adds 4-page Quick View and a source-complete Mobile Report with internal Date → Negeri → Daerah → Lokasi bookmarks and links. Both honor the selected archive date range, state and price level. Missing prices are never fabricated.
 
 ## What you can do
 
@@ -38,6 +38,7 @@ The dashboard uses a transparent, stock-style **survey price** model, not an exc
 | **V3.1 Product Detail** | Inspect one product's three price levels, history, state comparison and original market records by Negeri → Daerah → Lokasi. |
 | **Data & Export** | Filter original observations by date range, product, state, level, grade and market. |
 | **Excel Downloads** | Export **Summary Data** for analysis or **Full Raw Data** with all 17 original FAMA fields. |
+| **PDF Downloads** | Export a 4-page mobile **Quick View** or a **Full Mobile Report** with source records, navigable PDF contents, price-ID audit lines, and selected survey-date range (up to 45 archived survey days; full report max 6,500 source records per download). |
 | **Automatic Updates** | GitHub Actions schedules eight checks daily, including a full rolling-window verification each night (best-effort timing). |
 
 ## Using the Dashboard
@@ -68,7 +69,7 @@ Full Raw Data fields:
 
 `priceid`, `tarikh_harga`, `systemdate`, `negeri`, `daerah`, `lokasi`, `peringkat`, `sublevel`, `kategori`, `kumpulan`, `jenis`, `varieti`, `gred`, `unit`, `harga`, `average14`, `supply`.
 
-The V3 and V3.1 dashboards fetch precomputed source-preserving JSON summaries and load original daily CSVs only when raw market records or Excel exports are requested. Archived daily CSVs keep stable revision identifiers; if any required date fails to load, the export stops instead of silently returning partial data.
+The V3 and V3.1 dashboards fetch precomputed source-preserving JSON summaries and load original daily CSVs only when raw market records, Excel exports, or PDF downloads are requested. PDF pages are 396 × 704 pt, generated entirely in-browser without CDN dependencies. Full Mobile PDF preserves every selected raw source record (including blanks and historical revisions) and keeps separate survey-date chapters. Archived daily CSVs keep stable revision identifiers; if any required date fails to load, the export stops instead of silently returning partial data.
 
 **Record corrections:** FAMA can assign a new survey date to an existing `priceid`. We preserve both archived versions in `data/daily/`, but only the version with the latest survey date enters current Dashboard calculations and Summary Data. `site/data/meta.json` carries the small `superseded_priceids` manifest so browsers reach the same result regardless of file download order. Full Raw Data intentionally includes every archived revision and missing-price row for auditability; do not mistake superseded archived rows for separate current market quotations.
 
@@ -125,7 +126,7 @@ For development and verification:
 python -m pytest tests/
 python -m scraper.scrape
 python -m scraper.aggregate
-node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs
+node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs
 cd site && python -m http.server 8000
 ```
 

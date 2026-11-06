@@ -1,0 +1,69 @@
+/* Neutral public-sector-inspired information design; no official agency claim. */
+:root{color:#24394a;background:#f3f6f9;color-scheme:light}
+body{background:#f3f6f9}
+.sidebar{background:#172c40;color:#e7edf4}
+.brand{gap:10px;padding:4px 7px 37px}
+.brand-logo{background:#f0f4f2;border:1px solid #cad8d6;border-radius:12px;filter:none;width:43px;height:43px;padding:5px}
+.brand strong{font-size:17px;letter-spacing:.1px;color:#f6f8fa}
+.brand small{font-size:8px;line-height:1.5;letter-spacing:.8px;color:#afc8d5}
+.nav-label{color:#8ca6b6}
+.nav-item{color:#c6d5df;border:1px solid transparent;font-weight:600}
+.nav-item:hover{background:#27445b;border-color:#365971}
+.nav-item.selected{background:#e9f1f5;border-color:#cbdde5;color:#21475d;box-shadow:none}
+.sidebar-foot{border-color:#375065;color:#c8d8e2}
+.sidebar-foot small{color:#9eb5c4}
+.live-dot{background:#83c7b5}
+.topbar{background:#fff;border-bottom:1px solid #dae3ea}
+.topbar-trail{color:#728598}.topbar-trail strong{color:#294a63}
+.tag{background:#e9f2f5;color:#205b69}
+.tag.warning{background:#fff3de;color:#87632f}
+.quiet-button,.legacy-link,.text-button{color:#235b71}
+.main{padding-top:34px}
+.page-intro h1{color:#243e54;font-weight:750}
+.page-intro p,.panel-heading p{color:#697f90}
+.hero{background:linear-gradient(115deg,#244a67 0%,#305f72 65%,#477d86 100%);border-radius:17px;box-shadow:0 7px 18px #1d3b5214}
+.hero h1 em{color:#dcefea}
+.hero p{color:#e4edf1}.eyebrow{color:#d9ecf0}.eyebrow.green{color:#387a82}
+.hero-leaf{color:#d7e9e67a}.hero-floating{background:#ffffff16;border-color:#ffffff38}
+.primary-button{background:#236b78;color:#fff;border-color:#236b78}
+.primary-button:hover{background:#195a68}
+.hero .primary-button{background:#e8f4f3;color:#204a5b;border-color:#e8f4f3}
+.hero .primary-button:hover{background:#fff}
+.secondary-button{background:#fff;color:#2b5b70;border-color:#d3e0e7}
+.secondary-button:hover{background:#eef4f7}
+.stat,.panel{background:#fff;border-color:#dde6ec;border-radius:14px;box-shadow:0 2px 14px #203a5410}
+.stat>span{color:#627e90}.stat strong{color:#244f66}.stat small{color:#8da0ae}
+.panel h2,.panel h3{color:#274357}
+.quick-item,.mover{border-color:#e2eaee}
+.positive,.delta-positive,.up{color:#217866}
+.negative,.delta-negative,.down{color:#b35c4a}
+.filters input,.filters select{border:1px solid #d0dce4;background:#fff;color:#2b4356;border-radius:9px}
+.filters input:focus,.filters select:focus{outline:2px solid #a4c5ce;outline-offset:1px;border-color:#598c9e}
+.filters label,.table-top,.table-foot{color:#647a8c}
+.segmented{background:#eff4f7;border:1px solid #dce6ec}
+.segmented button{color:#6a7e8d}
+.segmented button.active{background:#fff;color:#235b70;box-shadow:0 1px 5px #27475b1d}
+.table-scroll{border-color:#e0e8ee}
+table thead{background:#eef3f6;color:#395c71}
+table th{border-color:#e4ecf0}
+table td{border-color:#e8eff2}
+table tbody tr:hover{background:#f6f9fb}
+.price-cell{color:#22546a}
+.chart-scroller{border-color:#dce6ed;background:linear-gradient(#fafcfe,#fff)}
+.state-track{background:#e7eef2}.state-fill{background:linear-gradient(90deg,#87b6c5,#337b90)}
+.state-name,.state-value,.health-grid dd{color:#2a566e}
+.health-grid dt,.explanation{color:#667d8d}
+.export-options{gap:15px}
+.export-card{background:#fafcfd;border:1px solid #dce7ed;border-radius:12px;padding:22px;align-items:flex-start}
+.export-card:hover{border-color:#a8c6d2;background:#f7fafb}
+.export-icon{background:#e5eff3;color:#36758a;border-radius:10px}
+.export-card h2{color:#263e53}
+.export-card h2 small{color:#698a9c}
+.export-card p{color:#6b8191;min-height:66px}
+.progress{background:#eaf1f5;color:#365e72!important;border:1px solid #d7e3eb}
+.method-note{color:#788c9b}
+.footer{background:#fff;border-color:#dae4ea;color:#687f90}.footer span{color:#748b9a}
+.toast{background:#204d61}
+.detail-level-card,.detail-levels article{border-color:#dce7ed;background:#fafcfd}
+.detail-back,.detail-scope-note{color:#356c81}
+@media(max-width:790px){.brand{padding:2px 3px 12px}.brand strong{font-size:16px}}

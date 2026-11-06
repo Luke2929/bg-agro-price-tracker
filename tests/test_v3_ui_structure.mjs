@@ -28,7 +28,7 @@ test('V3 uses modular local scripts, no CDN or external JavaScript dependencies'
   assert.match(style,/@media\(max-width:790px\)/);
 });
 test('full raw CSV export is not labeled a summary and has all source columns',()=>{
-  assert.match(html,/Full Raw Data/);
+  assert.match(html,/Full Raw Excel/);
   assert.match(html,/17 个 FAMA 原始字段/);
   assert.match(code,/summarizeRows\(records,store\.meta\.superseded_priceids/);
   assert.match(code,/const heads=raw\?FAMA_COLUMNS/);

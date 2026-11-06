@@ -2,11 +2,12 @@ import {FAMA_COLUMNS,escapeHtml,fmtMoney,fmtDate,ageDays,mytDate,quoteChange,
   rankMovers,filterQuotes,productLabel,historySeries,statePrices,parseCSV,
   validPrice,summarizeRows} from './engine.mjs';
 import {buildXlsx,downloadXlsx} from './excel.mjs';
+import {buildFamaPdf,downloadPdf} from '../pdf.mjs';
 
 const $=id=>document.getElementById(id);
 const BASE='../data/v3/';
 const RAW_BASE='https://raw.githubusercontent.com/Luke2929/bg-agro-price-tracker/master/data/daily/';
-const PAGE_NAMES={overview:'农价总览',prices:'价格明细',history:'历史与州别',watchlist:'我的关注',export:'Excel 导出',system:'运行状态'};
+const PAGE_NAMES={overview:'农价总览',prices:'价格明细',history:'历史与州别',watchlist:'我的关注',export:'Excel / PDF 导出',system:'运行状态'};
 const store={overview:null,index:null,meta:null,health:null,history:new Map(),page:'overview',
   period:1,visible:40,watch:[],fetching:false,rawCache:new Map()};
 let historyRequestSequence=0;
@@ -20,7 +21,7 @@ async function fetchJson(path,refresh=false){
 
 function alertUser(message,error=false){
   const toast=$('toast');toast.textContent=message;toast.hidden=false;
-  toast.style.background=error?'#9b5040':'#204c39';
+  toast.style.background=error?'#9b5040':'#204d61';
   clearTimeout(alertUser.timer);alertUser.timer=setTimeout(()=>toast.hidden=true,5200);
 }
 function failure(message){$('error-banner').textContent=message;$('error-banner').hidden=false;alertUser(message,true);}
@@ -200,7 +201,7 @@ function drawChart(points,start,end){
     const x=x0+(day+.5)/dayCount*plotWidth;
     const height=p.price/upper*plotHeight;
     const barWidth=Math.max(3,Math.min(13,plotWidth/dayCount*.75));
-    return `<rect x="${x-barWidth/2}" y="${plotBottom-height}" width="${barWidth}" height="${height}" rx="2" fill="#4b9877"><title>${escapeHtml(p.date)} · ${fmtMoney(p.price)} · ${p.markets} markets</title></rect>`;
+    return `<rect x="${x-barWidth/2}" y="${plotBottom-height}" width="${barWidth}" height="${height}" rx="2" fill="#418aa2"><title>${escapeHtml(p.date)} · ${fmtMoney(p.price)} · ${p.markets} markets</title></rect>`;
   }).join('');
   const tickStep=dayCount>100?30:dayCount>45?14:7;
   const ticks=[];
@@ -321,19 +322,52 @@ async function runExport(raw){
       :summary.map(r=>[r.date,r.varieti,r.gred,r.unit,r.level,r.state,
         Number(r.price.toFixed(4)),r.markets,r.observations,r.category]);
     $('export-progress').textContent=`正在生成 Excel · ${lines.length.toLocaleString('en-MY')} 行`;
-    const notes=[['Data source','FAMA AMI; original BG Agro daily CSV archive'],
+    const notes=[['Data source','FAMA AMI; archived daily CSV'],
       ['Price date','tarikh_harga is the survey date; not the download/execution date'],
       ['Range',`${from} through ${to}`],['State filter',state||'All Malaysia'],
       ['Level filter',level||'All three survey levels'],
       ['Granularity',raw?'All 17 source columns; includes superseded and blank-price source records':'One equal-weight average per distinct survey market; latest version of each priceid only'],
       ['Missing observations','Not estimated; blank prices are not zero'],
       ['Run timestamp','FAMA source date and scraper execution are distinct']];
-    const filename=`BG_Agro_${raw?'Full_Raw':'Summary'}_${from}_to_${to}.xlsx`;
+    const filename=`Harga_Pasaran_${raw?'Full_Raw':'Summary'}_${from}_to_${to}.xlsx`;
     const blob=buildXlsx(heads,lines,{sheetName:raw?'Full Raw Data':'Summary Data',notes});
     downloadXlsx(blob,filename);
     $('export-progress').textContent=`已生成 ${filename} · ${lines.length.toLocaleString('en-MY')} 行；请检查浏览器下载。`;
     alertUser(`Excel 已生成：${lines.length.toLocaleString('en-MY')} 行。`);
   }catch(e){$('export-progress').textContent='导出未完成：'+e.message;alertUser(e.message,true);}
+  finally{store.fetching=false;button.disabled=false;}
+}
+
+async function runPdfExport(type){
+  if(store.fetching)return;
+  const from=$('export-from').value,to=$('export-to').value,
+    state=$('export-state').value,level=$('export-level').value;
+  const valid=/^\d{4}-\d{2}-\d{2}$/;
+  if(!valid.test(from)||!valid.test(to)||from>to||from<store.meta.window.min||to>store.meta.window.max){
+    alertUser('请在真实 FAMA 存档范围内选择有效日期。',true);return;
+  }
+  const dates=(store.meta.archive_dates||[]).filter(date=>date>=from&&date<=to);
+  if(!dates.length){alertUser('所选日期范围内没有原始 CSV。',true);return;}
+  if(dates.length>45){alertUser('单次最多下载 45 个有存档的调查日。',true);return;}
+  const button=$(type==='quick'?'export-pdf-quick':'export-pdf-full');
+  store.fetching=true;button.disabled=true;
+  try{
+    const records=[];
+    for(let i=0;i<dates.length;i++){
+      const date=dates[i];
+      $('export-progress').textContent=`正在读取原始 CSV · ${i+1} / ${dates.length} 个调查日 (${date})`;
+      const rows=await loadDaily(date);
+      for(const row of rows)if((!state||row.negeri===state)&&(!level||row.peringkat===level))records.push(row);
+      if(type==='full'&&records.length>6500)throw Error('Full Mobile PDF 最多支持 6,500 条原始记录，请缩短日期或选择州别。大范围可以使用 Quick View PDF。');
+    }
+    if(!records.length)throw Error('所选日期、州属和价格层级没有 FAMA 记录。');
+    $('export-progress').textContent=`正在生成 ${type==='quick'?'4 页速览':'三级导航完整'} PDF · ${records.length.toLocaleString('en-MY')} 条原始记录`;
+    const bytes=buildFamaPdf(records,{from,to,state,level,type,superseded:store.meta.superseded_priceids||{}});
+    const filename=`Harga_Pasaran_${type==='quick'?'Quick_View':'Full_Mobile'}_${from}_to_${to}.pdf`;
+    downloadPdf(bytes,filename);
+    $('export-progress').textContent=`PDF 已生成：${filename}（${records.length.toLocaleString('en-MY')} 条记录）；请检查浏览器下载。`;
+    alertUser('PDF 已生成，包含所选调查日期范围的真实 FAMA 数据。');
+  }catch(e){$('export-progress').textContent='PDF 导出未完成：'+e.message;alertUser(e.message,true);}
   finally{store.fetching=false;button.disabled=false;}
 }
 
@@ -366,6 +400,8 @@ function bindEvents(){
     $(id).addEventListener('change',()=>renderHistory().catch(e=>failure(e.message)));
   $('export-summary').addEventListener('click',()=>runExport(false));
   $('export-raw').addEventListener('click',()=>runExport(true));
+  $('export-pdf-quick').addEventListener('click',()=>runPdfExport('quick'));
+  $('export-pdf-full').addEventListener('click',()=>runPdfExport('full'));
   $('reload').addEventListener('click',()=>load(true));
 }
 
