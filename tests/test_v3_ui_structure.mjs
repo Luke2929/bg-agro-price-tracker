@@ -30,3 +30,8 @@ test('full raw CSV export is not labeled a summary and has all source columns',(
   assert.match(code,/summarizeRows\(records,store\.meta\.superseded_priceids/);
   assert.match(code,/const heads=raw\?FAMA_COLUMNS/);
 });
+
+test('history requests are sequenced to prevent stale async chart overwrites',()=>{
+  assert.match(code,/const requestSequence=\+\+historyRequestSequence/);
+  assert.match(code,/if\(requestSequence!==historyRequestSequence\)return/);
+});
