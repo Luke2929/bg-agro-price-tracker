@@ -33,7 +33,7 @@ The dashboard uses a transparent, stock-style **survey price** model, not an exc
 | **Compare & Trends** | Explore state-level prices, recorded history and individual market observations. |
 | **Data & Export** | Filter original observations by date range, product, state, level, grade and market. |
 | **Excel Downloads** | Export **Summary Data** for analysis or **Full Raw Data** with all 17 original FAMA fields. |
-| **Automatic Updates** | GitHub Actions checks new data four times daily, with a full rolling-window verification each night. |
+| **Automatic Updates** | GitHub Actions schedules eight checks daily, including a full rolling-window verification each night (best-effort timing). |
 
 ## Using the Dashboard
 
@@ -95,7 +95,15 @@ The [GitHub Actions workflow](.github/workflows/scrape.yml) runs automatically a
 | **5:37 PM, 7:37 PM, 9:37 PM** | Latest 5 survey dates |
 | **11:37 PM** | Full rolling-window scan |
 
-These schedules explicitly use `Asia/Kuala_Lumpur`. The workflow can also be triggered manually. Manual executions and code pushes always verify the complete source window, run both test suites, and rebuild the dashboard JSON; routine scheduled checks skip the unchanged-code regression suite and reuse existing aggregates when CSVs have not changed. The full nightly scan still captures older corrections and late records. Scheduled runs with no data changes skip redundant Pages deployments. This is **best-effort scheduled data**, not a second-by-second live feed: GitHub Actions can delay or drop scheduled triggers, so strict publication-time guarantees require an independent monitor or scheduler.
+The current workflow expresses these MYT times using equivalent UTC cron values (MYT = UTC+8). It can also be triggered manually. Manual executions and code pushes always verify the complete source window, run both test suites, and rebuild the dashboard JSON; routine scheduled checks skip the unchanged-code regression suite and reuse existing aggregates when CSVs have not changed. The full nightly scan still captures older corrections and late records. Scheduled runs with no data changes skip redundant Pages deployments. This is **best-effort scheduled data**, not a second-by-second live feed: GitHub Actions can delay or drop scheduled triggers, so strict publication-time guarantees require an independent monitor or scheduler.
+
+## V3 rebuild (in progress)
+
+The complete-project rebuild is being developed separately from production.
+See [V3 architecture and release gates](docs/V3_ARCHITECTURE.md) for the raw
+archive preservation rules, staged ingestion, comparison parity, modular UI,
+independent scheduling and safe GitHub Pages cutover plan. Do not treat a V3
+draft branch as a replacement for the live dashboard until its gates pass.
 
 ## Project structure
 
@@ -113,6 +121,7 @@ For development and verification:
 python -m pytest tests/
 python -m scraper.scrape
 python -m scraper.aggregate
+node --test tests/test_dashboard_algorithm.cjs tests/test_market_math_v3.cjs
 cd site && python -m http.server 8000
 ```
 

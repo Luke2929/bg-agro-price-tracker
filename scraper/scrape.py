@@ -192,6 +192,19 @@ def write_csv(path: str, records) -> None:
 
 def merge_into_file(path: str, incoming) -> dict:
     """Merge ``incoming`` records into ``path``. Returns a small stats dict."""
+    stats, merged = prepare_merge(path, incoming)
+    if stats["changed"]:
+        write_csv(path, merged)
+    return stats
+
+
+def prepare_merge(path: str, incoming) -> tuple[dict, list]:
+    """Build a corrected archive snapshot *without writing it*.
+
+    V3 validates all selected survey days before publishing any snapshots. This
+    read-only preparation step is shared with ``merge_into_file`` so both paths keep
+    the same old-row and non-empty-field preservation semantics.
+    """
     existing = read_csv(path)
     merge_stats: dict = {}
     merged = merge_records(existing, incoming, stats=merge_stats)
@@ -199,8 +212,6 @@ def merge_into_file(path: str, incoming) -> dict:
     changed = merged != sorted(
         existing.values(), key=lambda r: priceid_sort_key(r["priceid"])
     )
-    if changed:
-        write_csv(path, merged)
     return {
         "path": path,
         "before": before,
@@ -209,7 +220,7 @@ def merge_into_file(path: str, incoming) -> dict:
         "changed": changed,
         "preserved_fields": merge_stats.get("preserved_fields", 0),
         "preserved_rows": merge_stats.get("preserved_rows", 0),
-    }
+    }, merged
 
 
 # --------------------------------------------------------------------------
@@ -400,6 +411,10 @@ def run(argv=None) -> int:
     table = []
     anomalies = []
     notes = []
+    # Do not modify *any* CSV until every selected survey day passes upstream
+    # count, market-chunk and record-identity verification. This matters when
+    # day 1 succeeds but a later FAMA query fails or returns incomplete rows.
+    prepared_updates = []
     total_written = 0
     total_preserved_fields = 0
     total_preserved_rows = 0
@@ -418,7 +433,9 @@ def run(argv=None) -> int:
                 "preserved_fields": 0, "preserved_rows": 0,
             }
         else:
-            stats = merge_into_file(path, records)
+            stats, prepared = prepare_merge(path, records)
+            if stats["changed"]:
+                prepared_updates.append((path, prepared))
         written = stats["after"]
         fetched = len(records)
         total_written += written
@@ -437,6 +454,14 @@ def run(argv=None) -> int:
             status = "MISMATCH"
             anomalies.append(
                 "%s: per-negeri mismatches %r" % (date_str, info["chunk_mismatches"])
+            )
+        incoming_ids = [r.get("priceid") or "" for r in records]
+        if (not all(incoming_ids) or len(set(incoming_ids)) != len(records)
+                or any(r.get("tarikh_harga") != date_str for r in records)):
+            status = "MISMATCH"
+            anomalies.append(
+                "%s: invalid source record identity (empty/duplicate priceid "
+                "or mismatched survey date)" % date_str
             )
 
         # --- informational: archive vs upstream ------------------------------
@@ -521,6 +546,12 @@ def run(argv=None) -> int:
         for line in anomalies:
             print("  " + line, file=sys.stderr)
         return 1
+    # Publishing happens only after complete successful verification. The
+    # existing write_csv uses a same-directory .tmp file + os.replace for
+    # atomicity of each individual CSV. The Git commit provides an atomic
+    # publication boundary across all dates in the production repository.
+    for path, prepared in prepared_updates:
+        write_csv(path, prepared)
     return 0
 
 

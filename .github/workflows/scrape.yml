@@ -80,7 +80,7 @@ jobs:
 
       - name: Run Algorithm V2 browser-logic tests
         if: github.event_name != 'schedule'
-        run: node --test tests/test_dashboard_algorithm.cjs
+        run: node --test tests/test_dashboard_algorithm.cjs tests/test_market_math_v3.cjs tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs
 
       - name: Scrape rolling FAMA price window
         env:
@@ -97,7 +97,12 @@ jobs:
             python -m scraper.scrape --limit-dates 5
           fi
 
-      - name: Rebuild dashboard JSON when needed
+      # V3 Phase 1: prevent any malformed archive or accidental historical
+      # priceid/file deletion from entering the published Git history.
+      - name: Verify original FAMA CSV archive and preservation
+        run: python -m scripts.archive_guard --against-ref HEAD
+
+      - name: Rebuild legacy and versioned V3 dashboard JSON when needed
         env:
           TRIGGER_EVENT: ${{ github.event_name }}
         run: |
@@ -107,10 +112,13 @@ jobs:
           if [ "$TRIGGER_EVENT" = "schedule" ] && \
              git diff --quiet -- data/daily && \
              [ -z "$(git ls-files --others --exclude-standard -- data/daily)" ] && \
-             python -c 'import json,pathlib,sys; p=pathlib.Path("site/data/meta.json"); data=json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}; sys.exit(0 if data.get("archive_versions") else 1)'; then
+             python -c 'import json,pathlib,sys; p=pathlib.Path("site/data/meta.json"); data=json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}; required=("site/data/v3/overview.json","site/data/v3/history-index.json","site/data/v3/health.json"); sys.exit(0 if data.get("archive_versions") and all(pathlib.Path(f).is_file() for f in required) else 1)'; then
             echo "Archive CSVs unchanged; reusing tested JSON aggregates."
           else
             python -m scraper.aggregate
+            python -m scraper.aggregate_v3 --history-dir site/data/v3/history
+            python -m scripts.validate_v3
+            python -m scripts.health_v3
           fi
 
       # A successful scrape is not necessarily a new daily price publication.
