@@ -6,13 +6,12 @@ name: BG Agro - Auto Update FAMA Prices
 
 on:
   schedule:
-    # MYT: poll at off-peak minutes throughout the publication day. GitHub
-    # may still delay or drop schedule events; this is best-effort polling.
-    - cron: "37 9,11,13,15,17,19,21 * * *"
-      timezone: "Asia/Kuala_Lumpur"
-    # Verify the entire upstream rolling window once nightly.
-    - cron: "37 23 * * *"
-      timezone: "Asia/Kuala_Lumpur"
+    # MYT 09:37, 11:37, 13:37, 15:37, 17:37, 19:37, 21:37.
+    # Use explicit UTC (MYT - 8 hours) after missed/delayed local-time
+    # schedules on 2026-11-06. GitHub's cron is still best-effort.
+    - cron: "37 1,3,5,7,9,11,13 * * *"
+    # MYT 23:37: verify the entire upstream rolling window once nightly.
+    - cron: "37 15 * * *"
 
   # Allow manual execution
   workflow_dispatch:
@@ -90,7 +89,7 @@ jobs:
           # Check recent survey days frequently. The late-night full scan
           # still captures older backfills and corrections within FAMA's
           # rolling source window. Manual/push runs always scan everything.
-          if [ -z "$TRIGGER_CRON" ] || [ "$TRIGGER_CRON" = "37 23 * * *" ]; then
+          if [ -z "$TRIGGER_CRON" ] || [ "$TRIGGER_CRON" = "37 15 * * *" ]; then
             echo "Full rolling-window verification."
             python -m scraper.scrape
           else
