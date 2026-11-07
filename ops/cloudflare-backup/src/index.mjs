@@ -1,8 +1,10 @@
-/* Independent V3 fallback runner. This Worker is NOT deployed by the PR.
- * Only an authorized operator may install its GITHUB_TOKEN secret and deploy.
+/* Independent V3 fallback runner. Committing this file does NOT deploy a Worker.
+ * Only an authorized Cloudflare account operator may install its token secret.
  */
 const API='https://api.github.com/repos/Luke2929/bg-agro-price-tracker/actions/workflows/scrape.yml';
-const MAX_SUCCESS_AGE_MS=150*60*1000;
+// GitHub normally polls twice per hour. A 90-minute silence is an
+// actionable missed-poll signal, without duplicating healthy executions.
+const MAX_SUCCESS_AGE_MS=90*60*1000;
 const MAX_PENDING_AGE_MS=180*60*1000;
 
 export function decideRecovery(runs, nowMs=Date.now()){
@@ -46,7 +48,7 @@ export async function checkAndRecover(env,nowMs=Date.now()){
     if(!decision.dispatch){console.log('BG Agro backup: no action',decision.reason);return decision;}
     await github(env.GITHUB_TOKEN,'/dispatches',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ref:'master'})
+      body:JSON.stringify({ref:'master',inputs:{scrape_scope:'recent'}})
     });
     const message=`BG Agro backup: dispatched master scrape.yml (${decision.reason})`;
     console.log(message);

@@ -15,8 +15,17 @@ on:
     # MYT 23:37: verify the entire upstream rolling window once nightly.
     - cron: "37 15 * * *"
 
-  # Allow manual execution
+  # Allow manual execution and a lightweight external fallback poll.
   workflow_dispatch:
+    inputs:
+      scrape_scope:
+        description: "Survey window to check (recent for backup scheduler)"
+        required: false
+        type: choice
+        options:
+          - full
+          - recent
+        default: full
 
   # Automatically update the website when code changes
   push:
@@ -87,11 +96,15 @@ jobs:
       - name: Scrape rolling FAMA price window
         env:
           TRIGGER_CRON: ${{ github.event.schedule }}
+          SCRAPE_SCOPE: ${{ inputs.scrape_scope }}
         run: |
           # Check recent survey days frequently. The late-night full scan
           # still captures older backfills and corrections within FAMA's
           # rolling source window. Manual/push runs always scan everything.
-          if [ -z "$TRIGGER_CRON" ] || [ "$TRIGGER_CRON" = "37 15 * * *" ]; then
+          if [ "$SCRAPE_SCOPE" = "recent" ]; then
+            echo "Fast external fallback: latest five FAMA survey dates."
+            python -m scraper.scrape --limit-dates 5
+          elif [ -z "$TRIGGER_CRON" ] || [ "$TRIGGER_CRON" = "37 15 * * *" ]; then
             echo "Full rolling-window verification."
             python -m scraper.scrape
           else

@@ -2,7 +2,8 @@ name = "bg-agro-fama-backup"
 main = "src/index.mjs"
 compatibility_date = "2026-10-01"
 
-# UTC: 12:55 / 16:55 / 20:55 / 00:55 (MYT).
-# GitHub's own regular cron normally fires 09:37–21:37 and 23:37 MYT.
+# Every 30 minutes from 09:25 to 23:55 MYT (01:25 to 15:55 UTC).
+# Staggered eight minutes after GitHub's 09:17/09:47 etc polls.
+# The Worker checks the last success and only dispatches on a stale run.
 [triggers]
-crons = ["55 4,8,12,16 * * *"]
+crons = ["25,55 1-15 * * *"]
