@@ -1,1 +1,1 @@
-{"schema":"bg-agro/fama-build-health/v3","status":"ok","checked_at_utc":"2026-11-09T14:27:54Z","latest_survey_date":"2026-11-07","trigger":"workflow_dispatch","changed_records":null,"build_note":"Static provenance for the last regenerated V3 JSON; not a live cron monitor"}
+{"schema":"bg-agro/fama-build-health/v3","status":"ok","checked_at_utc":"2026-11-09T15:03:48Z","latest_survey_date":"2026-11-07","trigger":"workflow_dispatch","changed_records":null,"build_note":"Static provenance for the last regenerated V3 JSON; not a live cron monitor"}
