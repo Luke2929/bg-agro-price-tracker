@@ -26,6 +26,14 @@ on:
           - full
           - recent
         default: full
+      execution_mode:
+        description: "auto for external cron-job.org calls; manual runs include regression tests"
+        required: false
+        type: choice
+        options:
+          - manual
+          - auto
+        default: manual
 
   # Automatically update the website when code changes
   push:
@@ -51,7 +59,7 @@ jobs:
     name: Scrape FAMA Data
     runs-on: ubuntu-latest
     outputs:
-      should_deploy: ${{ github.event_name != 'schedule' || steps.commit_data.outputs.has_changes == 'true' }}
+      should_deploy: ${{ steps.commit_data.outputs.has_changes == 'true' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.execution_mode != 'auto') }}
 
     steps:
 
@@ -69,7 +77,9 @@ jobs:
         env:
           TRIGGER_EVENT: ${{ github.event_name }}
           TRIGGER_CRON: ${{ github.event.schedule }}
+          EXECUTION_MODE: ${{ inputs.execution_mode }}
         run: |
+          echo "Execution mode: ${EXECUTION_MODE:-native}"
           echo "Trigger: ${TRIGGER_EVENT}"
           echo "Scheduled cron: ${TRIGGER_CRON:-manual-or-push}"
           echo "Started UTC: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
@@ -77,20 +87,21 @@ jobs:
 
       - name: Run backend tests
         # Source-data polls reuse the already-tested code; code pushes and
-        # manual runs execute the entire regression suite.
-        if: github.event_name != 'schedule'
+        # manual runs execute the entire regression suite. External
+        # workflow_dispatch calls marked auto use the lightweight path.
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.execution_mode != 'auto')
         run: |
           python -m pip install -r requirements.txt
           python -m pytest -q
 
       - name: Setup Node.js for dashboard tests
-        if: github.event_name != 'schedule'
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.execution_mode != 'auto')
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
       - name: Run V3 and V3.1 browser-logic tests
-        if: github.event_name != 'schedule'
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.execution_mode != 'auto')
         run: node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs
 
       - name: Scrape rolling FAMA price window
@@ -120,14 +131,14 @@ jobs:
       - name: Rebuild legacy and versioned V3 dashboard JSON when needed
         env:
           TRIGGER_EVENT: ${{ github.event_name }}
+          EXECUTION_MODE: ${{ inputs.execution_mode }}
         run: |
-          # An automated data commit triggers this workflow again through
-          # `push`. Do not rebuild on every push just to change timestamps:
-          # that would create an endless commit -> push -> commit loop.
-          # Rebuild whenever archived CSVs changed, an aggregate engine changed
-          # in this commit, generated V3 files are absent, or a human explicitly
-          # requested a workflow_dispatch refresh.
-          if [ "$TRIGGER_EVENT" != "workflow_dispatch" ] && \
+          # Skip expensive aggregation when existing CSVs and code are unchanged
+          # during scheduled or external automatic polls. Manual dispatches
+          # always refresh; new CSVs or aggregation-code changes also refresh.
+          # The default GITHUB_TOKEN does not retrigger push workflows for
+          # commits made by this job.
+          if { [ "$TRIGGER_EVENT" != "workflow_dispatch" ] || [ "$EXECUTION_MODE" = "auto" ]; } && \
              git diff --quiet -- data/daily && \
              [ -z "$(git ls-files --others --exclude-standard -- data/daily)" ] && \
              git diff --quiet HEAD^ HEAD -- scraper/aggregate.py scraper/aggregate_v3.py scraper/market_math.py && \
@@ -195,12 +206,12 @@ jobs:
 
       # Prepare GitHub Pages
       - name: Configure GitHub Pages
-        if: github.event_name != 'schedule' || steps.commit_data.outputs.has_changes == 'true'
+        if: steps.commit_data.outputs.has_changes == 'true' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.execution_mode != 'auto')
         uses: actions/configure-pages@v5
 
       # Upload dashboard and generated JSON
       - name: Upload GitHub Pages artifact
-        if: github.event_name != 'schedule' || steps.commit_data.outputs.has_changes == 'true'
+        if: steps.commit_data.outputs.has_changes == 'true' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.execution_mode != 'auto')
         uses: actions/upload-pages-artifact@v4
         with:
           path: site
