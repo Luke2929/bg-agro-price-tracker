@@ -3,81 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f3f6f9">
-  <meta name="description" content="马来西亚农产品价格资讯平台 — FAMA 原始调查价格、历史趋势、州别比较、Excel 及 PDF 导出。">
-  <title>马来西亚农产品价格资讯平台 · V3</title>
+  <meta name="robots" content="noindex,follow">
+  <meta name="theme-color" content="#17382e">
+  <meta http-equiv="refresh" content="0;url=../v3.1/">
+  <title>正在前往最新农产品价格 Dashboard</title>
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
-  <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="../assets/official-theme.css">
-  <script type="module" src="./app.mjs"></script>
+  <script>window.location.replace(new URL('../v3.1/',window.location.href));</script>
+  <style>
+    body{display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;background:#f1f5f2;color:#17382e;font:16px/1.7 system-ui,"Microsoft YaHei",sans-serif;text-align:center}
+    a{color:#286f4a;font-weight:700}
+  </style>
 </head>
 <body>
-<div class="shell">
-  <aside class="sidebar" aria-label="主导航">
-    <div class="brand"><img class="brand-logo" src="../assets/agro-logo.png" alt="农业数据标志"><div><strong>农业价格资讯</strong><small>MALAYSIA PRICE MONITOR · V3</small></div></div>
-    <p class="nav-label">WORKSPACE</p>
-    <nav class="navigation" aria-label="功能页面">
-      <button type="button" class="nav-item selected" data-page="overview"><span>◫</span> 农价总览</button>
-      <button type="button" class="nav-item" data-page="prices"><span>▤</span> 价格明细</button>
-      <button type="button" class="nav-item" data-page="history"><span>▥</span> 历史与州别</button>
-      <button type="button" class="nav-item" data-page="watchlist"><span>☆</span> 我的关注 <small id="saved-counter">0</small></button>
-      <button type="button" class="nav-item" data-page="export"><span>⇩</span> Excel / PDF 导出</button>
-      <button type="button" class="nav-item" data-page="system"><span>◉</span> 运行状态</button>
-    </nav>
-    <div class="sidebar-foot"><div class="live-dot"></div><span>数据：FAMA AMI 原始档案</span><small>Malaysia · Agricultural Price Data</small></div>
-  </aside>
-
-  <div class="workspace">
-    <header class="topbar"><div class="topbar-trail">农业价格资讯 <span>/</span> <strong id="trail">农价总览</strong></div><div class="top-actions"><span class="tag" id="source-badge">正在载入数据</span><button type="button" class="quiet-button" id="reload">↻ 刷新</button><a href="../v3.1/" class="legacy-link">产品详情 V3.1 ↗</a></div></header>
-    <main class="main" id="main">
-      <div class="notice" id="error-banner" role="alert" hidden></div>
-      <section data-screen="overview" class="screen active" aria-labelledby="overview-title">
-        <div class="hero"><div class="hero-copy"><span class="eyebrow">MALAYSIA AGRICULTURAL PRICE DATA</span><h1 id="overview-title">把农产品价格，<br><em>看得更清楚。</em></h1><p>真实 FAMA 调查数据 · 农场 / 批发 / 零售 · 价格不估算、不补齐。</p><div class="hero-actions"><button type="button" class="primary-button" data-go="prices">查看最新价格 <span>→</span></button><button type="button" class="secondary-button" data-go="history">查看历史趋势</button></div></div><div class="hero-graphic" aria-hidden="true"><div class="ring ring-1"></div><div class="ring ring-2"></div><div class="hero-leaf">❋</div><div class="hero-floating"><small>LATEST SURVEY</small><strong id="hero-date">—</strong><span>FAMA · Malaysia</span></div></div></div>
-
-        <div class="stat-grid">
-          <article class="stat"><span>最新调查日期</span><strong id="stat-survey">—</strong><small id="stat-age">以官方价格日期为准</small></article>
-          <article class="stat"><span>有效最新调查记录</span><strong id="stat-rows">—</strong><small>原始价格记录，不是商品数量</small></article>
-          <article class="stat"><span>有报价的州／直辖区</span><strong id="stat-states">—</strong><small>按当日实际覆盖统计</small></article>
-          <article class="stat"><span>当前价格组合</span><strong id="stat-quotes">—</strong><small>商品 × 等级 × 层级 × 地区</small></article>
-        </div>
-
-        <section class="panel movers-panel"><div class="panel-heading"><div><span class="eyebrow green">MARKET MOVERS</span><h2>价格涨跌榜</h2><p>同一批调查市场对比；只显示符合样本覆盖门槛的数据。</p></div><div class="segmented" role="group" aria-label="涨跌观察窗口"><button type="button" data-period="1" class="active">昨日对比</button><button type="button" data-period="7">7 天</button><button type="button" data-period="30">30 天</button></div></div><div class="movers-grid"><div><h3>上升幅度 <span class="up">↑</span></h3><div id="movers-up" class="mover-list"><p class="empty">载入中…</p></div></div><div><h3>下降幅度 <span class="down">↓</span></h3><div id="movers-down" class="mover-list"><p class="empty">载入中…</p></div></div></div><p class="method-note">仅显示全国范围、匹配市场数 ≥ 3 且前后市场覆盖率均 ≥ 50% 的可比数据；价格上涨不等于所有市场都涨价。</p></section>
-
-        <section class="panel"><div class="panel-heading"><div><span class="eyebrow green">LATEST PRICES</span><h2>今日价格速览</h2><p>按实际调查日展示，不把旧报价冒充今天的报价。</p></div><button type="button" class="text-button" data-go="prices">全部价格 →</button></div><div id="quick-prices" class="quick-grid"></div></section>
-      </section>
-
-      <section data-screen="prices" class="screen" aria-labelledby="prices-title"><div class="page-intro"><span class="eyebrow green">FAMA PRICE EXPLORER</span><h1 id="prices-title">价格明细</h1><p>筛选产品、州别与价格层级；所有报价都来自所显示的调查日期。</p></div>
-        <section class="panel"><div class="filters four"><label>查找农产品<input id="price-search" type="search" placeholder="例如 CILI, KUBIS, BAYAM"></label><label>价格层级<select id="price-level"><option value="">全部层级</option><option>Ladang</option><option>Borong</option><option>Runcit</option></select></label><label>州／直辖区<select id="price-state"><option value="">全马平均</option></select></label><label>产品分类<select id="price-category"><option value="">全部分类</option></select></label></div><div class="table-top"><span id="price-table-status">正在读取官方档案…</span><span class="subtle">平均价以调查市场等权计算</span></div><div class="table-scroll"><table><thead><tr><th>农产品 · 规格</th><th>层级</th><th>地区</th><th>均价 (RM)</th><th>昨日比较</th><th>7 天比较</th><th>30 天比较</th><th>市场</th><th>关注</th></tr></thead><tbody id="price-table-body"></tbody></table></div><div class="table-foot"><span id="price-visible"></span><button type="button" class="secondary-button small" id="more-prices">加载更多</button></div></section>
-        <section class="panel"><div class="panel-heading"><div><h2>原始市场报价 · Daerah / Lokasi</h2><p>查看指定调查日的县、采集地点及实际原始报价；已被更新的旧 priceid 不重复展示。</p></div><button type="button" class="secondary-button small" id="fetch-markets">读取市场记录</button></div><div class="filters four"><label>FAMA 调查日期<select id="market-date"></select></label><label>州／直辖区<select id="market-state"><option value="">全部州</option></select></label><label>Daerah / Lokasi<input id="market-search" type="search" placeholder="例如 KINTA, IPOH"></label><label>农产品 / 品级<input id="market-product" type="search" placeholder="例如 TOMATO"></label></div><div class="table-top"><span id="market-status">选择日期并点击「读取市场记录」。</span></div><div class="table-scroll"><table><thead><tr><th>调查日期</th><th>州</th><th>Daerah</th><th>Lokasi</th><th>农产品 / 品级</th><th>层级</th><th>来源价格 (RM)</th></tr></thead><tbody id="market-body"><tr><td colspan="7" class="empty">尚未载入原始市场报价。</td></tr></tbody></table></div></section>
-      </section>
-
-      <section data-screen="history" class="screen" aria-labelledby="history-title"><div class="page-intro"><span class="eyebrow green">HISTORICAL COMPARISON</span><h1 id="history-title">历史趋势与州别价格</h1><p>只连接真实有记录的调查日；缺失日期不会人工补价。</p></div>
-        <section class="panel"><div class="filters four"><label>农产品（规格相同）<select id="history-product"></select></label><label>价格层级<select id="history-level"><option>Borong</option><option>Ladang</option><option>Runcit</option></select></label><label>观察地区<select id="history-state"><option value="">全马平均</option></select></label><label>历史窗口<select id="history-window"><option value="30">近 30 天</option><option value="90" selected>近 90 天</option><option value="180">近 180 天</option></select></label></div><div class="chart-heading"><div><h2 id="chart-title">历史价格趋势</h2><p id="chart-caption">加载真实价格数据中…</p></div><span class="chart-unit">RM / 来源单位</span></div><div class="chart-scroller"><svg id="history-chart" role="img" aria-label="按实际调查日期绘制的 FAMA 历史价格柱状图"></svg></div><p class="method-note">不同日期的样本市场可能不同；此图展示当天各市场等权均价，不能单独用来判断同一市场的涨跌。上方涨跌榜采用同市场匹配算法。</p></section>
-        <section class="panel"><div class="panel-heading"><div><h2>各州报价对比</h2><p id="states-caption">同一调查日 · 同一种规格 · 同一价格层级</p></div></div><div id="states-bars" class="states-bars"></div></section>
-      </section>
-
-      <section data-screen="watchlist" class="screen" aria-labelledby="watch-title"><div class="page-intro"><span class="eyebrow green">MY WATCHLIST</span><h1 id="watch-title">我的关注</h1><p>保存最多 20 组产品 × 价格层级 × 地区，方便每日检查；只保存在当前浏览器。</p></div><section class="panel"><div class="table-scroll"><table><thead><tr><th>农产品 · 规格</th><th>层级</th><th>地区</th><th>最新均价</th><th>1 天</th><th>7 天</th><th>30 天</th><th>操作</th></tr></thead><tbody id="watch-body"></tbody></table></div></section></section>
-
-      <section data-screen="export" class="screen" aria-labelledby="export-title">
-        <div class="page-intro"><span class="eyebrow green">DATA EXPORTS</span><h1 id="export-title">Excel / PDF 数据导出</h1><p>选好日期范围、州属和价格层级，再下载适合分析或 WhatsApp 分享的文件。</p></div>
-        <section class="panel">
-          <div class="filters four"><label>起始日期<input id="export-from" type="date"></label><label>结束日期<input id="export-to" type="date"></label><label>州／直辖区<select id="export-state"><option value="">全马</option></select></label><label>价格层级<select id="export-level"><option value="">全部层级</option><option>Ladang</option><option>Borong</option><option>Runcit</option></select></label></div>
-          <div class="export-options">
-            <div class="export-card"><span class="export-icon">▦</span><div><h2>Summary Excel <small>统计分析</small></h2><p>按真实调查日期、产品、品级、单位、地区和层级计算市场等权均价；不重复计算旧版 priceid。</p><button type="button" class="primary-button" id="export-summary">下载 Summary Excel</button></div></div>
-            <div class="export-card"><span class="export-icon">▤</span><div><h2>Full Raw Excel <small>全部原始记录</small></h2><p>保留 17 个 FAMA 原始字段、空白价格和历史修订记录，适合核对来源。</p><button type="button" class="secondary-button" id="export-raw">下载 Full Raw Excel</button></div></div>
-            <div class="export-card"><span class="export-icon">▧</span><div><h2>Quick View PDF <small>4 页 · 手机速览</small></h2><p>9:16 手机版；州属覆盖、主要蔬菜价格区间、其他分类与方法说明。适合 WhatsApp 分享。</p><button type="button" class="primary-button" id="export-pdf-quick">下载 Quick View PDF</button></div></div>
-            <div class="export-card"><span class="export-icon">▥</span><div><h2>Full Mobile PDF <small>完整市场报价</small></h2><p>按照调查日期 → Negeri → Daerah → Lokasi 浏览，支持可点击目录、PDF 书签及全部源记录；单次最多 6,500 条。</p><button type="button" class="secondary-button" id="export-pdf-full">下载 Full Mobile PDF</button></div></div>
-          </div>
-          <p id="export-progress" class="progress" aria-live="polite">Excel 和 PDF 共用以上日期与地区筛选；单次最多 45 个有存档的调查日。</p>
-          <p class="method-note">只读取 GitHub 保存的真实 FAMA CSV；缺失价格不当 RM0，日期缺档不补值。Full Mobile PDF 每个实际调查日独立分组，避免将不同日期混成同一天报价。无法完整读取档案时，整次导出停止。</p>
-        </section>
-      </section>
-
-      <section data-screen="system" class="screen" aria-labelledby="system-title"><div class="page-intro"><span class="eyebrow green">SYSTEM HEALTH</span><h1 id="system-title">运行状态与数据质量</h1><p>区分“GitHub 执行成功”和“FAMA 已发布新价格”；两者不是同一件事。</p></div><div class="health-grid"><article class="panel"><h2>数据完整性</h2><dl id="archive-health"></dl></article><article class="panel"><h2>自动化监控</h2><dl id="job-health"><div><dt>运行状态</dt><dd>等待检测…</dd></div></dl></article></div><section class="panel"><h2>数据处理规则</h2><ul class="explanation"><li>原始 <code>data/daily/*.csv</code> 是审计档案，不会因 V3 迁移而删除或覆盖。</li><li>同一天同产品先按市场计算平均；各市场在州或全国平均中等权。</li><li>涨跌比较只匹配相同产品、等级、单位、价格层级与市场。</li><li>最新调查日期和程序运行时间分别显示；缺失数据不会被估算。</li><li>GitHub Actions 预约执行不是强保证。备用调度与外部告警需要另行授权配置。</li></ul><a href="../v3.1/" class="text-button">打开 V3.1 农产品详情 →</a></section></section>
-    </main>
-    <footer class="footer">马来西亚农产品价格资讯平台 · V3 <span>来源：FAMA AMI · 独立资讯整理，非 FAMA 官方网站或交易报价</span></footer>
-  </div>
-</div>
-<div id="toast" role="status" class="toast" hidden></div>
+  <main>
+    <p>正在前往最新版马来西亚农产品价格资讯平台（V3.1）…</p>
+    <p><a href="../v3.1/">如果没有自动跳转，点击进入 Dashboard V3.1</a></p>
+  </main>
 </body>
 </html>

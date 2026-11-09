@@ -4,14 +4,14 @@
 
 An independent BG Agro dashboard built from publicly available **FAMA (Federal Agricultural Marketing Authority)** market price observations. Search produce prices, compare Malaysian states, inspect price changes and export original records for review.
 
-**[Open V3 Dashboard](https://luke2929.github.io/bg-agro-price-tracker/v3/)** · **[V3.1 Product Details](https://luke2929.github.io/bg-agro-price-tracker/v3.1/)** · [Original CSV Archive](data/daily/) · [Automated Updates](https://github.com/Luke2929/bg-agro-price-tracker/actions/workflows/scrape.yml)
+**[Open Latest Dashboard V3.1](https://luke2929.github.io/bg-agro-price-tracker/)** · [Original CSV Archive](data/daily/) · [Automated Updates](https://github.com/Luke2929/bg-agro-price-tracker/actions/workflows/scrape.yml)
 
 > **中文简介：** BG Agro 将 FAMA 的农业市场调查价格整理成简洁的 Dashboard。你可以按蔬菜、州属、日期和价格层级查询，比较历史变化，也可以将指定日期范围的原始数据下载成 Excel。数据按计划自动更新，**不是即时交易报价**。
 
-The site root (`/`) redirects to V3. The classic dashboard was retired after
-Luke approved this release; its implementation remains recoverable in Git history.
+The site root (`/`) now redirects to **V3.1**, the single official dashboard.
+Old `/v3/` bookmarks redirect to V3.1 automatically; earlier code remains recoverable in Git history.
 
-## V3 / V3.1 — consistent FAMA comparisons
+## V3.1 — consistent FAMA comparisons
 
 The dashboard uses a transparent, stock-style **survey price** model, not an exchange-traded price feed:
 
@@ -39,14 +39,13 @@ The dashboard uses a transparent, stock-style **survey price** model, not an exc
 | **Data & Export** | Filter original observations by date range, product, state, level, grade and market. |
 | **Excel Downloads** | Export **Summary Data** for analysis or **Full Raw Data** with all 17 original FAMA fields. |
 | **PDF Downloads** | Export a 4-page mobile **Quick View** or a **Full Mobile Report** with source records, navigable PDF contents, price-ID audit lines, and selected survey-date range (up to 45 archived survey days; full report max 6,500 source records per download). |
-| **Automatic Updates** | GitHub Actions schedules eight checks daily, including a full rolling-window verification each night (best-effort timing). |
+| **Automatic Updates** | GitHub Actions and an external cron scheduler check recent FAMA observations and verify the full rolling window nightly (best-effort timing). |
 
 ## Using the Dashboard
 
-1. Open **[V3 Dashboard](https://luke2929.github.io/bg-agro-price-tracker/v3/)**. The latest survey date is shown explicitly; automatic data updates are independent of the UI version.
-2. In **价格明细**, filter products, state and price level. In **历史与州别**, inspect the 30/90/180-day recorded trends.
-3. Open **[V3.1](https://luke2929.github.io/bg-agro-price-tracker/v3.1/)** and select any product to inspect Ladang, Borong and Runcit cards, then filter by actual Negeri / Daerah / Lokasi.
-4. Use **Excel 导出** to download Summary Data or the full 17-field raw FAMA archive for a selected date range.
+1. Open the **[latest V3.1 Dashboard](https://luke2929.github.io/bg-agro-price-tracker/)**. The latest FAMA survey date is shown explicitly.
+2. Use **价格明细** and **历史与州别** to filter prices, compare states and inspect 30/90/180-day trends. Select a product to see its Ladang / Borong / Runcit profile and real Negeri → Daerah → Lokasi observations.
+3. Use **Excel / PDF 导出** to download Summary Data, full 17-field raw CSV data or mobile PDF reports for the selected date range.
 
 ### Understanding the numbers
 
@@ -69,7 +68,7 @@ Full Raw Data fields:
 
 `priceid`, `tarikh_harga`, `systemdate`, `negeri`, `daerah`, `lokasi`, `peringkat`, `sublevel`, `kategori`, `kumpulan`, `jenis`, `varieti`, `gred`, `unit`, `harga`, `average14`, `supply`.
 
-The V3 and V3.1 dashboards fetch precomputed source-preserving JSON summaries and load original daily CSVs only when raw market records, Excel exports, or PDF downloads are requested. PDF pages are 396 × 704 pt, generated entirely in-browser without CDN dependencies. Full Mobile PDF preserves every selected raw source record (including blanks and historical revisions) and keeps separate survey-date chapters. Archived daily CSVs keep stable revision identifiers; if any required date fails to load, the export stops instead of silently returning partial data.
+The V3.1 dashboard fetches precomputed source-preserving JSON summaries and load original daily CSVs only when raw market records, Excel exports, or PDF downloads are requested. PDF pages are 396 × 704 pt, generated entirely in-browser without CDN dependencies. Full Mobile PDF preserves every selected raw source record (including blanks and historical revisions) and keeps separate survey-date chapters. Archived daily CSVs keep stable revision identifiers; if any required date fails to load, the export stops instead of silently returning partial data.
 
 **Record corrections:** FAMA can assign a new survey date to an existing `priceid`. We preserve both archived versions in `data/daily/`, but only the version with the latest survey date enters current Dashboard calculations and Summary Data. `site/data/meta.json` carries the small `superseded_priceids` manifest so browsers reach the same result regardless of file download order. Full Raw Data intentionally includes every archived revision and missing-price row for auditability; do not mistake superseded archived rows for separate current market quotations.
 
@@ -88,7 +87,7 @@ flowchart TD
     A["FAMA public AMI / Power BI data"] --> B["Python scraper"]
     B --> C["Original daily CSV archive"]
     C --> D["Aggregated site/data JSON"]
-    C --> E["BG Agro V3 and V3.1"]
+    C --> E["Official V3.1 Dashboard"]
     D --> E
     E --> F["GitHub Pages"]
 ```
@@ -97,18 +96,16 @@ The [GitHub Actions workflow](.github/workflows/scrape.yml) runs automatically a
 
 | Malaysia Time (MYT) | Scan type |
 | --- | --- |
-| **9:37 AM, 11:37 AM, 1:37 PM, 3:37 PM** | Latest 5 survey dates |
-| **5:37 PM, 7:37 PM, 9:37 PM** | Latest 5 survey dates |
-| **11:37 PM** | Full rolling-window scan |
+| **9:17 AM–11:47 PM**, at **:17 and :47** each hour | Latest 5 survey dates (native backup schedule) |
+| **11:37 PM** | Full rolling-window scan (native backup schedule) |
 
-The current workflow expresses these MYT times using equivalent UTC cron values (MYT = UTC+8). It can also be triggered manually. Manual executions and code pushes always verify the complete source window, run both test suites, and rebuild the dashboard JSON; routine scheduled checks skip the unchanged-code regression suite and reuse existing aggregates when CSVs have not changed. The full nightly scan still captures older corrections and late records. Scheduled runs with no data changes skip redundant Pages deployments. This is **best-effort scheduled data**, not a second-by-second live feed: GitHub Actions can delay or drop scheduled triggers, so strict publication-time guarantees require an independent monitor or scheduler.
+The current workflow expresses these MYT times using equivalent UTC cron values (MYT = UTC+8). It can also be triggered manually. Manual executions and code pushes verify the complete source window and run both regression suites. External `workflow_dispatch` calls with `execution_mode: auto` and native scheduled checks skip unchanged-code tests and reuse JSON aggregates when CSVs have not changed. The full nightly scan still captures older corrections and late records. Scheduled runs with no data changes skip redundant Pages deployments. This is **best-effort scheduled data**, not a second-by-second live feed: GitHub Actions can delay or drop scheduled triggers, so strict publication-time guarantees require an independent monitor or scheduler.
 
 ## V3.1 product profile
 
-V3 remains at `/v3/`, while the independent detail-enabled dashboard lives at
-`/v3.1/`. See the [V3.1 architecture and algorithm audit](docs/V3_1_PRODUCT_DETAIL.md).
-The classic root page now redirects to V3. The UI migration does not modify
-the historical FAMA CSVs, scraper, price identity or update schedule.
+The V3.1 dashboard is the sole public interface at `/v3.1/` and the site root redirects there.
+Legacy `/v3/` URLs redirect to V3.1. See the [V3.1 architecture and algorithm audit](docs/V3_1_PRODUCT_DETAIL.md).
+The UI migration does not modify the historical FAMA CSVs, scraper, price identity or update schedule.
 
 ## Project structure
 
@@ -116,7 +113,7 @@ the historical FAMA CSVs, scraper, price identity or update schedule.
 | --- | --- |
 | [`scraper/`](scraper/) | FAMA data retrieval and aggregation logic. |
 | [`data/daily/`](data/daily/) | Archived original daily CSV observations. |
-| [`site/`](site/) | Root redirect, V3, V3.1, shared logo and prepared JSON data. |
+| [`site/`](site/) | V3.1 dashboard, redirects for legacy URLs, shared logo and prepared JSON data. |
 | [`.github/workflows/scrape.yml`](.github/workflows/scrape.yml) | Automated scraping and GitHub Pages deployment. |
 | [`tests/`](tests/) | Existing scraper and aggregation tests. |
 

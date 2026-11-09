@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {ageDays,mytDate,rankMovers,filterQuotes,historySeries,parseCSV,
   summarizeRows,FAMA_COLUMNS,productIdentity,canonicalDailyRows,productAreaRows,
   localLevelPrices,productScopePrices,productAreaOptions} from '../site/v3.1/engine.mjs';
-import {buildXlsx} from '../site/v3/excel.mjs';
+import {buildXlsx} from '../site/v3.1/excel.mjs';
 
 function quote({state='',pct=5,eligible=true,grade='A',level='Borong'}={}){
   return {product_key:'BAYAM||'+grade+'||Kilogram',varieti:'BAYAM',gred:grade,

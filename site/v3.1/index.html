@@ -28,7 +28,7 @@
   </aside>
 
   <div class="workspace">
-    <header class="topbar"><div class="topbar-trail">农业价格资讯 <span>/</span> <strong id="trail">农价总览</strong></div><div class="top-actions"><span class="tag" id="source-badge">正在载入数据</span><button type="button" class="quiet-button" id="reload">↻ 刷新</button><a href="../v3/" class="legacy-link">返回 V3 ↗</a></div></header>
+    <header class="topbar"><div class="topbar-trail">农业价格资讯 <span>/</span> <strong id="trail">农价总览</strong></div><div class="top-actions"><span class="tag" id="source-badge">正在载入数据</span><button type="button" class="quiet-button" id="reload">↻ 刷新</button></div></header>
     <main class="main" id="main">
       <div class="notice" id="error-banner" role="alert" hidden></div>
       <section data-screen="overview" class="screen active" aria-labelledby="overview-title">
@@ -120,7 +120,7 @@
         </section>
       </section>
 
-      <section data-screen="system" class="screen" aria-labelledby="system-title"><div class="page-intro"><span class="eyebrow green">SYSTEM HEALTH</span><h1 id="system-title">运行状态与数据质量</h1><p>区分“GitHub 执行成功”和“FAMA 已发布新价格”；两者不是同一件事。</p></div><div class="health-grid"><article class="panel"><h2>数据完整性</h2><dl id="archive-health"></dl></article><article class="panel"><h2>自动化监控</h2><dl id="job-health"><div><dt>运行状态</dt><dd>等待检测…</dd></div></dl></article></div><section class="panel"><h2>数据处理规则</h2><ul class="explanation"><li>原始 <code>data/daily/*.csv</code> 是审计档案，不会因 V3 迁移而删除或覆盖。</li><li>同一天同产品先按市场计算平均；各市场在州或全国平均中等权。</li><li>涨跌比较只匹配相同产品、等级、单位、价格层级与市场。</li><li>最新调查日期和程序运行时间分别显示；缺失数据不会被估算。</li><li>GitHub Actions 预约执行不是强保证。备用调度与外部告警需要另行授权配置。</li></ul><a href="../v3/" class="text-button">返回 V3 Dashboard →</a></section></section>
+      <section data-screen="system" class="screen" aria-labelledby="system-title"><div class="page-intro"><span class="eyebrow green">SYSTEM HEALTH</span><h1 id="system-title">运行状态与数据质量</h1><p>区分“GitHub 执行成功”和“FAMA 已发布新价格”；两者不是同一件事。</p></div><div class="health-grid"><article class="panel"><h2>数据完整性</h2><dl id="archive-health"></dl></article><article class="panel"><h2>自动化监控</h2><dl id="job-health"><div><dt>运行状态</dt><dd>等待检测…</dd></div></dl></article></div><section class="panel"><h2>数据处理规则</h2><ul class="explanation"><li>原始 <code>data/daily/*.csv</code> 是审计档案，不会因 V3 迁移而删除或覆盖。</li><li>同一天同产品先按市场计算平均；各市场在州或全国平均中等权。</li><li>涨跌比较只匹配相同产品、等级、单位、价格层级与市场。</li><li>最新调查日期和程序运行时间分别显示；缺失数据不会被估算。</li><li>GitHub Actions 预约执行不是强保证。备用调度与外部告警需要另行授权配置。</li></ul></section></section>
     </main>
     <footer class="footer">马来西亚农产品价格资讯平台 · V3.1 <span>来源：FAMA AMI · 独立资讯整理，非 FAMA 官方网站或交易报价</span></footer>
   </div>

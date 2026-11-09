@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {buildFamaPdf,canonicalPdfRows,pdfPriceRanges} from '../site/pdf.mjs';
-import {parseCSV} from '../site/v3/engine.mjs';
+import {parseCSV} from '../site/v3.1/engine.mjs';
 
 const sample=(values={})=>({priceid:'1',tarikh_harga:'2026-11-06',negeri:'PERAK',
   daerah:'KINTA',lokasi:'PASAR BESAR IPOH',peringkat:'Runcit',kategori:'Sayur-Sayuran',
@@ -67,18 +67,16 @@ test('multi-day PDF keeps dates in separate chapters instead of combining survey
   assert.match(pdf,/RM 6\.00/);
 });
 
-test('both dashboards have working PDF buttons, neutral public branding, and shared theme',()=>{
-  for(const version of ['v3','v3.1']){
-    const html=readFileSync(new URL(`../site/${version}/index.html`,import.meta.url),'utf8');
-    const code=readFileSync(new URL(`../site/${version}/app.mjs`,import.meta.url),'utf8');
-    assert.doesNotMatch(html,/BG Agro|Luke Ng/i);
-    assert.match(html,/assets\/official-theme\.css/);
-    for(const id of ['export-pdf-quick','export-pdf-full']){
-      assert.match(html,new RegExp(`id="${id}"`));
-      assert.match(code,new RegExp(`\\$\\('${id}'\\)\\.addEventListener`));
-    }
-    assert.match(code,/buildFamaPdf\(records,/);
+test('V3.1 has working PDF buttons, neutral branding, and shared theme',()=>{
+  const html=readFileSync(new URL('../site/v3.1/index.html',import.meta.url),'utf8');
+  const code=readFileSync(new URL('../site/v3.1/app.mjs',import.meta.url),'utf8');
+  assert.doesNotMatch(html,/BG Agro|Luke Ng/i);
+  assert.match(html,/assets\/official-theme\.css/);
+  for(const id of ['export-pdf-quick','export-pdf-full']){
+    assert.match(html,new RegExp(`id="${id}"`));
+    assert.match(code,new RegExp(`\\$\\('${id}'\\)\\.addEventListener`));
   }
+  assert.match(code,/buildFamaPdf\(records,/);
 });
 
 test('real FAMA CSV generates both PDF variants without synthetic observations',()=>{
