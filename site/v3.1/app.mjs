@@ -489,12 +489,12 @@ async function runPdfExport(type){
       if(type==='full'&&records.length>6500)throw Error('Full Mobile PDF 最多支持 6,500 条原始记录，请缩短日期或选择州别。大范围可以使用 Quick View PDF。');
     }
     if(!records.length)throw Error('所选日期、州属和价格层级没有 FAMA 记录。');
-    $('export-progress').textContent=`正在生成 ${type==='quick'?'4 页速览':'三级导航完整'} PDF · ${records.length.toLocaleString('en-MY')} 条原始记录`;
+    $('export-progress').textContent=`正在生成 ${type==='quick'?'V3 州别价格速览':'V3 三级导航完整'} PDF · ${records.length.toLocaleString('en-MY')} 条原始记录`;
     const bytes=buildFamaPdf(records,{from,to,state,level,type,superseded:store.meta.superseded_priceids||{}});
     const filename=`Harga_Pasaran_${type==='quick'?'Quick_View':'Full_Mobile'}_${from}_to_${to}.pdf`;
     downloadPdf(bytes,filename);
     $('export-progress').textContent=`PDF 已生成：${filename}（${records.length.toLocaleString('en-MY')} 条记录）；请检查浏览器下载。`;
-    alertUser('PDF 已生成，包含所选调查日期范围的真实 FAMA 数据。');
+    alertUser(type==='quick'?'Quick View 已生成：以所选范围内最新调查日为价格速览，附日期覆盖说明。':'Full Mobile PDF 已生成：保留所选日期范围全部原始记录。');
   }catch(e){$('export-progress').textContent='PDF 导出未完成：'+e.message;alertUser(e.message,true);}
   finally{store.fetching=false;button.disabled=false;}
 }
@@ -591,3 +591,4 @@ async function load(refresh=false){
 }
 
 readWatch();bindEvents();load();
+

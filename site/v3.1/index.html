@@ -112,8 +112,8 @@
           <div class="export-options">
             <div class="export-card"><span class="export-icon">▦</span><div><h2>Summary Excel <small>统计分析</small></h2><p>按真实调查日期、产品、品级、单位、地区和层级计算市场等权均价；不重复计算旧版 priceid。</p><button type="button" class="primary-button" id="export-summary">下载 Summary Excel</button></div></div>
             <div class="export-card"><span class="export-icon">▤</span><div><h2>Full Raw Excel <small>全部原始记录</small></h2><p>保留 17 个 FAMA 原始字段、空白价格和历史修订记录，适合核对来源。</p><button type="button" class="secondary-button" id="export-raw">下载 Full Raw Excel</button></div></div>
-            <div class="export-card"><span class="export-icon">▧</span><div><h2>Quick View PDF <small>4 页 · 手机速览</small></h2><p>9:16 手机版；州属覆盖、主要蔬菜价格区间、其他分类与方法说明。适合 WhatsApp 分享。</p><button type="button" class="primary-button" id="export-pdf-quick">下载 Quick View PDF</button></div></div>
-            <div class="export-card"><span class="export-icon">▥</span><div><h2>Full Mobile PDF <small>完整市场报价</small></h2><p>按照调查日期 → Negeri → Daerah → Lokasi 浏览，支持可点击目录、PDF 书签及全部源记录；单次最多 6,500 条。</p><button type="button" class="secondary-button" id="export-pdf-full">下载 Full Mobile PDF</button></div></div>
+            <div class="export-card"><span class="export-icon">▧</span><div><h2>Quick View PDF <small>新版 · 州别手机速览</small></h2><p>显示所选范围最新调查日的州别精选 L/B/R 价格区间、日期覆盖和术语说明；页数随州别变化，适合 WhatsApp 分享。</p><button type="button" class="primary-button" id="export-pdf-quick">下载 Quick View PDF</button></div></div>
+            <div class="export-card"><span class="export-icon">▥</span><div><h2>Full Mobile PDF <small>新版 · 完整原始报价</small></h2><p>最新调查日优先，按照日期 → Negeri → Daerah → Lokasi 浏览，支持可点击目录、PDF 书签、全部价格及源记录 ID；单次最多 6,500 条。</p><button type="button" class="secondary-button" id="export-pdf-full">下载 Full Mobile PDF</button></div></div>
           </div>
           <p id="export-progress" class="progress" aria-live="polite">Excel 和 PDF 共用以上日期与地区筛选；单次最多 45 个有存档的调查日。</p>
           <p class="method-note">只读取 GitHub 保存的真实 FAMA CSV；缺失价格不当 RM0，日期缺档不补值。Full Mobile PDF 每个实际调查日独立分组，避免将不同日期混成同一天报价。无法完整读取档案时，整次导出停止。</p>
@@ -128,3 +128,4 @@
 <div id="toast" role="status" class="toast" hidden></div>
 </body>
 </html>
+
