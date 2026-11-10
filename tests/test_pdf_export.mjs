@@ -32,17 +32,20 @@ test('PDF ranges preserve level, grade, and unit without zero-filling missing pr
   assert.equal(kg.levels.Borong,undefined);
 });
 
-test('quick PDF has four mobile pages, true source values, and clickable document catalog',()=>{
+test('V3 Quick View uses responsive mobile pages, actual prices and working internal links',()=>{
   const rows=[sample({priceid:'100',peringkat:'Ladang',harga:'2.30'}),
     sample({priceid:'101',peringkat:'Runcit',harga:'6.00'})];
   const bytes=buildFamaPdf(rows,{type:'quick',from:'2026-11-06',to:'2026-11-06'});
   const pdf=new TextDecoder().decode(bytes);
   assert.match(pdf,/^%PDF-1\.4/);
-  assert.match(pdf,/\/Count 4/);
+  assert.match(pdf,/\/MediaBox \[0 0 420 744\]/);
+  assert.match(pdf,/\/Count 3/);
   assert.match(pdf,/\/Subtype \/Link/);
   assert.match(pdf,/\/Outlines/);
-  assert.match(pdf,/RM 2\.30/);
-  assert.match(pdf,/RM 6\.00/);
+  assert.match(pdf,/L 2\.30/);
+  assert.match(pdf,/R 6\.00/);
+  assert.match(pdf,/PETUNJUK HARGA/);
+  assert.doesNotMatch(pdf,/Tarikh tidak diketahui/);
   assert.doesNotMatch(pdf,/BG Agro/);
 });
 
@@ -55,16 +58,41 @@ test('full PDF has survey date, state, district, and market navigation and raw p
   assert.match(pdf,/\/Outlines/);
   assert.match(pdf,/\/Dest \[/);
   assert.match(pdf,/harga kosong dikekalkan/);
+  assert.match(pdf,/Pilih Negeri \/ Wilayah/);
+  assert.match(pdf,/Luke Ng/);
 });
 
 test('multi-day PDF keeps dates in separate chapters instead of combining survey quotes',()=>{
   const rows=[sample({priceid:'101',harga:'2.00',tarikh_harga:'2026-11-05'}),
     sample({priceid:'102',harga:'6.00',tarikh_harga:'2026-11-06'})];
   const pdf=new TextDecoder().decode(buildFamaPdf(rows,{type:'full',from:'2026-11-05',to:'2026-11-06'}));
-  assert.match(pdf,/NEGERI \/ WILAYAH - 2026-11-05/);
-  assert.match(pdf,/NEGERI \/ WILAYAH - 2026-11-06/);
+  assert.match(pdf,/2026-11-05/);
+  assert.match(pdf,/2026-11-06/);
   assert.match(pdf,/RM 2\.00/);
   assert.match(pdf,/RM 6\.00/);
+  assert.doesNotMatch(pdf,/Tarikh tidak diketahui/);
+});
+
+test('Quick View prioritizes the latest survey date while reporting coverage by date',()=>{
+  const rows=[sample({priceid:'101',harga:'2.00',tarikh_harga:'2026-11-05'}),
+    sample({priceid:'102',harga:'6.00',tarikh_harga:'2026-11-06'})];
+  const pdf=new TextDecoder().decode(buildFamaPdf(rows,{type:'quick',from:'2026-11-05',to:'2026-11-06'}));
+  assert.match(pdf,/2026-11-05/);
+  assert.match(pdf,/2026-11-06/);
+  assert.match(pdf,/R 6\.00/);
+  assert.doesNotMatch(pdf,/R 2\.00/);
+});
+
+test('long location names and multi-page state navigation are not clipped to one line',()=>{
+  const states=['PERLIS','KEDAH','PULAU PINANG','PERAK','SELANGOR','NEGERI SEMBILAN',
+    'MELAKA','JOHOR','PAHANG','TERENGGANU','KELANTAN','SABAH','SARAWAK','W.P. KUALA LUMPUR'];
+  const rows=states.map((negeri,i)=>sample({priceid:String(900+i),negeri,
+    lokasi:'LOKASI KUTIPAN HARGA PASAR BORONG PUSAT PEMBORONGAN KAMPUNG PANJANG PERAK'}));
+  const pdf=new TextDecoder().decode(buildFamaPdf(rows,{type:'full',from:'2026-11-06',to:'2026-11-06'}));
+  assert.match(pdf,/SETERUSNYA/);
+  assert.match(pdf,/KAMPUNG/);
+  assert.match(pdf,/PANJANG PERAK/);
+  assert.match(pdf,/NEGERI TERKINI/);
 });
 
 test('V3.1 has working PDF buttons, neutral branding, and shared theme',()=>{
@@ -86,3 +114,4 @@ test('real FAMA CSV generates both PDF variants without synthetic observations',
   assert.ok(buildFamaPdf(rows,{...options,type:'quick'}).length>6000);
   assert.ok(buildFamaPdf(rows,{...options,type:'full'}).length>50000);
 });
+
