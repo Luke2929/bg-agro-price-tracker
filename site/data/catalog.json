@@ -2098,6 +2098,15 @@
    ]
   },
   {
+   "id": "pucuk-maman",
+   "name": "PUCUK MAMAN",
+   "kategori": "Sayur-Sayuran",
+   "unit": "Kilogram",
+   "grades": [
+    "F.A.Q"
+   ]
+  },
+  {
    "id": "pucuk-paku",
    "name": "PUCUK PAKU",
    "kategori": "Sayur-Sayuran",
