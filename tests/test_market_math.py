@@ -10,6 +10,7 @@ import pytest
 from scraper.market_math import (
     MatchedMarketComparator,
     market_average,
+    market_key,
     product_key,
     valid_price,
 )
@@ -64,3 +65,41 @@ def test_invalid_prices_are_missing_not_zero():
     assert valid_price("NaN") is None
     assert valid_price("-2") is None
     assert valid_price("3.45") == 3.45
+    assert valid_price("0") == 0
+    assert valid_price("0x10") is None
+    assert valid_price("1_000") is None
+
+
+def test_market_and_product_identity_are_unambiguous():
+    assert market_key({"lokasi": "A||B", "sublevel": "C"}) != market_key(
+        {"lokasi": "A", "sublevel": "B||C"}
+    )
+    assert product_key({"varieti": "A||B", "gred": "C"}) != product_key(
+        {"varieti": "A", "gred": "B||C"}
+    )
+
+
+def test_v34_archive_price_regressions():
+    from scraper.aggregate import DEFAULT_DAILY_DIR, read_rows
+    from scraper.aggregate_v3 import build_overview
+
+    fixtures = json.loads(
+        (Path(__file__).parent / "fixtures/v34_archive_comparisons.json").read_text(encoding="utf-8")
+    )
+    overview = build_overview(read_rows(DEFAULT_DAILY_DIR), fixtures["current_date"])
+    for expected in fixtures["comparisons"]:
+        product = "||".join((expected["product"], fixtures["grade"], fixtures["unit"]))
+        quote = next(q for q in overview["prices"] if q["product_key"] == product
+                     and q["state"] == "" and q["level"] == expected["level"])
+        change = quote["changes"]["30"]
+        assert change["eligible"]
+        assert change["currentDate"] == fixtures["current_date"]
+        assert change["previousDate"] == fixtures["previous_date"]
+        assert change["actualDays"] == 30
+        assert change["markets"] == expected["markets"]
+        for field in ("previous", "current", "percent"):
+            assert change[field] == pytest.approx(expected[field], rel=0, abs=1e-8)
+        assert change["percent"] == pytest.approx(
+            (change["current"] - change["previous"]) / change["previous"] * 100, abs=1e-12
+        )
+        assert f'{change["percent"]:+.1f}%' == expected["display"]

@@ -106,6 +106,32 @@ def test_nonfinite_source_price_is_treated_as_missing():
     assert aggregate.parse_decimal("2.50") == aggregate.Decimal("2.50")
 
 
+def test_archive_reader_preserves_quoted_fields_and_checks_record_width_and_date(tmp_path):
+    day = "2026-11-13"
+    location = ' Market "A", north\r\nBlock B '
+    write_daily_csv(tmp_path, day, [make_row("42", day, lokasi=location, harga="0")])
+    row = aggregate.read_rows(tmp_path)[0]
+    assert list(row) == HEADER
+    assert row["lokasi"] == location
+    assert row["harga"] == "0"
+    path = tmp_path / f"{day}.csv"
+    path.write_text(",".join(HEADER) + "\n42," + day + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="column count"):
+        aggregate.read_rows(tmp_path)
+    write_daily_csv(tmp_path, day, [make_row("42", "2026-11-12")])
+    with pytest.raises(ValueError, match="survey date"):
+        aggregate.read_rows(tmp_path)
+
+
+def test_same_day_priceid_winner_is_not_excluded_by_revision_manifest():
+    first = make_row("42", "2026-11-13", harga="1")
+    correction = make_row("42", "2026-11-13", harga="2")
+    old_date = make_row("42", "2026-11-12", harga="9")
+    rows, superseded = aggregate.canonicalize_rows([old_date, first, correction])
+    assert rows == [correction]
+    assert superseded == {"2026-11-12": ["42"]}
+
+
 # ---------------------------------------------------------------------
 # National average = mean over ALL rows, not mean of per-state means
 # ---------------------------------------------------------------------

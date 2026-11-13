@@ -1,15 +1,17 @@
 /* V3.4 Creator Workspace — pure data transforms; zero external services. */
-import {quoteChange,PRICE_LEVELS} from './engine.mjs';
+import {comparisonEvidence,quoteChange,PRICE_LEVELS,productIdentity,isValidISODate} from './engine.mjs';
+
+export {isValidISODate};
 
 export const WORKSPACE_SCHEMA='bg-agro/creator-v34/1';
 export const WORKSPACE_KEY='bg-agro-v34-creator-workspace';
 export const WORKFLOW_STATES=['idea','draft','scheduled','published'];
 export const POST_CHANNELS=['facebook','tiktok','whatsapp'];
-export const FORMATS=['discussion','story','analysis','video'];
+export const FORMATS=['discussion','casual','story','analysis','educational','community','video'];
 export const LANGUAGES=['bm','zh','both'];
+export const PROMOTION_OPTIONS=['mentionPage','inviteFollow','mentionWhatsApp','commentKeyword','networking'];
 const MAX_RECORDS=1000;
 const MAX_TEXT=10000;
-const MIN_COVERAGE=0.5;
 
 function bounded(value,max=MAX_TEXT){
   return String(value??'').slice(0,max);
@@ -17,14 +19,21 @@ function bounded(value,max=MAX_TEXT){
 function compareDate(a,b){
   return String(a||'').localeCompare(String(b||''));
 }
-function safePct(value){return Number.isFinite(value)?value:0;}
 export function formatPercent(percent){
+  if(!Number.isFinite(percent))return '—';
+  if(Math.abs(percent)<0.05)return '0.0%';
   return (percent>0?'+':'')+percent.toFixed(1)+'%';
 }
-export function isValidISODate(day){
-  if(typeof day!=='string'||!(/^\d{4}-\d{2}-\d{2}$/).test(day))return false;
-  const timestamp=Date.parse(day+'T00:00:00Z');
-  return Number.isFinite(timestamp)&&new Date(timestamp).toISOString().slice(0,10)===day;
+
+export function formatPrice(value,unit,{signed=false,precision=2}={}){
+  if(!Number.isFinite(value))return '—';
+  const amount=Math.abs(value).toLocaleString('en-MY',{
+    minimumFractionDigits:2,maximumFractionDigits:precision
+  });
+  const hasValue=Number(amount.replaceAll(',',''))>0;
+  const sign=hasValue?(value<0?'-':signed?'+':''):'';
+  const displayUnit=unit==='Kilogram'?'kg':unit==='Biji'?'biji':unit;
+  return sign+'RM'+amount+(displayUnit?'/'+displayUnit:'');
 }
 export function clampMetric(value){
   const n=Number(value);
@@ -58,57 +67,45 @@ export function scoreOpportunity(quote,context={}) {
 }
 
 function quoteId(quote,period){
-  return [quote.product_key,quote.level,quote.state,String(period)].join('\u001f');
+  return JSON.stringify([quote.date,quote.product_key,quote.level,quote.state,period]);
 }
 
 // Never combine L/B/R means. One scored story per eligible product+scope; the
 // strongest eligible level nominates the topic while retaining the other levels.
-export function findContentSignals(prices,{period=7,region='',category='',query='',type='all'}={}){
+export function findContentSignals(prices,{period=7,region='',category='',query='',type='all',level=''}={}){
   const p=[1,7,30].includes(Number(period))?Number(period):7;
   const candidates=(Array.isArray(prices)?prices:[]).filter(q=>
-    (q.state||'')===region&&(!category||q.kategori===category)&&
-    (!query||[q.varieti,q.gred,q.unit].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase()))&&
-    quoteChange(q,p));
+    q.state===region&&matchesTopic(q,category,query)&&comparisonEvidence(q,p));
   const byProduct=new Map();
   for(const q of candidates){
-    const product=q.product_key||[q.varieti,q.gred,q.unit].join('||');
+    const product=q.product_key;
     if(!byProduct.has(product))byProduct.set(product,[]);
     byProduct.get(product).push(q);
   }
   const results=[];
-  for(const [productKey,quotes] of byProduct){
+  for(const quotes of byProduct.values()){
     const valid=quotes.filter(q=>Math.abs(quoteChange(q,p).percent)<50);
     const outliers=quotes.filter(q=>Math.abs(quoteChange(q,p).percent)>=50);
     const allLevels=PRICE_LEVELS.every(l=>valid.some(q=>q.level===l));
     const signs=valid.map(q=>Math.sign(quoteChange(q,p).percent));
-    const aligned=allLevels&&signs.length>=3&&signs.every(x=>x>0)||allLevels&&signs.length>=3&&signs.every(x=>x<0);
+    const aligned=allLevels&&(signs.every(x=>x>0)||signs.every(x=>x<0));
     const divergent=signs.some(x=>x>0)&&signs.some(x=>x<0);
-    const riskOnly=!valid.length;
-    const leader=[...(riskOnly?outliers:valid)].sort(
+    const risk=outliers.length>0;
+    const leaders=type==='audit'||!valid.length?outliers:valid.filter(q=>
+      type==='rise'?quoteChange(q,p).percent>0:type==='fall'?quoteChange(q,p).percent<0:true);
+    const leader=leaders.filter(q=>!level||q.level===level).sort(
       (a,b)=>Math.abs(quoteChange(b,p).percent)-Math.abs(quoteChange(a,p).percent)
     )[0];
     if(!leader)continue;
-    const change=quoteChange(leader,p);
-    const risk=outliers.length>0;
+    const comparison=comparisonEvidence(leader,p);
     const score=scoreOpportunity(leader,{
       period:p,region,alignCount:aligned?3:0,divergent
     });
     const item={
-      id:quoteId(leader,p),productKey,product:leader.varieti,
-      grade:leader.gred||'',unit:leader.unit||'',category:leader.kategori||'',
-      level:leader.level,region:region||'',period:p,percent:change.percent,
-      markets:change.markets,currentCoverage:change.currentCoverage,
-      previousCoverage:change.previousCoverage,
-      currentDate:change.currentDate||leader.date||'',
-      previousDate:change.previousDate||'',
-      currentMean:change.current,previousMean:change.previous,
-      aligned,divergent,flagged:risk,
-      publishable:!risk&&!riskOnly&&Math.abs(change.percent)<50,
+      ...comparison,id:quoteId(leader,p),category:leader.kategori||'',
+      aligned,divergent,flagged:risk,publishable:!risk,
       score:score?.total||0,components:score?.components||null,
-      levels:valid.map(q=>({
-        level:q.level,percent:quoteChange(q,p).percent,
-        markets:quoteChange(q,p).markets
-      }))
+      levels:valid.map(q=>comparisonEvidence(q,p))
     };
     if(type==='rise'&&!(item.percent>0&&item.publishable))continue;
     if(type==='fall'&&!(item.percent<0&&item.publishable))continue;
@@ -120,93 +117,210 @@ export function findContentSignals(prices,{period=7,region='',category='',query=
   }
   return results.sort((a,b)=>{
     if(a.publishable!==b.publishable)return a.publishable?-1:1;
+    if(type==='rise')return b.percent-a.percent||b.score-a.score;
+    if(type==='fall')return a.percent-b.percent||b.score-a.score;
+    if(type==='audit')return Math.abs(b.percent)-Math.abs(a.percent);
     return b.score-a.score||Math.abs(b.percent)-Math.abs(a.percent)||
       a.product.localeCompare(b.product);
   });
 }
 
-const LANG={
-  bm:{up:'NAIK',down:'TURUN',farm:'ladang',wholesale:'borong',retail:'runcit'},
-  zh:{up:'上涨',down:'下跌',farm:'农场',wholesale:'批发',retail:'零售'}
-};
-function levelsName(level,lang){
-  if(lang==='zh')return ({Ladang:'农场',Borong:'批发',Runcit:'零售'})[level]||level;
-  return ({Ladang:'ladang',Borong:'borong',Runcit:'runcit'})[level]||level;
-}
-function hashtags(signal,lang){
-  const type=signal.product.toUpperCase().replace(/[^A-Z0-9]+/g,'');
-  if(lang==='zh')return '#马来西亚农业 #FAMA #农产品价格 #SkyAgro';
-  return '#HargaPertanian #PetaniMalaysia #FAMA #SkyAgro'+(type?' #'+type:'');
+export function matchesTopic(quote,category='',query=''){
+  return (!category||quote.kategori===category)&&(!query||
+    [quote.varieti,quote.gred,quote.unit].join(' ').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
 }
 
-// A real editorial draft, not AI-generated prose. Every numerical claim comes
-// only from immutable matched-market evidence. No fabricated farmer stories.
-export function composeCreatorDraft(signal,{language='bm',format='discussion',channel='facebook'}={}){
-  if(!signal||!signal.publishable||Math.abs(signal.percent)>=50)
+export function statePriceSpreads(prices,{region='',category='',query=''}={}){
+  const groups=new Map();
+  for(const quote of prices){
+    if(!quote.state||quote.markets<3||!Number.isFinite(quote.price)||quote.price<0||
+      !matchesTopic(quote,category,query))continue;
+    const key=JSON.stringify([quote.product_key,quote.level,quote.date]);
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(quote);
+  }
+  const spreads=[];
+  for(const quotes of groups.values()){
+    if(quotes.length<2)continue;
+    const sorted=quotes.sort((a,b)=>a.price-b.price||a.state.localeCompare(b.state));
+    let low=sorted[0],high=sorted.at(-1);
+    if(region){
+      const local=sorted.find(quote=>quote.state===region);
+      if(!local)continue;
+      if(local.price-low.price>=high.price-local.price)high=local;
+      else low=local;
+    }
+    const difference=high.price-low.price;
+    if(difference>0)spreads.push({low,high,difference,relative:difference/high.price});
+  }
+  return spreads.sort((a,b)=>b.relative-a.relative||b.difference-a.difference);
+}
+
+const LEVEL_ZH={Ladang:'农场',Borong:'批发',Runcit:'零售'};
+const DRAFT_SETTINGS={showSource:true,mentionPage:false,inviteFollow:false,
+  mentionWhatsApp:false,commentKeyword:false,networking:false,confirmedConversation:false};
+
+export function draftSettings(settings={}){
+  return Object.fromEntries(Object.entries(DRAFT_SETTINGS).map(([key,value])=>
+    [key,typeof settings?.[key]==='boolean'?settings[key]:value]));
+}
+
+export function evidenceForQuote(quote,period,prices=[quote],surveyDate=quote?.date){
+  const comparison=comparisonEvidence(quote,period,surveyDate);
+  if(!comparison)return null;
+  const flagged=Math.abs(comparison.percent)>=50||prices.some(other=>other.product_key===quote.product_key&&other.state===quote.state&&
+    Math.abs(quoteChange(other,period)?.percent)>=50);
+  return {...comparison,id:quoteId(quote,period),source:'FAMA AMI',flagged,publishable:!flagged};
+}
+
+function checkedEvidence(signal){
+  if(!signal?.publishable||signal.flagged||Math.abs(signal.percent)>=50)
     throw Error('此选题缺少可发布的合格数据，请先核实。');
+  const quote={
+    product_key:signal.productKey,varieti:signal.product,gred:signal.grade,unit:signal.unit,
+    level:signal.level,state:signal.region,date:signal.currentDate,
+    changes:{[signal.period]:{
+      eligible:true,previous:signal.previousMean,current:signal.currentMean,
+      rmDifference:signal.rmDifference,percent:signal.percent,markets:signal.markets,
+      previousDate:signal.previousDate,currentDate:signal.currentDate,days:signal.period,
+      actualDays:signal.actualDays,currentMarkets:signal.currentMarkets,previousMarkets:signal.previousMarkets,
+      currentCoverage:signal.currentCoverage,previousCoverage:signal.previousCoverage
+    }}
+  };
+  if(!comparisonEvidence(quote,signal.period))throw Error('价格比较数据不完整或不一致。');
+  return signal;
+}
+
+function promotionParagraphs(settings,lang){
+  const bm=lang==='bm';
+  return [
+    settings.confirmedConversation&&(bm?'Saya ada bincang angka ni dengan bos SKY AGRO.':'我有跟 SKY AGRO 老板聊过这组行情。'),
+    settings.mentionPage&&(bm?'Kalau nak sembang pasal harga dan kebun, boleh singgah halaman SKY AGRO.':'想交流行情或种植经验，可以到 SKY AGRO 页面聊聊。'),
+    settings.inviteFollow&&(bm?'Kalau berguna, boleh follow untuk tengok perkongsian harga seterusnya.':'觉得有用，可以关注，之后还有农价分享。'),
+    settings.mentionWhatsApp&&(bm?'Kalau nak masuk komuniti pertanian WhatsApp, boleh mesej saya.':'想进农业 WhatsApp 群，可以私讯我。'),
+    settings.commentKeyword&&(bm?'Kalau berminat, komen NAK.':'有兴趣可以留言 NAK。'),
+    settings.networking&&(bm?'Orang kebun sekitar Pusing, Batu Gajah, Siputeh, Tronoh dan Gopeng, jom kenal-kenal.':'Pusing、Batu Gajah、Siputeh、Tronoh、Gopeng 附近的农友，欢迎互相认识。')
+  ].filter(Boolean);
+}
+
+function template(signal,format,lang,settings){
+  const bm=lang==='bm',level=bm?signal.level.toLowerCase():LEVEL_ZH[signal.level];
+  const percent=formatPercent(signal.percent);
+  const movement=signal.percent>0?(bm?'NAIK':'上涨'):signal.percent<0?(bm?'TURUN':'下跌'):(bm?'KEKAL':'持平');
+  const title=bm?'HARGA '+signal.product+' '+movement+' '+percent+' · '+signal.level.toUpperCase():
+    signal.product+' '+level+'价'+movement+' '+percent;
+  const place=bm?(signal.region||'pasaran tinjauan seluruh Malaysia'):(signal.region||'全国调查样本');
+  const previous=formatPrice(signal.previousMean,signal.unit),current=formatPrice(signal.currentMean,signal.unit);
+  const difference=formatPrice(signal.rmDifference,signal.unit,{signed:true});
+  const grade=signal.grade||(bm?'tiada gred direkodkan':'品级未记录');
+  const interval=bm
+    ? signal.currentDate+' berbanding '+signal.previousDate+' (selang '+signal.actualDays+' hari).'
+    : signal.previousDate+' 至 '+signal.currentDate+'（相隔 '+signal.actualDays+' 天）。';
+  const evidence=bm
+    ? interval+' Purata harga '+level+' '+signal.product+' ('+grade+', '+signal.unit+') di '+place+
+      ' bergerak daripada '+previous+' kepada '+current+'. Beza '+difference+' ('+percent+
+      ') berdasarkan '+signal.markets+' pasaran yang sama.'
+    : interval+place+'的 '+signal.product+'（'+grade+'，'+signal.unit+'）'+level+'均价从 '+previous+
+      ' 到 '+current+'，价差 '+difference+'（'+percent+'），涵盖 '+signal.markets+' 个共同调查市场。';
+  const question=bm?'Harga kat tempat korang macam mana? Kongsi kawasan dan harga yang korang nampak.':
+    '你那边看到的是什么价？可以留言说说地点和实际报价。';
+  const note=bm?'Harga di setiap kawasan boleh berbeza. Untung bergantung juga pada kos dan hasil jualan.':
+    '各地报价可能不同。实际利润还取决于成本和售出的数量。';
+  const method=bm?'Purata dikira daripada pasaran yang sama. Setiap pasaran diberi berat yang sama.':
+    '比较使用两日都有报价的市场，各市场权重相同。';
+  const text=(value,required=false)=>({value,required});
+  const fact=text((format==='video'?(bm?'VOICEOVER: ':'解说：'):'')+evidence,true);
+  const segments={
+    analysis:[text(title),fact,text(method)],
+    casual:[text(bm?'Harga sayur ni, lain tempat lain ceritanya. Tengok yang ni dulu.':'菜价每个地方都不一样，先看这组数字。'),fact,text(question)],
+    discussion:[text(title),fact,text(question)],
+    story:[
+      text(bm?'Kadang-kadang masa harga tengah cantik, hasil pula tak banyak. Bila hasil banyak, harga pula jatuh. Memang pening kepala dibuatnya.':
+        '行情好的时候，手上的菜可能不多。等菜多起来，又担心赶上价格回落。'),
+      text(bm?'Dari petik hasil, asingkan ikut gred sampai hantar ke pasar, ada macam-macam kerja. Lepas tu baru sampai soalan yang orang kebun selalu kena fikir: harga hari ni cukup ke untuk tutup kos?':
+        '从采收、分级到送到市场，中间还有不少活。农友算账时还要问，今天的售价够不够 cover 成本？'),
+      text(bm?'Bila tengok satu angka je, susah nak tahu apa yang berubah. Jom tengok dua tarikh untuk sayur yang sama.':
+        '只看一天的报价，很难知道价格怎么走。拿同一种菜的两个调查日来看看。'),
+      fact,text(note),text(question)
+    ],
+    educational:[
+      text(bm?'Ladang ialah harga di peringkat kebun. Borong ialah harga urus niaga borong. Runcit ialah harga di peringkat jualan kepada pengguna.':
+        'Ladang 是农场端，Borong 是批发端，Runcit 是面向消费者的零售端。'),
+      fact,text(method),text(note)
+    ],
+    community:[
+      text(bm?'Kalau ada orang kebun atau peniaga kat sini, jom bandingkan dengan harga di tempat masing-masing.':
+        '有种菜或卖菜的朋友，欢迎拿你那边的行情一起聊。'),fact,text(question)
+    ],
+    video:[
+      text((bm?'HOOK (0–3s): ':'开场（0–3 秒）：')+title),fact,
+      text(bm?'VISUAL: Paparkan harga dan peringkat '+level+'.':'画面：显示'+level+'层级、两日均价和调查日期。'),
+      text((bm?'SOALAN PENONTON: ':'互动问题：')+question)
+    ]
+  }[format];
+  if(format==='discussion')segments.push(text(note));
+  segments.push(...promotionParagraphs(settings,lang).map(value=>text(value,true)));
+  if(settings.showSource)segments.push(text(bm?'Sumber: FAMA AMI':'来源：FAMA AMI',true));
+  return {title,segments};
+}
+
+function hashtags(signal,lang,settings){
+  const product=signal.product.toUpperCase().replace(/[^A-Z0-9]+/g,'');
+  return [
+    lang==='zh'?'#马来西亚农业 #农产品价格':'#HargaPertanian #PetaniMalaysia',
+    settings.showSource?'#FAMA':'',
+    settings.mentionPage?'#SkyAgro':'',
+    lang==='bm'&&product?'#'+product:''
+  ].filter(Boolean).join(' ');
+}
+
+function draftTemplate(signal,{language='bm',format='discussion',channel='facebook',settings}={}){
+  checkedEvidence(signal);
   if(!LANGUAGES.includes(language)||!FORMATS.includes(format)||!POST_CHANNELS.includes(channel))
     throw Error('不支持的内容格式或语言');
-  const percent=formatPercent(signal.percent),day=signal.currentDate,old=signal.previousDate,
-    place=signal.region||'Malaysia',levelBM=levelsName(signal.level,'bm'),
-    levelZH=levelsName(signal.level,'zh');
-  if(!isValidISODate(day)||!isValidISODate(old)||!Number.isInteger(signal.markets)||signal.markets<3)
-    throw Error('缺少可核实的 FAMA 比较日期或共同市场数，不能生成结论。');
-  const bmTitle='HARGA '+signal.product+' '+(signal.percent>0?'NAIK ':'TURUN ')+percent+' — PETANI NAMPAK TAK?';
-  const zhTitle=signal.product+' '+levelZH+'价格'+(signal.percent>0?'上涨':'下跌')+percent+'，农民怎么看？';
-  const bmEvidence='Saya semak rekod tinjauan FAMA untuk '+day+' berbanding '+old+
-    '. Bagi '+signal.product+' ('+signal.grade+' / '+signal.unit+'), harga purata '+
-    levelBM+' di '+place+' berubah '+percent+' berdasarkan '+signal.markets+
-    ' pasaran yang sama pada dua tarikh tersebut.';
-  const zhEvidence='我整理了 FAMA 在 '+day+' 与 '+old+' 的市场调查数据。'+
-    signal.product+'（'+signal.grade+' / '+signal.unit+'）在'+
-    (signal.region||'全马')+'的'+levelZH+'层级，'+signal.markets+
-    ' 个共同调查市场的价格变化为 '+percent+'。';
-  const bmQuestion='Di kebun atau pasar kawasan anda, harga betul-betul macam ni ke? '+
-    'Kos benih, baja, pekerja dan pengangkutan masih terkawal? Kongsi pengalaman sebenar di komen.';
-  const zhQuestion='你那边的实际收购价也有这种变化吗？肥料、人工和运输成本有什么变化？欢迎分享真实情况。';
-  const bmNote='Sumber: FAMA AMI | Tarikh: '+day+' | Rujukan: '+old+
-    ' | '+signal.markets+' pasaran sepadan. Tinjauan bukan tawaran jual beli, '+
-    'dan perubahan harga tidak membuktikan untung atau punca perubahan.';
-  const zhNote='来源：FAMA AMI｜调查日：'+day+'｜比较基准：'+old+
-    '｜共同市场：'+signal.markets+'。调查均价不等于成交价，也不能证明利润或涨跌原因。';
-  const bmFormats={
-    discussion:[bmTitle,bmEvidence,bmQuestion,bmNote].join('\n\n'),
-    story:['Orang kebun selalu cerita, harga sayur ni kadang naik kadang turun.',
-      'Saya tak nak agak-agak, jadi saya semak data FAMA dulu.',bmEvidence,
-      'Angka ni bukan bermakna semua petani dapat harga sama.',bmQuestion,bmNote].join('\n\n'),
-    analysis:['SEMAKAN HARGA PERTANIAN — '+signal.product,
-      bmEvidence,'Penting: perbandingan dibuat pada pasaran yang sama, '+
-      'bukan purata semua lokasi yang berbeza.',bmQuestion,bmNote].join('\n\n'),
-    video:['HOOK (0–3s): '+bmTitle,
-      'VOICEOVER: '+bmEvidence,
-      'VISUAL: Paparkan harga dan peringkat '+levelBM+'.',
-      'SOALAN PENONTON: '+bmQuestion,
-      'CAPTION: '+bmNote].join('\n\n')
-  };
-  const zhFormats={
-    discussion:[zhTitle,zhEvidence,zhQuestion,zhNote].join('\n\n'),
-    story:['最近整理农产品价格时，我发现一个值得农友讨论的变化。',
-      zhEvidence,'这并不代表每个农场都拿到一样的价格。',zhQuestion,zhNote].join('\n\n'),
-    analysis:['农价观察｜'+signal.product,zhEvidence,
-      '说明：比较采用同一批市场的报价，而不是不同地区均价简单相减。',
-      zhQuestion,zhNote].join('\n\n'),
-    video:['开场（0–3 秒）：'+zhTitle,'解说：'+zhEvidence,
-      '画面：显示'+levelZH+'价格层级与两个真实调查日。',
-      '互动问题：'+zhQuestion,'说明：'+zhNote].join('\n\n')
-  };
-  let body=language==='bm'?bmFormats[format]:language==='zh'?zhFormats[format]:
-    bmFormats[format]+'\n\n—— 中文 ——\n\n'+zhFormats[format];
-  if(channel==='tiktok')body+='\n\n'+
-    (language==='zh'?hashtags(signal,'zh'):hashtags(signal,'bm'));
-  else if(channel==='facebook')body+='\n\n'+
-    (language==='zh'?hashtags(signal,'zh'):hashtags(signal,'bm'))+
-    (language==='both'?' '+hashtags(signal,'zh'):'');
-  return {
-    title:language==='zh'?zhTitle:bmTitle,
-    body,language,format,channel,
-    evidence:signal,
-    evidenceDate:day,createdFrom:'fama-matched-market'
-  };
+  settings=draftSettings(settings);
+  const langs=language==='both'?['bm','zh']:[language];
+  const translations=langs.map(lang=>template(signal,format,lang,settings));
+  const segments=translations.flatMap(({segments},index)=>
+    index?[{value:'—— 中文 ——',required:true},...segments]:segments);
+  if(channel!=='whatsapp')segments.push({value:langs.map(lang=>hashtags(signal,lang,settings)).join(' ')});
+  return {title:translations[0].title,segments,language,format,channel,settings};
+}
+
+export function composeCreatorDraft(signal,options){
+  const {title,segments,language,format,channel,settings}=draftTemplate(signal,options);
+  return {title,body:segments.map(segment=>segment.value).join('\n\n'),language,format,channel,settings,
+    evidence:signal,evidenceDate:signal.currentDate,createdFrom:'fama-matched-market'};
+}
+
+const normalizeText=text=>String(text??'').trim().replace(/\s+/g,' ');
+
+// Validate public copy against the current archive-backed template. Optional
+// paragraphs may be removed; required facts and wording cannot be substituted.
+export function validateCreatorDraft({title,body},signal,options){
+  let expected;
+  try{expected=draftTemplate(signal,options);}
+  catch(error){return {valid:false,message:error.message};}
+  if(normalizeText(title)!==normalizeText(expected.title))
+    return {valid:false,message:'标题与选定比较不一致。请重新生成文案。'};
+  const paragraphs=String(body??'').trim().split(/\r?\n[ \t]*\r?\n/).map(normalizeText).filter(Boolean);
+  const remaining=new Set(paragraphs);
+  if(remaining.size!==paragraphs.length)return {valid:false,message:'正文含有重复段落。'};
+  for(const segment of expected.segments){
+    if(!remaining.delete(normalizeText(segment.value))&&segment.required)
+      return {valid:false,message:'正文的价格、日期或范围无法核对。请重新生成文案。'};
+  }
+  if(remaining.size)
+    return {valid:false,message:'正文含有无法验证的改动。可以调整已验证段落的顺序、删去可选段落，或重新生成。'};
+  return {valid:true,message:'已核对价格、调查日期、市场数和范围。'};
+}
+
+export function buildMarketPostIdea(quote,period,surveyDate,prices){
+  const evidence=evidenceForQuote(quote,period,prices,surveyDate);
+  if(!evidence?.publishable||evidence.region||evidence.percent===0)return '';
+  const options={language:'bm',format:'casual',channel:'facebook'};
+  const draft=composeCreatorDraft(evidence,options);
+  return validateCreatorDraft(draft,evidence,options).valid?draft.title+'\n\n'+draft.body:'';
 }
 
 export function observedStreak(history,{level='Borong',state='',endDate}={}){
@@ -252,7 +366,7 @@ function validatedRecord(r){
     title:bounded(r.title,300),body:bounded(r.body),
     scheduledDate:scheduled,postedDate:isValidISODate(r.postedDate)?r.postedDate:'',
     postUrl:url,notes:bounded(r.notes,2000),
-    metrics:normalizeMetrics(r.metrics),evidence,
+    metrics:normalizeMetrics(r.metrics),evidence,settings:draftSettings(r.settings),
     evidenceDate:bounded(r.evidenceDate,12)
   };
 }
@@ -289,11 +403,12 @@ export function contentMetrics(workspace){
   }
   return totals;
 }
-export function toCSV(workspace){
+export function toCSV(workspace,{includeTitle=()=>true}={}){
   const records=readWorkspace(workspace).records;
   const fields=['id','title','status','channel','scheduledDate','postedDate','postUrl',
     'evidenceDate','reach','likes','comments','shares','messages','joins','orders'];
   const escape=value=>'"'+String(value??'').replace(/"/g,'""').replace(/[\r\n]+/g,' ')+'"';
-  const rows=records.map(r=>fields.map(key=>escape(key in r.metrics?r.metrics[key]:r[key])).join(','));
+  const rows=records.map(r=>fields.map(key=>
+    escape(key==='title'&&!includeTitle(r)?'':key in r.metrics?r.metrics[key]:r[key])).join(','));
   return fields.map(escape).join(',')+'\r\n'+rows.join('\r\n')+(rows.length?'\r\n':'');
 }

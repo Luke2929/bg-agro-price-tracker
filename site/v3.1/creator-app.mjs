@@ -1,14 +1,20 @@
 /* Creator V3.4: local-first UI, no platform API connections. */
 import {
  WORKSPACE_KEY,emptyWorkspace,readWorkspace,saveRecord,contentMetrics,
- findContentSignals,composeCreatorDraft,observedStreak,formatPercent,
+ findContentSignals,composeCreatorDraft,observedStreak,formatPercent,formatPrice,
+ evidenceForQuote,validateCreatorDraft,draftSettings,statePriceSpreads,matchesTopic,
  toCSV,normalizeMetrics,isValidISODate
 } from './creator-core.mjs';
-import {escapeHtml,mytDate} from './engine.mjs';
+import {escapeHtml,mytDate,comparisonMarketDetails} from './engine.mjs';
 const $=id=>document.getElementById(id),v=id=>$(id).value;
 const metrics=['reach','likes','comments','shares','messages','joins','orders'];
 const names={idea:'选题',draft:'草稿',scheduled:'计划发布',published:'已发布'};
 const channels={facebook:'Facebook',tiktok:'TikTok',whatsapp:'WhatsApp'};
+const settingsInputs={
+  showSource:'creator-source',mentionPage:'creator-mention-page',inviteFollow:'creator-invite-follow',
+  mentionWhatsApp:'creator-mention-whatsapp',commentKeyword:'creator-comment-keyword',
+  networking:'creator-networking',confirmedConversation:'creator-confirmed-conversation'
+};
 const formatNum=n=>Number(n||0).toLocaleString('en-MY');
 function saveBlob(data,name,type){
   const u=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type}));
@@ -28,8 +34,7 @@ function wrapped(ctx,word,x,y,width,lineHeight,limit){
   if(line&&n<limit){ctx.fillText(line,x,y+n*lineHeight);n++;}
   return y+n*lineHeight;
 }
-function makeCard(signal,platform){
-  if(!signal?.publishable)throw Error('只有经过合格同市场核对的选题才允许导出');
+function makeCard(signal,platform,settings){
   const width=1080,height=platform==='tiktok'?1920:1350;
   const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
   const ctx=canvas.getContext('2d');if(!ctx)throw Error('Canvas 不可用');
@@ -37,33 +42,39 @@ function makeCard(signal,platform){
   grad.addColorStop(0,'#123a2e');grad.addColorStop(1,'#348065');
   ctx.fillStyle=grad;ctx.fillRect(0,0,width,height);
   ctx.fillStyle='#e8f6e6';ctx.font='bold 36px system-ui';
-  ctx.fillText('SKY AGRO  |  FAMA MARKET PRICE',75,100);
-  ctx.fillStyle='#d2e8d8';ctx.font='30px system-ui';ctx.fillText('Malaysia · Agricultural price survey',75,156);
+  ctx.fillText(settings.mentionPage?'SKY AGRO  |  MARKET PRICES':'AGRICULTURAL MARKET PRICES',75,100);
+  ctx.fillStyle='#d2e8d8';ctx.font='30px system-ui';ctx.fillText('Matched-market survey',75,156);
   ctx.fillStyle='#ffffff';ctx.font='bold 68px system-ui';
-  const after=wrapped(ctx,signal.product,75,280,930,86,3);
+  const after=wrapped(ctx,signal.product,75,235,930,75,3);
   ctx.font='bold 32px system-ui';ctx.fillStyle='#d4eddd';
-  ctx.fillText(signal.level+'  ·  '+(signal.region||'Malaysia'),75,after+62);
-  const y=Math.max(510,after+98);
+  ctx.fillText(signal.level+'  ·  '+(signal.region||'Malaysia')+'  ·  '+(signal.grade||'Ungraded'),75,after+16,930);
+  const y=Math.max(460,after+55);
   ctx.fillStyle='#f5faf3';ctx.beginPath();ctx.roundRect(70,y,940,285,30);ctx.fill();
   ctx.fillStyle=signal.percent>0?'#246e4d':'#9d4f32';
   ctx.font='bold 150px system-ui';ctx.fillText(formatPercent(signal.percent),110,y+185);
   ctx.fillStyle='#4e7463';ctx.font='bold 30px system-ui';
-  ctx.fillText(signal.period+' DAYS · MATCHED MARKETS',112,y+244);
+  ctx.fillText(signal.actualDays+' DAYS · '+signal.markets+' MATCHED MARKETS',112,y+244);
   ctx.fillStyle='#e4f5e8';ctx.font='32px system-ui';
-  ctx.fillText('Survey: '+signal.currentDate,75,y+370);
-  ctx.fillText('Baseline: '+signal.previousDate,75,y+430);
-  ctx.fillText('Shared markets: '+signal.markets,75,y+490);
+  ctx.fillText(signal.previousDate+'  ·  '+formatPrice(signal.previousMean,signal.unit),75,y+355,930);
+  ctx.fillText(signal.currentDate+'  ·  '+formatPrice(signal.currentMean,signal.unit),75,y+415,930);
+  ctx.fillText('Difference  ·  '+formatPrice(signal.rmDifference,signal.unit,{signed:true}),75,y+475,930);
   ctx.font='27px system-ui';ctx.fillStyle='#cfe8d4';
-  wrapped(ctx,'Same variety, grade, unit, price level & market locations. Actual price and profits may differ.',75,y+560,920,42,4);
-  ctx.font='bold 26px system-ui';ctx.fillStyle='#bcd8c3';
-  ctx.fillText('Source: FAMA AMI · Independent compilation',75,height-76);
+  wrapped(ctx,'Each shared market carries the same weight. Local prices may vary.',75,y+550,920,38,2);
+  if(settings.showSource){
+    ctx.font='bold 26px system-ui';ctx.fillStyle='#bcd8c3';
+    ctx.fillText('Source: FAMA AMI · Independent compilation',75,height-76);
+  }
   canvas.toBlob(blob=>{
     if(blob)saveBlob(blob,'sky_agro_'+signal.currentDate+'_'+platform+'.png','image/png');
   },'image/png');
 }
-export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}){
+export function createCreatorWorkspace({
+  getOverview,getArchiveDates,loadSnapshot,loadEvidenceRows,loadHistory,loadStreaks,showComparison,notify,navigate
+}){
   let workspace=emptyWorkspace(),blocked=false,editingId='',editingEvidence=null,selectedEvidence=null;
-  let signals=[],pool=[],historicalRequest=0;
+  let signals=[],pool=[],signalData=null,verifiedEvidence=null;
+  let historicalRequest=0,signalRequest=0,researchRequest=0,verificationRequest=0;
+  let archiveChecks=new Map();
   const tell=(s,bad=false)=>notify(s,bad);
   const choose=(el,items,initial)=>{
     const prev=el.value;el.replaceChildren();el.add(new Option(initial,''));
@@ -78,73 +89,224 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
     if(blocked)throw Error('旧资料读取失败，保存被暂停');
     localStorage.setItem(WORKSPACE_KEY,JSON.stringify(next));workspace=next;
   }
-  const active=()=>pool[Number(v('creator-topic'))]||null;
+  const active=()=>pool.find(s=>s.id===v('creator-topic'))||null;
   const currentEvidence=()=>editingId?editingEvidence:selectedEvidence;
+  const options=()=>({
+    channel:v('creator-channel'),language:v('creator-language'),format:v('creator-format'),
+    settings:Object.fromEntries(Object.entries(settingsInputs).map(([key,id])=>[key,$(id).checked]))
+  });
+  const applySettings=settings=>{
+    const checked=draftSettings(settings);
+    for(const [key,id] of Object.entries(settingsInputs))$(id).checked=checked[key];
+  };
+  function updateValidation(){
+    const draft={title:v('creator-title'),body:v('creator-body')};
+    const validation=verifiedEvidence?
+      validateCreatorDraft(draft,verifiedEvidence,options()):
+      {valid:false,message:currentEvidence()?'请核对并重新生成文案。':'请选择调查数据并生成文案。'};
+    for(const id of ['creator-copy','creator-export-fb','creator-export-tiktok'])$(id).disabled=!validation.valid;
+    $('creator-validation').textContent=validation.message;
+    $('creator-validation').classList.toggle('validation-error',!validation.valid&&Boolean(draft.body));
+    return validation;
+  }
   function evidence(){
     const s=currentEvidence();
     $('creator-evidence').textContent=s?
-      s.product+' · '+s.level+' · '+(s.region||'全马')+' · '+formatPercent(s.percent)+
-      ' · '+s.previousDate+' → '+s.currentDate+' · '+s.markets+' 个共同市场。'+
-      '不能据此断言利润或涨跌原因。':
+      [s.product,s.grade,s.level,s.region||'全国调查样本',formatPercent(s.percent),
+        formatPrice(s.previousMean,s.unit)+' → '+formatPrice(s.currentMean,s.unit),
+        (s.previousDate||'—')+' → '+(s.currentDate||'—'),
+        Number.isInteger(s.actualDays)?'实际相隔 '+s.actualDays+' 天':'',
+        Number.isInteger(s.markets)?s.markets+' 个共同市场':''].filter(Boolean).join(' · '):
       '请先从选题情报中选择有合格 FAMA 比较的农产品。';
+    $('creator-studio-details').disabled=!verifiedEvidence;
+    updateValidation();
+  }
+  const filters=()=>({
+    period:Number(v('creator-signal-period')),region:v('creator-signal-region'),
+    category:v('creator-signal-category'),query:v('creator-signal-search'),
+    type:v('creator-signal-type'),level:v('creator-signal-level')
+  });
+  function renderTopics(value=''){
+    const select=$('creator-topic');
+    select.replaceChildren(new Option('请选择实际报价选题',''));
+    for(const s of pool)select.add(new Option(s.product+' · '+s.level+' · '+
+      formatPercent(s.percent)+' · '+(s.region||'全国调查样本')+' · '+s.currentDate,s.id));
+    select.value=pool.some(s=>s.id===value)?value:'';
   }
   function signalsRender(){
-    const data=getOverview();if(!data)return;
-    signals=findContentSignals(data.prices,{period:Number(v('creator-signal-period')),
-      region:v('creator-signal-region'),category:v('creator-signal-category'),
-      query:v('creator-signal-search'),type:v('creator-signal-type')});
-    const usable=signals.filter(x=>x.publishable);
+    const data=signalData;
+    if(!data)return;
+    const filter=filters(),last=active();
+    signals=findContentSignals(data.prices,filter);
+    pool=signals.filter(x=>x.publishable);
+    if(selectedEvidence&&!pool.some(x=>x.id===selectedEvidence.id))pool.unshift(selectedEvidence);
+    renderTopics(last?.id||selectedEvidence?.id);
     $('creator-signal-summary').textContent=data.survey_date+' · '+signals.length+
-      ' 个候选，'+usable.length+' 个可研究，'+signals.filter(x=>x.flagged).length+
-      ' 个含大幅异常。排序依内部选题评分；展示前 80 个。';
+      ' 个候选，'+signals.filter(x=>x.publishable).length+' 个可写，'+
+      signals.filter(x=>x.flagged).length+' 个含大幅波动。展示前 80 个。';
     $('creator-signal-list').innerHTML=signals.slice(0,80).map((s,i)=>{
-      const tags=[s.aligned?'三层同步':'',s.divergent?'三层分化':'',
-        s.flagged?'异常需核实':''].filter(Boolean).map(x=>'<span class="creator-pill">'+x+'</span>').join('');
+      const tags=[s.aligned?'三层同向':'',s.divergent?'层级分化':'',s.flagged?'波动待核实':'']
+        .filter(Boolean).map(x=>'<span class="creator-pill">'+x+'</span>').join('');
+      const levels=s.levels.filter(item=>item.level!==s.level).map(item=>
+        '<small title="'+escapeHtml(item.previousDate+' → '+item.currentDate)+'">'+item.level+' '+
+        escapeHtml(formatPrice(item.previousMean,item.unit)+' → '+formatPrice(item.currentMean,item.unit)+' · '+
+        formatPrice(item.rmDifference,item.unit,{signed:true})+' · '+formatPercent(item.percent)+
+        ' · '+item.actualDays+' 天 · '+item.markets+' 市场')+'</small>').join('');
       return '<article class="creator-signal-row">'+
-       '<div class="creator-signal-name"><strong>'+escapeHtml(s.product)+'</strong><small>'+
-       escapeHtml([s.grade,s.unit,s.level,s.region||'全马'].join(' · '))+
-       '</small><div class="creator-tags">'+tags+'</div></div>'+
-       '<div class="creator-signal-number"><b class="'+(s.percent>0?'creator-up':'creator-down')+'">'+
-       formatPercent(s.percent)+'</b><small>'+escapeHtml(s.previousDate)+' → '+
-       escapeHtml(s.currentDate)+' · '+s.markets+' 共同市场</small></div>'+
-       '<div class="creator-score"><strong>'+s.score+'<small>/100</small></strong><span>选题优先级</span></div>'+
-       '<div class="creator-actions"><button type="button" class="secondary-button small" data-creator-history="'+i+'">检查历史</button>'+
-       '<button type="button" class="primary-button small" data-creator-draft="'+i+'"'+
-       (s.publishable?'':' disabled')+'>写这条选题</button></div></article>';
-    }).join('')||'<p class="empty">没有符合条件的市场信号。可以改变周期、地区或筛选类型。</p>';
-    pool=usable;
-    if(selectedEvidence&&!pool.some(x=>x.id===selectedEvidence.id))selectedEvidence=null;
-    const sel=$('creator-topic'),last=sel.value;sel.replaceChildren();
-    sel.add(new Option('请选择实际报价选题',''));
-    pool.forEach((s,i)=>sel.add(new Option(s.product+' · '+s.level+' · '+
-      formatPercent(s.percent)+' · '+(s.region||'全马'),String(i))));
-    sel.value=[...sel.options].some(o=>o.value===last)?last:(pool.length?'0':'');
-    evidence();
+        '<div class="creator-signal-name"><strong>'+escapeHtml(s.product)+'</strong><small>'+
+        escapeHtml([s.grade,s.unit,s.region||'全国调查样本'].filter(Boolean).join(' · '))+
+        '</small><div class="creator-tags">'+tags+'</div>'+levels+'</div>'+
+        '<div class="creator-signal-number"><b class="'+(s.percent>0?'creator-up':'creator-down')+'">'+
+        formatPercent(s.percent)+' <span class="price-level-pill price-level-'+s.level.toLowerCase()+'">'+s.level+
+        '</span></b><small>'+escapeHtml(formatPrice(s.previousMean,s.unit)+' → '+formatPrice(s.currentMean,s.unit)+
+        ' · '+formatPrice(s.rmDifference,s.unit,{signed:true}))+'</small><small>'+escapeHtml(s.previousDate)+' → '+
+        escapeHtml(s.currentDate)+' · 实际 '+s.actualDays+' 天 · '+s.markets+' 个共同市场</small></div>'+
+        '<div class="creator-score"><strong>'+s.score+'<small>/100</small></strong><span>选题优先级</span></div>'+
+        '<div class="creator-actions"><button type="button" class="secondary-button small" data-creator-details="'+i+'">查看价格对比依据</button>'+
+        '<button type="button" class="secondary-button small" data-creator-history="'+i+'">检查历史</button>'+
+        '<button type="button" class="primary-button small" data-creator-draft="'+i+'"'+
+        (s.publishable?'':' disabled')+'>写这条选题</button></div></article>';
+    }).join('')||'<p class="empty">当前筛选暂无合格比较。可切换日期、周期、地区或层级。</p>';
+    renderResearch(data,filter);
   }
-  function refresh(){
-    const data=getOverview();if(!data)return;
-    choose($('creator-signal-region'),data.states.map(x=>({value:x,label:x})),'全国平均');
+  function renderResearch(data,filter){
+    const research=++researchRequest;
+    const prices=filter.level?data.prices.filter(q=>q.level===filter.level):data.prices;
+    const spreads=statePriceSpreads(prices,filter).slice(0,3);
+    $('creator-spreads').innerHTML=spreads.map(({low,high,difference})=>
+      '<li><strong>'+escapeHtml(low.varieti+' · '+low.level+' · '+(low.gred||'未记录品级'))+'</strong><span>'+
+      escapeHtml(low.state+' '+formatPrice(low.price,low.unit)+'（'+low.markets+' 市场） · '+
+        high.state+' '+formatPrice(high.price,high.unit)+'（'+high.markets+' 市场） · 州际价差 '+
+        formatPrice(difference,low.unit))+'</span></li>').join('');
+    $('creator-spread-empty').hidden=Boolean(spreads.length);
+    $('creator-trends').replaceChildren();
+    $('creator-trend-status').textContent='正在核对最近三个有档案的调查日…';
+    const labels=new Map(prices.map(q=>[q.product_key,q]));
+    loadStreaks(data.survey_date,filter.region).then(trends=>{
+      if(research!==researchRequest)return;
+      const relevant=trends.filter(t=>(!filter.level||filter.level===t.level)&&
+        labels.has(t.productKey)&&matchesTopic(labels.get(t.productKey),filter.category,filter.query));
+      $('creator-trends').innerHTML=['rise','fall'].map(direction=>
+        relevant.filter(t=>t.direction===direction).slice(0,2).map(t=>{
+          const label=labels.get(t.productKey);
+          return '<li><strong>'+escapeHtml(label.varieti+' · '+t.level+' · '+(label.gred||'未记录品级')+' · '+
+            (direction==='rise'?'连续上涨':'连续下跌'))+'</strong><span>'+escapeHtml(t.points.map(p=>
+            p.date+' '+formatPrice(p.price,label.unit)).join(' → ')+' · '+t.markets+' 个共同市场')+'</span></li>';
+        }).join('')).join('');
+      $('creator-trend-status').textContent=relevant.length?
+        (filter.region||'全国调查样本')+' · 三个调查日使用同一组市场。':
+        '当前筛选下暂无符合覆盖门槛的连续变化。';
+    }).catch(error=>{
+      if(research===researchRequest)$('creator-trend-status').textContent='趋势读取失败：'+error.message;
+    });
+  }
+  function useSignalSnapshot(data){
+    signalData=data;
+    choose($('creator-signal-region'),data.states.map(x=>({value:x,label:x})),'全国调查样本');
     choose($('creator-signal-category'),
       [...new Set(data.prices.map(q=>q.kategori).filter(Boolean))].sort().map(x=>({value:x,label:x})),'全部分类');
-    signalsRender();calendarRender();
+    signalsRender();
   }
-  function generate(){
-    editingId='';editingEvidence=null;
-    const s=active();if(!s)return tell('请先选定符合样本条件的农产品。',true);
-    selectedEvidence=s;
-    ['creator-notes','creator-scheduled-date','creator-posted-date','creator-post-url'].forEach(id=>$(id).value='');
+  async function changeSignalDate(){
+    const request=++signalRequest,day=v('creator-signal-date');
+    if(!day)return;
+    ++researchRequest;
+    signalData=null;
+    signals=[];pool=selectedEvidence?[selectedEvidence]:[];
+    renderTopics(selectedEvidence?.id);
+    $('creator-signal-summary').textContent='正在读取 '+day+' 的调查比较…';
+    $('creator-signal-list').replaceChildren();
+    $('creator-trends').replaceChildren();
+    $('creator-spreads').replaceChildren();
+    $('creator-trend-status').textContent='正在读取所选调查日…';
+    $('creator-spread-empty').hidden=true;
     try{
-      const draft=composeCreatorDraft(s,{channel:v('creator-channel'),
-        language:v('creator-language'),format:v('creator-format')});
-      $('creator-title').value=draft.title;$('creator-body').value=draft.body;
-      $('creator-status').value='draft';$('creator-editing-status').textContent='尚未保存';
-      evidence();
-    }catch(e){tell(e.message,true);}
+      const data=await loadSnapshot(day);
+      if(request===signalRequest)useSignalSnapshot(data);
+    }catch(error){
+      if(request===signalRequest){
+        $('creator-signal-summary').textContent=day+' 的比较无法读取：'+error.message;
+        $('creator-trend-status').textContent='该调查日暂无法核对。';
+      }
+    }
   }
-  function reset(){
-    editingId='';editingEvidence=null;selectedEvidence=null;
+  function refresh(){
+    const overview=getOverview();if(!overview)return;
+    archiveChecks=new Map();
+    const dates=[...getArchiveDates()].reverse();
+    const select=$('creator-signal-date'),last=select.value;
+    select.replaceChildren(...dates.map(day=>new Option(day,day)));
+    select.value=dates.includes(last)?last:overview.survey_date;
+    if(select.value===overview.survey_date){
+      ++signalRequest;
+      useSignalSnapshot(overview);
+    }else changeSignalDate();
+    calendarRender();
+    if(currentEvidence())verifyEvidence();
+  }
+  function verifyAgainstArchive(s){
+    const key=JSON.stringify([s.productKey,s.level,s.region,s.currentDate,s.period]);
+    const checks=archiveChecks;
+    if(checks.has(key))return checks.get(key);
+    const pending=(async()=>{
+      const data=await loadSnapshot(s.currentDate);
+      const quote=data.prices.find(q=>q.product_key===s.productKey&&q.level===s.level&&q.state===s.region);
+      const source=evidenceForQuote(quote,s.period,data.prices,s.currentDate);
+      if(!source?.publishable)throw Error('此选题缺少可发布的合格比较。');
+      const {rows,superseded}=await loadEvidenceRows(source);
+      comparisonMarketDetails(rows,source,superseded);
+      return source;
+    })();
+    checks.set(key,pending);
+    pending.catch(()=>checks.delete(key));
+    return pending;
+  }
+  async function verifyEvidence(){
+    const request=++verificationRequest,s=currentEvidence();
+    verifiedEvidence=null;
+    evidence();
+    if(!s?.productKey||!s.currentDate)return;
+    $('creator-validation').textContent='正在核对原始市场记录…';
+    try{
+      const source=await verifyAgainstArchive(s);
+      if(request!==verificationRequest)return;
+      verifiedEvidence=source;
+      if(editingId)editingEvidence=source;
+      else selectedEvidence=source;
+      evidence();
+      return source;
+    }catch(error){
+      if(request===verificationRequest)$('creator-validation').textContent='价格数据验证失败。'+error.message;
+    }
+  }
+  function openTopic(source){
+    reset();
+    selectedEvidence=source;
+    if(!pool.some(s=>s.id===source.id))pool.unshift(source);
+    renderTopics(source.id);
+    navigate('studio');
+  }
+  async function generate(){
+    const source=editingId?editingEvidence:active()||selectedEvidence;
+    if(!source)return tell('请先选定符合样本条件的农产品。',true);
+    if(!editingId)selectedEvidence=source;
+    const verified=await verifyEvidence();
+    if(!verified)return;
+    try{
+      const draft=composeCreatorDraft(verified,options());
+      $('creator-title').value=draft.title;$('creator-body').value=draft.body;
+      if(!editingId)$('creator-status').value='draft';
+      $('creator-editing-status').textContent=editingId?'文案已更新，尚未保存':'尚未保存';
+      evidence();
+    }catch(error){tell(error.message,true);}
+  }
+  function reset({keepSettings=false}={}){
+    ++verificationRequest;
+    editingId='';editingEvidence=null;selectedEvidence=null;verifiedEvidence=null;
     ['creator-title','creator-body','creator-notes','creator-scheduled-date','creator-posted-date',
       'creator-post-url'].forEach(id=>$(id).value='');
+    $('creator-topic').value='';
+    if(!keepSettings)applySettings();
     $('creator-status').value='draft';$('creator-editing-status').textContent='新文章';
     evidence();
   }
@@ -166,7 +328,7 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
         title,body,scheduledDate:v('creator-scheduled-date'),
         postedDate:v('creator-posted-date'),postUrl:v('creator-post-url'),
         notes:v('creator-notes'),metrics:earlier?.metrics||normalizeMetrics({}),
-        evidence:s||null,evidenceDate:s?.currentDate||''
+        evidence:s||null,evidenceDate:s?.currentDate||'',settings:options().settings
       };
       persist(saveRecord(workspace,record));editingId=record.id;editingEvidence=s;
       $('creator-editing-status').textContent='已保存在此浏览器 · '+names[record.status];
@@ -175,14 +337,16 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
   }
   function edit(id){
     const r=workspace.records.find(x=>x.id===id);if(!r)return;
-    editingId=r.id;editingEvidence=r.evidence||null;selectedEvidence=null;
+    editingId=r.id;editingEvidence=r.evidence||null;selectedEvidence=null;verifiedEvidence=null;
     const fields={'creator-title':r.title,'creator-body':r.body,'creator-status':r.status,
       'creator-channel':r.channel,'creator-language':r.language,
       'creator-format':r.format,'creator-scheduled-date':r.scheduledDate,
       'creator-posted-date':r.postedDate,'creator-post-url':r.postUrl,'creator-notes':r.notes};
     Object.entries(fields).forEach(([key,val])=>$(key).value=val||'');
+    applySettings(r.settings);
+    $('creator-topic').value='';
     $('creator-editing-status').textContent='正在编辑：'+names[r.status];
-    evidence();navigate('studio');
+    evidence();navigate('studio');verifyEvidence();
   }
   async function inspectHistory(idx){
     const signal=signals[idx];if(!signal)return;
@@ -309,44 +473,81 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
   }
   function bind(){
     read();$('creator-calendar-month').value=mytDate().slice(0,7);
-    ['creator-signal-period','creator-signal-region','creator-signal-category','creator-signal-type']
+    ['creator-signal-period','creator-signal-region','creator-signal-category','creator-signal-type','creator-signal-level']
       .forEach(id=>$(id).addEventListener('change',signalsRender));
+    $('creator-signal-date').addEventListener('change',changeSignalDate);
     $('creator-signal-search').addEventListener('input',signalsRender);
     $('creator-topic').addEventListener('change',()=>{
-      editingId='';editingEvidence=null;selectedEvidence=active();evidence();
+      const next=active();
+      reset({keepSettings:true});
+      selectedEvidence=next;
+      $('creator-topic').value=next?.id||'';
+      evidence();
     });
+    for(const id of ['creator-title','creator-body'])$(id).addEventListener('input',updateValidation);
+    for(const id of ['creator-channel','creator-language','creator-format',...Object.values(settingsInputs)])
+      $(id).addEventListener('change',updateValidation);
     $('creator-generate').addEventListener('click',generate);
     $('creator-save').addEventListener('click',save);
-    $('creator-new').addEventListener('click',reset);
+    $('creator-new').addEventListener('click',()=>reset());
     $('creator-copy').addEventListener('click',async()=>{
       try{
-        if(!v('creator-body'))throw Error('没有可复制的正文');
+        const validation=updateValidation();
+        if(!validation.valid)throw Error(validation.message);
         await navigator.clipboard.writeText(v('creator-body'));tell('已复制正文');
       }catch(e){tell('复制失败：'+e.message,true);}
     });
-    $('creator-export-fb').addEventListener('click',()=>{
-      try{makeCard(currentEvidence(),'facebook');}catch(e){tell(e.message,true);}
-    });
-    $('creator-export-tiktok').addEventListener('click',()=>{
-      try{makeCard(currentEvidence(),'tiktok');}catch(e){tell(e.message,true);}
+    for(const [id,platform] of [['creator-export-fb','facebook'],['creator-export-tiktok','tiktok']]){
+      $(id).addEventListener('click',()=>{
+        try{
+          const validation=updateValidation();
+          if(!validation.valid)throw Error(validation.message);
+          makeCard(verifiedEvidence,platform,options().settings);
+        }catch(e){tell(e.message,true);}
+      });
+    }
+    $('creator-studio-details').addEventListener('click',()=>{
+      if(verifiedEvidence)showComparison(verifiedEvidence);
     });
     ['creator-calendar-month','creator-calendar-state','creator-calendar-platform']
       .forEach(id=>$(id).addEventListener('change',calendarRender));
     $('creator-metric-post').addEventListener('change',metricValues);
     $('creator-metric-save').addEventListener('click',metricsSave);
     $('creator-backup-json').addEventListener('click',backup);
-    $('creator-export-csv').addEventListener('click',()=>{
-      saveBlob('\ufeff'+toCSV(workspace),'sky_agro_creator_metrics_'+mytDate()+'.csv',
-        'text/csv;charset=utf-8');
+    $('creator-export-csv').addEventListener('click',async()=>{
+      const button=$('creator-export-csv');
+      const snapshot=workspace,checks=archiveChecks;
+      const verified=new Set();
+      button.disabled=true;
+      try{
+        for(let i=0;i<snapshot.records.length;i+=4){
+          await Promise.all(snapshot.records.slice(i,i+4).map(async record=>{
+            const s=record.evidence;
+            if(!s?.productKey||!s.currentDate)return;
+            try{
+              const source=await verifyAgainstArchive(s);
+              if(validateCreatorDraft(record,source,record).valid)verified.add(record.id);
+            }catch{/* The metrics export keeps the row and leaves its unverified title blank. */}
+          }));
+          if(checks!==archiveChecks)throw Error('行情已刷新，请重新导出。');
+        }
+        saveBlob('\ufeff'+toCSV(snapshot,{includeTitle:r=>verified.has(r.id)}),
+          'sky_agro_creator_metrics_'+mytDate()+'.csv','text/csv;charset=utf-8');
+        if(verified.size<snapshot.records.length)tell('成效 CSV 已导出，未核对的标题留空。');
+      }catch(error){tell(error.message,true);}
+      finally{button.disabled=false;}
     });
     $('creator-import-json').addEventListener('change',e=>importBackup(e.target));
     $('creator-signal-list').addEventListener('click',e=>{
       const topic=e.target.closest('[data-creator-draft]');
       if(topic){
         const s=signals[Number(topic.dataset.creatorDraft)];
-        if(!s?.publishable)return;
-        const index=pool.findIndex(x=>x.id===s.id);
-        if(index>=0){reset();$('creator-topic').value=String(index);selectedEvidence=s;evidence();navigate('studio');}
+        if(s?.publishable)openTopic(s);
+      }
+      const detail=e.target.closest('[data-creator-details]');
+      if(detail){
+        const s=signals[Number(detail.dataset.creatorDetails)];
+        if(s)showComparison(s);
       }
       const trend=e.target.closest('[data-creator-history]');
       if(trend)inspectHistory(Number(trend.dataset.creatorHistory));
@@ -374,5 +575,5 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
     if(page==='studio')evidence();
     if(page==='calendar')calendarRender();
   }
-  return {bind,render,refresh};
+  return {bind,render,refresh,openTopic};
 }

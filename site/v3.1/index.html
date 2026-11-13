@@ -41,10 +41,10 @@
             <div class="insight-board-title">
               <span class="insight-kicker">FAMA MARKET INTELLIGENCE · CONTENT IDEAS</span>
               <h1 id="overview-title">每日农价内容灵感板</h1>
-              <p>用真实调查行情找选题，不把涨跌当成利润，也不猜测市场变化原因。</p>
             </div>
             <div class="insight-board-tools">
-              <span class="insight-date" id="insight-date">正在读取调查日期…</span>
+              <label class="insight-date-control">调查日期<select id="insight-survey-date"><option value="">载入中…</option></select></label>
+              <span class="insight-date" id="insight-date" role="status">正在读取调查日期…</span>
               <div class="insight-periods" role="group" aria-label="每日农价灵感比较窗口">
                 <button type="button" data-insight-period="1" class="active">昨日</button>
                 <button type="button" data-insight-period="7">7 天</button>
@@ -68,6 +68,7 @@
             <span id="insight-method">仅选全国同市场可比数据；需 ≥ 3 个共同市场且双方覆盖率 ≥ 50%。</span>
             <div class="creator-overview-actions"><button type="button" class="insight-open-prices" data-go="prices">价格明细 →</button><button type="button" class="creator-overview-action" data-go="signals">Creator 选题情报 →</button></div>
           </div>
+          <p class="insight-level-guide">Ladang 农场端 · Borong 批发端 · Runcit 零售端</p>
         </section>
 
         <div class="stat-grid">
@@ -156,14 +157,20 @@
         <div class="page-intro"><span class="eyebrow green">V3.2 · SIGNAL INTELLIGENCE</span><h1 id="signals-title">选题情报 · 机会评分</h1><p>用 FAMA 同市场比较找选题。评分是透明优先级，不是爆款概率；异常数据单独标示。</p></div>
         <section class="panel">
           <div class="filters four">
+            <label>调查日期<select id="creator-signal-date"><option value="">载入中…</option></select></label>
             <label>比较周期<select id="creator-signal-period"><option value="1">昨日</option><option value="7" selected>7 天</option><option value="30">30 天</option></select></label>
             <label>州／地区<select id="creator-signal-region"><option value="">全国</option></select></label>
             <label>产品分类<select id="creator-signal-category"><option value="">全部分类</option></select></label>
             <label>信号类型<select id="creator-signal-type"><option value="all">全部选题</option><option value="rise">上涨</option><option value="fall">下跌</option><option value="aligned">L/B/R 同向</option><option value="divergent">L/B/R 分化</option><option value="audit">异常待核实</option></select></label>
+            <label>价格层级<select id="creator-signal-level"><option value="">全部层级</option><option>Ladang</option><option>Borong</option><option>Runcit</option></select></label>
+            <label>搜索农产品<input id="creator-signal-search" type="search" placeholder="例如 CILI, TIMUN, BAYAM"></label>
           </div>
-          <label class="creator-field">搜索农产品<input id="creator-signal-search" type="search" placeholder="例如 CILI, TIMUN, BAYAM"></label>
           <div class="creator-signal-summary" id="creator-signal-summary" aria-live="polite">等候真实 FAMA 报价…</div>
-          <p class="creator-help">机会评分最高 100：涨跌幅 30 + 同市场证据 30 + 地区相关性 20 + 讨论潜力 20。只用合格比较；分数不是价格预测，也不是预估流量。绝对涨跌 ≥ 50% 标为待核实。</p>
+          <p class="creator-help">选题评分综合涨跌幅、市场覆盖、地区和讨论潜力。绝对涨跌 ≥ 50% 时标为待核实。</p>
+          <div class="creator-research">
+            <details><summary>连续上涨与下跌</summary><p id="creator-trend-status" role="status"></p><ul id="creator-trends"></ul></details>
+            <details><summary>同日州际价差</summary><p>同品种、品级、单位和层级。每州至少 3 个调查市场。按相对价差排序。</p><p id="creator-spread-empty" hidden>当前筛选下暂无足够的州际样本。</p><ul id="creator-spreads"></ul></details>
+          </div>
           <div id="creator-signal-list" class="creator-signal-list" aria-live="polite"></div>
         </section>
         <section class="panel"><div class="panel-heading"><div><h2>历史均价趋势 · 辅助调查</h2><p>查看最近真实调查日的均价变化；不同日期的调查市场可能不一样，这不是同市场连续涨跌证据。</p></div></div><div id="creator-streak" class="creator-streak">点击选题中的「检查历史」，查看真实观察序列。</div></section>
@@ -176,10 +183,23 @@
             <label>选题<select id="creator-topic"><option value="">等候行情数据…</option></select></label>
             <label>平台<select id="creator-channel"><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="whatsapp">WhatsApp</option></select></label>
             <label>语言<select id="creator-language"><option value="bm">马来文</option><option value="zh">简体中文</option><option value="both">BM + 中文</option></select></label>
-            <label>表达方式<select id="creator-format"><option value="discussion">互动讨论</option><option value="story">真实数据故事</option><option value="analysis">市场分析</option><option value="video">短视频脚本</option></select></label>
+            <label>表达方式<select id="creator-format"><option value="discussion">农友讨论</option><option value="casual">马来西亚口语</option><option value="story">长篇故事</option><option value="analysis">专业行情简报</option><option value="educational">农业知识分享</option><option value="community">SKY AGRO 社群互动</option><option value="video">短视频脚本</option></select></label>
           </div>
           <div id="creator-evidence" class="creator-evidence">请选择有合格市场比较证据的选题。</div>
-          <div class="creator-actions"><button type="button" class="primary-button" id="creator-generate">生成有来源的文案</button><button type="button" class="secondary-button" id="creator-copy">复制正文</button><span class="creator-inline-status" id="creator-editing-status">新文章</span></div>
+          <details class="creator-draft-settings">
+            <summary>公开来源与社群选项</summary>
+            <div class="creator-checks">
+              <label><input type="checkbox" id="creator-source" checked> 显示来源 · Show Source</label>
+              <label><input type="checkbox" id="creator-mention-page"> 提及 SKY AGRO 页面</label>
+              <label><input type="checkbox" id="creator-invite-follow"> 邀请关注</label>
+              <label><input type="checkbox" id="creator-mention-whatsapp"> 提及 WhatsApp 农业群</label>
+              <label><input type="checkbox" id="creator-comment-keyword"> 邀请留言 NAK</label>
+              <label><input type="checkbox" id="creator-networking"> 邀请附近农友交流</label>
+              <label><input type="checkbox" id="creator-confirmed-conversation"> 我确认已和 SKY AGRO 老板聊过这组行情</label>
+            </div>
+          </details>
+          <div class="creator-actions"><button type="button" class="primary-button" id="creator-generate">生成文案</button><button type="button" class="secondary-button" id="creator-copy" disabled>复制正文</button><button type="button" class="secondary-button" id="creator-studio-details" disabled>查看价格对比依据</button><span class="creator-inline-status" id="creator-editing-status">新文章</span></div>
+          <p class="creator-validation" id="creator-validation" role="status">请选择调查数据并生成文案。</p>
           <label class="creator-field">标题<input id="creator-title" maxlength="300" type="text" placeholder="自动生成后可手动修改"></label>
           <label class="creator-field">正文 / 短视频口播<textarea id="creator-body" rows="14" maxlength="10000" placeholder="选择选题和类型后生成，也可继续编辑。"></textarea></label>
           <div class="filters four">
@@ -189,8 +209,8 @@
             <label>已发布网址<input id="creator-post-url" type="url" placeholder="https://..."></label>
           </div>
           <label class="creator-field">备注 / 待核实问题<textarea id="creator-notes" rows="2" maxlength="2000" placeholder="图片素材、农民访谈、验证事项…"></textarea></label>
-          <div class="creator-actions"><button type="button" class="primary-button" id="creator-save">保存到内容日历</button><button type="button" class="secondary-button" id="creator-new">新建草稿</button><button type="button" class="secondary-button" id="creator-export-fb">FB 1080×1350 PNG</button><button type="button" class="secondary-button" id="creator-export-tiktok">TikTok 1080×1920 PNG</button></div>
-          <p class="creator-help">图卡是 FAMA 数据图形，不是农场实拍；文案是基于规则的离线草稿，不是外部 AI 生成。发布前核查日期、基准市场和内容。计划发布日期不会自动发帖。</p>
+          <div class="creator-actions"><button type="button" class="primary-button" id="creator-save">保存到内容日历</button><button type="button" class="secondary-button" id="creator-new">新建草稿</button><button type="button" class="secondary-button" id="creator-export-fb" disabled>FB 1080×1350 PNG</button><button type="button" class="secondary-button" id="creator-export-tiktok" disabled>TikTok 1080×1920 PNG</button></div>
+          <p class="creator-help">草稿可编辑并保存在浏览器。复制和 PNG 导出需要通过文案核对。排期仅作记录。</p>
         </section>
       </section>
 
@@ -237,6 +257,22 @@
     <footer class="footer">马来西亚农产品价格资讯平台 · Creator V3.4 <span>来源：FAMA AMI · 独立资讯整理，非 FAMA 官方网站或交易报价</span></footer>
   </div>
 </div>
+<dialog id="comparison-dialog" class="comparison-dialog" aria-labelledby="comparison-title">
+  <header>
+    <div><h2 id="comparison-title">查看价格对比依据</h2><p>View Comparison Details</p></div>
+    <form method="dialog"><button type="submit" class="secondary-button small" autofocus>关闭</button></form>
+  </header>
+  <p id="comparison-selection" class="comparison-selection"></p>
+  <p id="comparison-status" role="status"></p>
+  <div id="comparison-result" hidden>
+    <p id="comparison-reconciliation" class="creator-evidence"></p>
+    <p class="method-note">同品种、品级、单位、层级及市场。先求各市场当日均价，再对两日共有的市场等权平均。涨跌幅使用未四舍五入的均价。基准为 RM0 的单个市场只显示价差。</p>
+    <label class="comparison-sort">排序<select id="comparison-sort"><option value="rise">涨幅最高</option><option value="fall">跌幅最大</option><option value="location">市场名称</option><option value="state">州属</option><option value="difference">绝对 RM 价差</option></select></label>
+    <div class="table-scroll comparison-table" tabindex="0" role="region" aria-label="逐市场价格比较">
+      <table><thead><tr><th>州属</th><th>县区</th><th>市场 / 地点</th><th>层级</th><th>Sublevel</th><th>基准调查日</th><th>基准均价</th><th>基准记录数</th><th>所选调查日</th><th>所选日均价</th><th>所选日记录数</th><th>价差</th><th>涨跌幅</th></tr></thead><tbody id="comparison-body"></tbody></table>
+    </div>
+  </div>
+</dialog>
 <div id="toast" role="status" class="toast" hidden></div>
 </body>
 </html>

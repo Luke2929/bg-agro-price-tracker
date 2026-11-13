@@ -3,22 +3,23 @@ import assert from 'node:assert/strict';
 import {
  WORKSPACE_SCHEMA,emptyWorkspace,readWorkspace,saveRecord,contentMetrics,toCSV,
  isValidISODate,findContentSignals,scoreOpportunity,composeCreatorDraft,
- observedStreak,normalizeMetrics
+ observedStreak,normalizeMetrics,validateCreatorDraft,FORMATS,statePriceSpreads
 } from '../site/v3.1/creator-core.mjs';
 
-const row=(name,level,pct,opt={})=>({
- product_key:name+'||F.A.Q||Kilogram',varieti:name,gred:'F.A.Q',
- unit:'Kilogram',level,state:opt.state||'',kategori:opt.kategori||'Sayur-Sayuran',
- date:'2026-11-13',changes:{
-  7:{eligible:opt.eligible!==false,percent:pct,markets:opt.markets??15,
-    currentCoverage:opt.coverage??0.88,previousCoverage:opt.coverage??0.9,
-    previousDate:'2026-11-06',currentDate:'2026-11-13',
-    current:opt.now??7,previous:opt.was??6},
-  30:{eligible:opt.eligible!==false,percent:pct,markets:opt.markets??14,
-    currentCoverage:0.9,previousCoverage:0.9,
-    previousDate:'2026-10-14',currentDate:'2026-11-13'}
- }
-});
+const row=(name,level,pct,opt={})=>{
+ const markets=opt.markets??15,previous=opt.was??6,current=previous*(1+pct/100);
+ const change=(days,previousDate)=>({
+   eligible:opt.eligible!==false,percent:pct,markets,
+   currentCoverage:markets/17,previousCoverage:markets/17,currentMarkets:17,previousMarkets:17,
+   previousDate,currentDate:'2026-11-13',days,actualDays:days,
+   current,previous,rmDifference:current-previous
+ });
+ return {
+   product_key:name+'||F.A.Q||Kilogram',varieti:name,gred:'F.A.Q',
+   unit:'Kilogram',level,state:opt.state||'',kategori:opt.kategori||'Sayur-Sayuran',
+   date:'2026-11-13',changes:{7:change(7,'2026-11-06'),30:change(30,'2026-10-14')}
+ };
+};
 test('v3.2 discovers source-eligible produce by product identity and geographic scope',()=>{
  const data=[
   row('BAYAM','Ladang',5.8),row('BAYAM','Borong',9.7),row('BAYAM','Runcit',5.0),
@@ -57,7 +58,7 @@ test('V3.3 builds dated, editable Malay/Chinese/video template without fake prof
  assert.match(bm.body,/2026-11-13 berbanding 2026-11-06/);
  assert.match(bm.body,/15 pasaran yang sama/);
  assert.match(bm.body,/FAMA AMI/);
- assert.match(bm.body,/tidak membuktikan untung/);
+ assert.match(bm.body,/Untung bergantung juga pada kos dan hasil jualan/);
  const mixed=composeCreatorDraft(s,{language:'both',format:'story',channel:'whatsapp'});
  assert.match(mixed.body,/—— 中文 ——/);
  assert.match(mixed.body,/共同调查市场/);
@@ -117,4 +118,64 @@ test('V3.4 rejects bad backups, duplicate IDs, invalid statuses and unsafe links
  assert.throws(()=>saveRecord(emptyWorkspace(),{...r,status:'pending'}),/状态无效/);
  assert.throws(()=>saveRecord(emptyWorkspace(),{...r,postUrl:'javascript:alert(1)'}),/HTTPS/);
  assert.throws(()=>saveRecord(emptyWorkspace(),{...r,scheduledDate:'2026-02-30'}),/日期无效/);
+});
+
+test('all draft formats preserve verified prices, grade, dates, price level and local scope',()=>{
+ const data=row('TIMUN HIJAU','Ladang',25,{was:2,state:'PERAK'});
+ const s=findContentSignals([data],{region:'PERAK'})[0];
+ for(const format of FORMATS){
+   const opts={format,language:'both',settings:{showSource:false,mentionPage:true,inviteFollow:true,
+     mentionWhatsApp:true,commentKeyword:true,networking:true}};
+   const draft=composeCreatorDraft(s,opts);
+   for(const value of ['RM2.00/kg','RM2.50/kg','+RM0.50/kg','+25.0%','F.A.Q','PERAK',
+     '2026-11-06','2026-11-13','15 pasaran yang sama','SKY AGRO','WhatsApp','NAK','Siputeh'])
+     assert.ok(draft.body.includes(value),format+' missing '+value);
+   assert.doesNotMatch(draft.body,/FAMA|seluruh Malaysia|全国|bincang angka ni dengan bos/);
+   assert.equal(validateCreatorDraft(draft,s,opts).valid,true);
+ }
+ const confirmed=composeCreatorDraft(s,{settings:{confirmedConversation:true}});
+ assert.match(confirmed.body,/Saya ada bincang angka ni dengan bos SKY AGRO/);
+ assert.equal(findContentSignals([row('TIMUN','Ladang',25,{markets:1})]).length,0);
+ const fallback=row('TIMUN','Ladang',25,{was:2});
+ fallback.changes[7].previousDate='2026-11-04';
+ fallback.changes[7].actualDays=9;
+ const draft=composeCreatorDraft(findContentSignals([fallback])[0]);
+ assert.match(draft.body,/2026-11-04 \(selang 9 hari\)/);
+});
+
+test('copy validation rejects edited claims, scope, invented causes and fake testimony',()=>{
+ const s=findContentSignals([row('TIMUN','Ladang',25,{was:2,state:'PERAK'})],{region:'PERAK'})[0];
+ const original=composeCreatorDraft(s);
+ for(const [before,after] of [['RM2.00','RM2.01'],['RM2.50','RM7.50'],['RM0.50','RM5.50'],
+   ['+25.0%','+50.0%'],['15 pasaran','1 pasaran'],['PERAK','seluruh Malaysia'],['ladang','runcit'],
+   ['2026-11-06','2026-11-05'],['F.A.Q','Gred A']]){
+   assert.equal(validateCreatorDraft({...original,body:original.body.replace(before,after)},s).valid,false,before);
+ }
+ assert.equal(validateCreatorDraft({...original,title:'HARGA TIMUN NAIK 50%'},s).valid,false);
+ for(const added of ['Petani pasti untung.', 'Harga naik kerana banjir.', 'Bos SKY AGRO beritahu saya.']){
+   assert.equal(validateCreatorDraft({...original,body:original.body+'\n\n'+added},s).valid,false);
+ }
+ const reordered=original.body.split('\n\n').filter(p=>!p.startsWith('Harga kat tempat')).reverse().join('\n\n');
+ assert.equal(validateCreatorDraft({...original,body:reordered},s).valid,true);
+ assert.equal(validateCreatorDraft(original,s,{settings:{showSource:false}}).valid,false);
+ assert.throws(()=>composeCreatorDraft({...s,currentMean:99}),/不完整或不一致/);
+});
+
+test('direction filters use independent levels and state spreads require same survey and comparable samples',()=>{
+ const levels=[row('SAWI','Ladang',-8),row('SAWI','Borong',20),row('SAWI','Runcit',-12)];
+ assert.equal(findContentSignals(levels,{type:'fall'})[0].level,'Runcit');
+ assert.equal(findContentSignals(levels,{type:'fall',level:'Ladang'})[0].level,'Ladang');
+ assert.equal(findContentSignals(levels,{type:'rise'})[0].level,'Borong');
+ const audit=findContentSignals([...levels.slice(0,2),row('SAWI','Runcit',-90)],{type:'audit'})[0];
+ assert.equal(audit.level,'Runcit');
+ assert.equal(audit.percent,-90);
+ assert.equal(audit.publishable,false);
+ const state=(name,level,price,markets)=>({...row('TIMUN',level,10,{state:name}),price,markets});
+ const quotes=[state('PERAK','Ladang',2,4),state('KEDAH','Ladang',3,5),
+   state('SELANGOR','Runcit',8,8),state('PAHANG','Ladang',90,1)];
+ const [spread]=statePriceSpreads(quotes,{region:'PERAK'});
+ assert.equal(spread.low.state,'PERAK');
+ assert.equal(spread.high.state,'KEDAH');
+ assert.equal(spread.difference,1);
+ assert.equal(statePriceSpreads(quotes).length,1);
 });

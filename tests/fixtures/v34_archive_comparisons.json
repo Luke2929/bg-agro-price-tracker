@@ -1,0 +1,35 @@
+{
+  "current_date": "2026-11-13",
+  "previous_date": "2026-10-14",
+  "grade": "F.A.Q",
+  "unit": "Kilogram",
+  "comparisons": [
+    {
+      "product": "TIMUN HIJAU",
+      "level": "Ladang",
+      "previous": 1.8894444444,
+      "current": 2.6777777778,
+      "markets": 18,
+      "percent": 41.72302264,
+      "display": "+41.7%"
+    },
+    {
+      "product": "SAWI HIJAU",
+      "level": "Runcit",
+      "previous": 8.0077777778,
+      "current": 7.0462222222,
+      "markets": 15,
+      "percent": -12.00777022,
+      "display": "-12.0%"
+    },
+    {
+      "product": "SAWI HIJAU",
+      "level": "Ladang",
+      "previous": 3.6450980392,
+      "current": 3.4882352941,
+      "markets": 17,
+      "percent": -4.30338892,
+      "display": "-4.3%"
+    }
+  ]
+}

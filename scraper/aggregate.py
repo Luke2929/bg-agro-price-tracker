@@ -69,6 +69,8 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Dict, Iterable, List, NamedTuple, Optional, Tuple
 
+from .scrape import CSV_COLUMNS
+
 LEVELS: Tuple[str, ...] = ("Ladang", "Borong", "Runcit")
 
 #: How far back latest.json may look for a product's last known price.
@@ -169,10 +171,22 @@ def parse_systemdate(raw: str) -> Optional[datetime]:
 def read_rows(daily_dir: Path) -> List[dict]:
     rows: List[dict] = []
     for path in sorted(Path(daily_dir).glob("*.csv")):
-        with open(path, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for r in reader:
-                rows.append(r)
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", path.stem) or parse_day(path.stem) is None:
+            raise ValueError(f"{path}: invalid archive date")
+        with path.open(newline="", encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle, strict=True)
+            try:
+                headers = reader.fieldnames or []
+                if len(headers) != len(CSV_COLUMNS) or set(headers) != set(CSV_COLUMNS):
+                    raise ValueError(f"{path}: invalid FAMA CSV header")
+                for row in reader:
+                    if None in row or None in row.values():
+                        raise ValueError(f"{path}:{reader.line_num}: invalid CSV column count")
+                    if row["tarikh_harga"] != path.stem:
+                        raise ValueError(f"{path}:{reader.line_num}: survey date does not match filename")
+                    rows.append(row)
+            except csv.Error as error:
+                raise ValueError(f"{path}:{reader.line_num}: malformed CSV") from error
     return rows
 
 
@@ -206,7 +220,11 @@ def canonicalize_rows(rows: List[dict]) -> Tuple[List[dict], Dict[str, List[str]
     for index, row in enumerate(rows):
         priceid = (row.get("priceid") or "").strip()
         if priceid and winner[priceid] != index:
-            superseded[row.get("tarikh_harga") or ""].append(priceid)
+            day = row.get("tarikh_harga") or ""
+            # The browser handles duplicates within a day in file order. The
+            # revision manifest excludes only IDs whose winning day moved.
+            if day != (rows[winner[priceid]].get("tarikh_harga") or ""):
+                superseded[day].append(priceid)
         else:
             current.append(row)
     return current, {

@@ -10,6 +10,10 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 import math
+import re
+
+
+DECIMAL_PRICE = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:e[+-]?[0-9]+)?", re.I)
 
 
 def _text(value: object) -> str:
@@ -19,7 +23,7 @@ def _text(value: object) -> str:
 def valid_price(raw: object) -> float | None:
     """Return a finite, nonnegative survey price or None for missing values."""
     value = _text(raw).strip()
-    if not value:
+    if not DECIMAL_PRICE.fullmatch(value):
         return None
     try:
         number = float(value)
@@ -29,16 +33,19 @@ def valid_price(raw: object) -> float | None:
 
 
 def product_key(row: dict) -> str:
-    return "||".join(_text(row.get(key)) for key in ("varieti", "gred", "unit"))
+    return "||".join(
+        _text(row.get(key)).strip().replace("%", "%25").replace("|", "%7C")
+        for key in ("varieti", "gred", "unit")
+    )
 
 
-def market_key(row: dict) -> str:
-    return "||".join(_text(row.get(key)) for key in ("negeri", "daerah", "lokasi", "sublevel"))
+def market_key(row: dict) -> tuple[str, ...]:
+    return tuple(_text(row.get(key)).strip() for key in ("negeri", "daerah", "lokasi", "sublevel"))
 
 
 def market_average(rows: list[dict]) -> dict | None:
     """One equal vote per market; repeated observations average within market."""
-    markets: dict[str, list[float]] = {}
+    markets: dict[tuple[str, ...], list[float]] = {}
     count = 0
     for row in rows:
         price = valid_price(row.get("harga"))
@@ -58,13 +65,13 @@ class MatchedMarketComparator:
     """Market-price comparison with the exact browser baseline semantics."""
 
     def __init__(self, rows: list[dict]):
-        self.days: dict[tuple[str, str], dict[str, dict[str, list[float]]]] = {}
+        self.days: dict[tuple[str, str], dict[str, dict[tuple[str, ...], list[float]]]] = {}
         self.observed: set[str] = set()
         for row in rows:
             price = valid_price(row.get("harga"))
             day = _text(row.get("tarikh_harga"))
-            level = _text(row.get("peringkat"))
-            if price is None or not day or not level:
+            level = _text(row.get("peringkat")).strip()
+            if price is None or not day or level not in ("Ladang", "Borong", "Runcit"):
                 continue
             self.observed.add(day)
             by_product = self.days.setdefault((day, level), {})
@@ -83,10 +90,9 @@ class MatchedMarketComparator:
         if not state:
             self._cache[cache_key] = source
             return source
-        prefix = state + "||"
         filtered = {
             product: {market: bucket for market, bucket in markets.items()
-                      if market.startswith(prefix)}
+                      if market[0] == state}
             for product, markets in source.items()
         }
         filtered = {product: markets for product, markets in filtered.items() if markets}
@@ -135,6 +141,7 @@ class MatchedMarketComparator:
                 "current": current_mean,
                 "previous": previous_mean,
                 "rmDifference": difference,
+                "rawPercent": raw_percent,
                 "percent": percent,
                 "markets": matched,
                 "currentDate": day,
