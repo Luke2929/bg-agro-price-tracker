@@ -48,3 +48,20 @@
 .price-change-heading .sort-arrow{font-size:13px;color:#93b4a0}
 .price-change-heading.active .sort-arrow{color:#257957}
 @media(max-width:790px){.price-sort-toolbar{padding:12px;gap:10px}.price-sort-toolbar label{flex:1 1 180px}.price-sort-toolbar select,.price-sort-toolbar label:nth-child(2) select{min-width:0}.price-sort-hint{flex-basis:100%}}
+
+/* Product-group view keeps a single product label while preserving L/B/R rows. */
+.price-product-cell{vertical-align:middle;min-width:215px;white-space:normal;border-right:1px solid #edf2ed;background:#fafcf9}
+.price-product-cell .product-link{white-space:normal;text-align:left;line-height:1.55}
+.price-product-cell small{white-space:normal}
+.price-rank-note{color:#547b63!important;font-weight:750}
+.price-level-pill{display:inline-block;white-space:nowrap;font-size:10px;font-weight:750;padding:4px 9px;border-radius:16px;background:#eef3f0;color:#446b56}
+.price-level-ladang{background:#e9f4ed;color:#2b7450}
+.price-level-borong{background:#fff6e3;color:#936b23}
+.price-level-runcit{background:#eaf2fb;color:#346c9f}
+#price-table-body tr.price-group-first td{border-top:2px solid #dde9df}
+#price-table-body tr.price-group-follow td{background:#fff}
+#price-table-body tr.price-sort-leading-level>td:not(.price-product-cell){background:#f1faf2}
+#price-table-body tr.price-sort-leading-level td.price-product-cell{background:#fafcf9}
+#price-table-body tr.price-group-first:hover>td,
+#price-table-body tr.price-group-follow:hover>td{background:#f4faf5}
+@media(max-width:790px){.price-product-cell{min-width:160px}}
