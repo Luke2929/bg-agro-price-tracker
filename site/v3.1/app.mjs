@@ -1,5 +1,5 @@
 import {FAMA_COLUMNS,escapeHtml,fmtMoney,fmtDate,ageDays,mytDate,quoteChange,
-  rankMovers,filterQuotes,sortQuotesByChange,productLabel,historySeries,statePrices,parseCSV,
+  rankMovers,filterQuotes,sortQuotesByChange,groupQuotesByProduct,productLabel,historySeries,statePrices,parseCSV,
   validPrice,summarizeRows,PRICE_LEVELS,productAreaRows,productScopePrices,
   productAreaOptions} from './engine.mjs';
 import {buildXlsx,downloadXlsx} from './excel.mjs';
@@ -116,26 +116,65 @@ function renderMovers(){
 
 function filters(){return {search:$('price-search').value,level:$('price-level').value,
   state:$('price-state').value,category:$('price-category').value};}
+function priceLevelCells(quote){
+  const id=store.overview.prices.indexOf(quote);
+  const levelClass=PRICE_LEVELS.includes(quote.level)?quote.level.toLowerCase():'other';
+  return `<td><span class="price-level-pill price-level-${levelClass}">${escapeHtml(quote.level)}</span></td><td>${escapeHtml(quote.state||'全马')}</td><td class="price-cell">${fmtMoney(quote.price)}</td><td>${percentMarkup(quote,1)}</td><td>${percentMarkup(quote,7)}</td><td>${percentMarkup(quote,30)}</td><td>${quote.markets}<small>${quote.observations} 条记录</small></td><td><button class="star ${isSaved(quote)?'saved':''}" data-watch-index="${id}" aria-label="${isSaved(quote)?'取消关注':'加入关注'}：${escapeHtml(quote.varieti)} ${escapeHtml(quote.level)}">${isSaved(quote)?'★':'☆'}</button></td>`;
+}
+
+function priceProductCell(quote,rowspan=1,leader=null,period=7,order='name'){
+  const rank=leader&&order!=='name'?quoteChange(leader,period):null;
+  const rankLabel=rank?`${escapeHtml(leader.level)} ${rank.percent>0?'+':''}${rank.percent.toFixed(1)}%`:'';
+  const descriptor=escapeHtml([quote.gred,quote.unit].filter(Boolean).join(' · '));
+  return `<td class="price-product-cell"${rowspan>1?` rowspan="${rowspan}"`:''}><button type="button" class="product-link" data-product-open="${escapeHtml(quote.product_key)}">${escapeHtml(quote.varieti)} ↗</button><small>${descriptor}</small>${rank?`<small class="price-rank-note">排序依据 · ${period} 天 · ${rankLabel}</small>`:''}</td>`;
+}
+
 function renderPrices(){
   if(!store.overview)return;
   const period=Number($('price-change-period').value);
   const order=$('price-change-order').value;
-  const matches=sortQuotesByChange(filterQuotes(store.overview.prices,filters()),{period,order});
-  const visible=matches.slice(0,store.visible);
+  const mode=$('price-display-mode').value;
+  const filtered=filterQuotes(store.overview.prices,filters());
+  const matches=sortQuotesByChange(filtered,{period,order});
+  const grouped=mode==='group';
+  const groups=grouped?groupQuotesByProduct(filtered,{period,order}):[];
+  const visible=grouped?groups.slice(0,store.visible):matches.slice(0,store.visible);
   const sortLabels={name:'按产品名称',rise:'涨幅最大优先',fall:'跌幅最大优先',swing:'绝对波动最大优先'};
-  $('price-table-status').textContent=fmtDate(store.overview.survey_date)+' · '+matches.length+' 组报价 · '+(order==='name'?sortLabels.name:period+' 天'+sortLabels[order]);
+  const prefix=fmtDate(store.overview.survey_date)+' · ';
+  const criteria=order==='name'?sortLabels.name:period+' 天'+sortLabels[order];
+  $('price-table-status').textContent=prefix+
+    (grouped?`${groups.length} 种产品 · ${groups.reduce((n,g)=>n+g.quotes.length,0)} 组层级报价`:`${matches.length} 组层级报价`)+
+    ' · '+criteria;
   document.querySelectorAll('[data-price-period]').forEach(btn=>{
     const active=Number(btn.dataset.pricePeriod)===period&&order!=='name';
     btn.classList.toggle('active',active);
     btn.querySelector('.sort-arrow').textContent=active?(order==='rise'?'↑':order==='fall'?'↓':'↕'):'↕';
     btn.closest('th').setAttribute('aria-sort',active?(order==='rise'?'descending':order==='fall'?'ascending':'other'):'none');
   });
-  $('price-table-body').innerHTML=visible.map(p=>{
-    const id=store.overview.prices.indexOf(p);
-    return `<tr><td><button type="button" class="product-link" data-product-open="${escapeHtml(p.product_key)}">${escapeHtml(p.varieti)} ↗</button><small>${escapeHtml([p.gred,p.unit].filter(Boolean).join(' · '))}</small></td><td>${escapeHtml(p.level)}</td><td>${escapeHtml(p.state||'全马')}</td><td class="price-cell">${fmtMoney(p.price)}</td><td>${percentMarkup(p,1)}</td><td>${percentMarkup(p,7)}</td><td>${percentMarkup(p,30)}</td><td>${p.markets}<small>${p.observations} 条记录</small></td><td><button class="star ${isSaved(p)?'saved':''}" data-watch-index="${id}" aria-label="${isSaved(p)?'取消关注':'加入关注'}">${isSaved(p)?'★':'☆'}</button></td></tr>`;
-  }).join('')||'<tr><td colspan="9" class="empty">当前筛选／涨跌排序没有符合条件的可比报价，请换一个周期或选择「产品名称」。</td></tr>';
-  $('price-visible').textContent=`显示 ${visible.length} / ${matches.length} 组`;
-  $('more-prices').disabled=matches.length<=store.visible;
+  if(grouped){
+    const rows=[];
+    for(const group of visible){
+      group.quotes.forEach((quote,index)=>{
+        const labelCell=index===0?priceProductCell(
+          group.quotes[0],group.quotes.length,group.leader,period,order
+        ):'';
+        const selected=group.leader===quote?' price-sort-leading-level':'';
+        const rowClass=(index===0?'price-group-first':'price-group-follow')+selected;
+        rows.push(`<tr class="${rowClass}">${labelCell}${priceLevelCells(quote)}</tr>`);
+      });
+    }
+    $('price-table-body').innerHTML=rows.join('')||
+      '<tr><td colspan="9" class="empty">当前条件没有符合涨跌方向的产品，请更换比较周期或选择「产品名称」。</td></tr>';
+    const quoteCount=visible.reduce((n,g)=>n+g.quotes.length,0);
+    $('price-visible').textContent=`显示 ${visible.length} / ${groups.length} 种产品 · ${quoteCount} 组独立层级报价`;
+    $('more-prices').disabled=groups.length<=store.visible;
+  }else{
+    $('price-table-body').innerHTML=visible.map(quote=>
+      `<tr>${priceProductCell(quote)}${priceLevelCells(quote)}</tr>`
+    ).join('')||'<tr><td colspan="9" class="empty">当前筛选／涨跌排序没有符合条件的可比报价，请换一个周期或选择「产品名称」。</td></tr>';
+    $('price-visible').textContent=`显示 ${visible.length} / ${matches.length} 组独立层级报价`;
+    $('more-prices').disabled=matches.length<=store.visible;
+  }
 }
 
 async function loadDaily(date){
@@ -539,7 +578,7 @@ function bindEvents(){
   for(const id of ['price-search','price-level','price-state','price-category']){
     $(id).addEventListener(id==='price-search'?'input':'change',()=>{store.visible=40;renderPrices();});
   }
-  for(const id of ['price-change-period','price-change-order']){
+  for(const id of ['price-change-period','price-change-order','price-display-mode']){
     $(id).addEventListener('change',()=>{store.visible=40;renderPrices();});
   }
   document.querySelectorAll('[data-price-period]').forEach(btn=>btn.addEventListener('click',()=>{

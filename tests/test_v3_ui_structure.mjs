@@ -70,7 +70,22 @@ test('price table has explicit 1/7/30-day ranking and clickable accessible chang
     assert.match(html,new RegExp('data-price-period="'+period+'"'));
   for(const order of ['name','rise','fall','swing'])
     assert.match(html,new RegExp('<option value="'+order+'">'));
-  assert.match(code,/sortQuotesByChange\(filterQuotes\(store\.overview\.prices,filters\(\)\),\{period,order\}\)/);
+  assert.match(code,/sortQuotesByChange\(filtered,\{period,order\}\)/);
   assert.match(code,/btn\.closest\('th'\)\.setAttribute\('aria-sort'/);
   assert.match(style,/\.price-sort-toolbar/);
+});
+
+test('product-group mode defaults to one label per full product, keeping level-specific watch and sortable comparisons',()=>{
+  assert.match(html,/id="price-display-mode"/);
+  assert.match(html,/<option value="group" selected>合并同产品/);
+  assert.match(html,/<option value="levels">逐层级显示/);
+  assert.match(code,/groupQuotesByProduct\(filtered,\{period,order\}\)/);
+  assert.match(code,/rowspan/,'groups must render product name as one spanning cell');
+  assert.match(code,/group\.quotes\.forEach/,'each price level stays a distinct record');
+  assert.match(code,/priceLevelCells\(quote\)/,'level-specific prices/changes are not averaged');
+  assert.match(code,/data-watch-index=/,'each level preserves its watch star');
+  assert.match(code,/store\.visible=40;renderPrices\(\)/,'filter changes reset pagination');
+  assert.match(style,/\.price-level-ladang/);
+  assert.match(style,/\.price-level-borong/);
+  assert.match(style,/\.price-level-runcit/);
 });
