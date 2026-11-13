@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {ageDays,mytDate,rankMovers,filterQuotes,historySeries,parseCSV,
-  summarizeRows,FAMA_COLUMNS,sortQuotesByChange,groupQuotesByProduct,productIdentity,canonicalDailyRows,productAreaRows,
+import {ageDays,mytDate,rankMovers,filterQuotes,quoteChange,historySeries,parseCSV,
+  summarizeRows,FAMA_COLUMNS,sortQuotesByChange,groupQuotesByProduct,archiveComparisonDates,
+  buildPriceDateSnapshot,shiftSurveyDate,productIdentity,canonicalDailyRows,productAreaRows,
   localLevelPrices,productScopePrices,productAreaOptions} from '../site/v3.1/engine.mjs';
 import {buildXlsx} from '../site/v3.1/excel.mjs';
 
@@ -250,4 +251,111 @@ test('group sorting uses only eligible matched markets and preserves nonqualifyi
   const rises=groupQuotesByProduct(rows,{period:7,order:'rise'});
   assert.deepEqual(rises.map(x=>x.quotes[0].varieti),['TOMATO','BAYAM']);
   assert.equal(rises[1].leader.level,'Ladang');
+});
+
+test('archive comparison windows are anchored to the selected date and only contain real CSV dates',()=>{
+  const all=['2026-09-30','2026-10-12','2026-10-13','2026-10-18','2026-10-19','2026-10-20','2026-10-21'];
+  assert.deepEqual(archiveComparisonDates(all,'2026-10-20'),[
+    '2026-10-20','2026-10-19','2026-10-18','2026-10-13','2026-10-12'
+  ]);
+  assert.deepEqual(archiveComparisonDates(all,'2026-08-08'),[]);
+  assert.equal(shiftSurveyDate('2026-10-20',-30),'2026-09-20');
+  assert.equal(shiftSurveyDate('2026-03-01',-1),'2026-02-28');
+  assert.equal(shiftSurveyDate('2026-03-01',-30),'2026-01-30');
+});
+
+test('selected historical date recomputes independent matched 1/7/30-day comparisons, not latest nationwide price',()=>{
+  const row=(date,id,place,price,product='BAYAM',level='Borong')=>({
+    tarikh_harga:date,priceid:id,negeri:'PERAK',daerah:'KINTA',lokasi:place,
+    sublevel:'20',peringkat:level,varieti:product,gred:'F.A.Q',
+    unit:'Kilogram',kategori:'Sayur-Sayuran',harga:String(price)
+  });
+  const makeDay=(date,prices)=>prices.map((price,i)=>row(date,date+'-'+i,['A','B','C'][i],price));
+  const current='2026-11-13',previous='2026-11-12',week='2026-11-06',month='2026-10-14';
+  const csv=new Map([
+    [current,[...makeDay(current,[12,14,16]),row(current,'tomato','A',10,'TOMATO','Runcit')]],
+    [previous,[...makeDay(previous,[10,12,14]),row(previous,'tomato-old','A',5,'TOMATO','Runcit')]],
+    [week,makeDay(week,[8,10,12])],
+    [month,makeDay(month,[4,6,8])],
+  ]);
+  const dates=[month,week,previous,current];
+  assert.deepEqual(archiveComparisonDates(dates,current),[current,previous,week,month]);
+  const snapshot=buildPriceDateSnapshot(csv,{surveyDate:current,archiveDates:dates});
+  assert.equal(snapshot.survey_date,current);
+  const bayam=snapshot.prices.find(p=>p.varieti==='BAYAM'&&p.level==='Borong'&&p.state==='');
+  assert.ok(bayam);
+  assert.equal(bayam.price,14);
+  assert.equal(bayam.markets,3);
+  assert.equal(bayam.observations,3);
+  assert.equal(bayam.changes['1'].previousDate,previous);
+  assert.equal(bayam.changes['7'].previousDate,week);
+  assert.equal(bayam.changes['30'].previousDate,month);
+  assert.equal(bayam.changes['1'].percent,(14-12)/12*100);
+  assert.equal(bayam.changes['7'].percent,40);
+  assert.ok(Math.abs(bayam.changes['30'].percent-133.33333333333334)<0.001);
+  assert.equal(bayam.changes['7'].markets,3);
+  assert.equal(bayam.changes['7'].currentCoverage,1);
+  assert.equal(bayam.changes['7'].previousCoverage,1);
+  assert.equal(bayam.changes['7'].eligible,true);
+  const state=snapshot.prices.find(p=>p.varieti==='BAYAM'&&p.state==='PERAK');
+  assert.equal(state.changes['7'].percent,40);
+  const tomato=snapshot.prices.find(p=>p.varieti==='TOMATO'&&p.state==='');
+  assert.equal(tomato.changes['1'].percent,100);
+  assert.equal(tomato.changes['1'].eligible,false,'one shared market is not sufficient');
+  assert.equal(quoteChange(tomato,1),null);
+  assert.deepEqual(sortQuotesByChange(filterQuotes(snapshot.prices,{state:'',level:'Borong'}),{period:7,order:'rise'}).map(x=>x.varieti),['BAYAM']);
+  assert.equal(snapshot.states[0],'PERAK');
+});
+
+test('selected date honors older baseline fallback and rejects incomplete or revised archive days',()=>{
+  const r=(date,id,market,price,level='Borong')=>({
+    priceid:id,tarikh_harga:date,negeri:'PERAK',daerah:'KINTA',lokasi:market,
+    sublevel:'10',peringkat:level,varieti:'CILI',gred:'F.A.Q',unit:'Kilogram',
+    kategori:'Sayur-Sayuran',harga:String(price)
+  });
+  const date='2026-10-20',older='2026-10-12';
+  const dates=[older,date];
+  const rows=new Map([
+    [date,[r(date,'latest','A',20),r(date,'old-revision','B',200),r(date,'new-revision','B',22),r(date,'third','C',24)]],
+    [older,[r(older,'first','A',10),r(older,'second','B',12),r(older,'third','C',14)]],
+  ]);
+  const snapshot=buildPriceDateSnapshot(rows,{
+    surveyDate:date,archiveDates:dates,supersededByDate:{[date]:['old-revision']}
+  });
+  const item=snapshot.prices.find(p=>!p.state);
+  assert.equal(item.price,22);
+  assert.equal(item.observations,3);
+  assert.equal(item.changes['7'].previousDate,older);
+  assert.equal(item.changes['7'].actualDays,8);
+  assert.equal(item.changes['7'].percent,(22-12)/12*100);
+  assert.equal(item.changes['1'],null);
+  assert.equal(item.changes['30'],null);
+  assert.equal(quoteChange(item,1),null);
+  assert.throws(()=>buildPriceDateSnapshot(new Map([[date,rows.get(date)]]),{
+    surveyDate:date,archiveDates:dates
+  }),/缺少历史原始 CSV/);
+  const bad=new Map(rows);
+  bad.set(older,[r('2026-10-11','wrong','A',15)]);
+  assert.throws(()=>buildPriceDateSnapshot(bad,{surveyDate:date,archiveDates:dates}),
+    /日期不匹配/);
+});
+
+test('matched date lookup never substitutes an invalid candidate with older one',()=>{
+  const day='2026-11-13',first='2026-11-06',earlier='2026-11-05';
+  const item=(date,n,place,price)=>({
+    priceid:date+'-'+n,tarikh_harga:date,negeri:'PERAK',
+    daerah:'KINTA',lokasi:place,sublevel:'20',peringkat:'Runcit',
+    varieti:'TOMATO',gred:'F.A.Q',unit:'Kilogram',kategori:'Sayur-Sayuran',harga:String(price)
+  });
+  const rows=new Map([
+    [day,[item(day,1,'A',10),item(day,2,'B',10),item(day,3,'C',10)]],
+    [first,[item(first,1,'A',5)]], // candidate has one common market, so ineligible
+    [earlier,[item(earlier,1,'A',5),item(earlier,2,'B',5),item(earlier,3,'C',5)]],
+  ]);
+  const snapshot=buildPriceDateSnapshot(rows,{surveyDate:day,archiveDates:[earlier,first,day]});
+  const change=snapshot.prices.find(p=>!p.state).changes['7'];
+  assert.equal(change.previousDate,first);
+  assert.equal(change.markets,1);
+  assert.equal(change.eligible,false);
+  assert.equal(quoteChange(snapshot.prices.find(p=>!p.state),7),null);
 });
