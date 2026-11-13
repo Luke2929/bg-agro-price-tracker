@@ -220,8 +220,10 @@ test('grouped price view shows product identity once, keeps all L/B/R levels and
   assert.deepEqual(sawi.quotes.map(p=>p.level),['Ladang','Borong','Runcit']);
   assert.deepEqual(sawi.quotes.map(p=>p.price),[2,4,6]);
   assert.equal(sawi.quotes[0].changes[30].percent,4,'other direction stays visible for context');
-  assert.equal(grouped[0].quotes[0].unit,'Biji','the strongest decline ranks the product first');
-  assert.equal(grouped[0].leader.changes[30].percent,-17);
+  assert.equal(grouped[0].quotes[0].gred,'A','the strongest decline across distinct grades ranks first');
+  assert.equal(grouped[0].leader.changes[30].percent,-20);
+  assert.equal(grouped[1].quotes[0].unit,'Biji','distinct units remain separate products');
+  assert.equal(grouped[1].leader.changes[30].percent,-17);
   assert.equal(rows.length,8,'source quotations remain untouched');
   assert.equal(rows[0].level,'Runcit','source order is not mutated');
   const names=groupQuotesByProduct(perak,{period:30,order:'name'});
