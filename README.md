@@ -39,7 +39,7 @@ The dashboard uses a transparent, stock-style **survey price** model, not an exc
 | **Data & Export** | Filter original observations by date range, product, state, level, grade and market. |
 | **Excel Downloads** | Export **Summary Data** for analysis or **Full Raw Data** with all 17 original FAMA fields. |
 | **PDF Downloads** | Export a 4-page mobile **Quick View** or a **Full Mobile Report** with source records, navigable PDF contents, price-ID audit lines, and selected survey-date range (up to 45 archived survey days; full report max 6,500 source records per download). |
-| **Daily CSV Index** | [Browse archived daily CSVs newest-first](DAILY_PRICE_INDEX.md), including last Git commit details and a per-date FAMA source snapshot verification status. A verified snapshot only means the fetched row count matched FAMA's control count at that check; it does not certify final publication completeness. |
+| **Daily CSV Index** | [Browse archived daily CSVs newest-first](DAILY_PRICE_INDEX.md), including last Git commit details, SHA-backed current snapshot verification and separately labeled historical GitHub Actions log checks. A matched historical fetch is not a present-day CSV verification. |
 | **Automatic Updates** | GitHub Actions and an external cron scheduler check recent FAMA observations and verify the full rolling window nightly (best-effort timing). |
 
 ## Using the Dashboard
@@ -72,6 +72,16 @@ Full Raw Data fields:
 The V3.1 dashboard fetches precomputed source-preserving JSON summaries and load original daily CSVs only when raw market records, Excel exports, or PDF downloads are requested. PDF pages are 396 × 704 pt, generated entirely in-browser without CDN dependencies. Full Mobile PDF preserves every selected raw source record (including blanks and historical revisions) and keeps separate survey-date chapters. Archived daily CSVs keep stable revision identifiers; if any required date fails to load, the export stops instead of silently returning partial data.
 
 **Record corrections:** FAMA can assign a new survey date to an existing `priceid`. We preserve both archived versions in `data/daily/`, but only the version with the latest survey date enters current Dashboard calculations and Summary Data. `site/data/meta.json` carries the small `superseded_priceids` manifest so browsers reach the same result regardless of file download order. Full Raw Data intentionally includes every archived revision and missing-price row for auditability; do not mistake superseded archived rows for separate current market quotations.
+
+## Historical FAMA verification evidence
+
+The [Daily CSV Index](DAILY_PRICE_INDEX.md) distinguishes two fundamentally different kinds of evidence:
+
+- `✅ Snapshot matched` comes from `data/fama_fetch_audit.json`: a recent FAMA count-vs-fetch comparison **plus an exact SHA-256 match against the currently archived CSV**. This is still not a guarantee that FAMA has finished publishing or covered all states.
+- `📜 Historical match` comes from [archived Actions log observations](data/fama_historical_checks.json) in this repository or the original [`ipohbot-png/fama-price-tracker`](https://github.com/ipohbot-png/fama-price-tracker). These old runs recorded matching per-day FAMA control and fetch counts, but **do not prove the current CSV remains identical** to those past snapshots.
+- `⚪ Not audited` means no admissible per-day source-control evidence was located; old CSV files remain available. In particular, an old Git commit that only claims an aggregate 29-day backfill is **not** equivalent to recovered per-day figures.
+
+The historical log source and original workflow-run URL are retained for auditability. The daily index automatically favors current SHA-backed evidence over historical logs when both exist. New scrapes do not alter any historical evidence or archived original CSVs.
 
 ## Data source and coverage
 
