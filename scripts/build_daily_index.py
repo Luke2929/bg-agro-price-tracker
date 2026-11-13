@@ -164,7 +164,7 @@ def build_index(
             f"**Latest archived survey date:** {filenames[0][:-4]}",
             "",
             "| Name (newest survey date first) | Last commit message | Last commit date (MYT) | Data status (FAMA snapshot) |",
-            "| --- | --- | --- |",
+            "| --- | --- | --- | --- |",
         ])
         for number, filename in enumerate(filenames):
             label = " **(Latest)**" if number == 0 else ""
