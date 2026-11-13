@@ -11,7 +11,8 @@
       "current": 2.6777777778,
       "markets": 18,
       "percent": 41.72302264,
-      "display": "+41.7%"
+      "display": "+41.7%",
+      "reviewReasons": ["market-impact"]
     },
     {
       "product": "SAWI HIJAU",

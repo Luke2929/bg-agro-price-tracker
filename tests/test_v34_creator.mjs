@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
  WORKSPACE_SCHEMA,emptyWorkspace,readWorkspace,saveRecord,contentMetrics,toCSV,
  isValidISODate,findContentSignals,scoreOpportunity,composeCreatorDraft,
- observedStreak,normalizeMetrics,validateCreatorDraft,FORMATS,statePriceSpreads
+ observedStreak,normalizeMetrics,validateCreatorDraft,FORMATS,statePriceSpreads,sourceReviewQuotes
 } from '../site/v3.1/creator-core.mjs';
 
 const row=(name,level,pct,opt={})=>{
@@ -178,4 +178,31 @@ test('direction filters use independent levels and state spreads require same su
  assert.equal(spread.high.state,'KEDAH');
  assert.equal(spread.difference,1);
  assert.equal(statePriceSpreads(quotes).length,1);
+ assert.deepEqual(statePriceSpreads(quotes.map(q=>q.state==='KEDAH'?{...q,priceReview:true}:q)),[]);
+});
+
+test('tier alignment and divergence require identical comparison dates',()=>{
+ const quotes=[row('SAWI','Ladang',-8),row('SAWI','Borong',-10),row('SAWI','Runcit',-12)];
+ assert.equal(findContentSignals(quotes,{type:'aligned'}).length,1);
+ const retail=quotes[2].changes[7];
+ retail.previousDate='2026-11-05';
+ retail.actualDays=8;
+ assert.deepEqual(findContentSignals(quotes,{type:'aligned'}),[]);
+ retail.percent=12;
+ retail.current=retail.previous*1.12;
+ retail.rmDifference=retail.current-retail.previous;
+ assert.deepEqual(findContentSignals(quotes,{type:'divergent'}),[]);
+});
+
+test('a source anomaly in an otherwise eligible comparison blocks content',()=>{
+ const quote=row('SAWI','Ladang',-8);
+ quote.changes[7].reviewReasons=['source-price'];
+ const [audit]=findContentSignals([quote],{type:'audit'});
+ assert.equal(audit.percent,-8);
+ assert.deepEqual(audit.reviewReasons,['source-price']);
+ assert.equal(audit.publishable,false);
+ assert.throws(()=>composeCreatorDraft(audit),/缺少可发布/);
+ const state={...quote,state:'PERAK',priceReview:true,price:80,markets:1};
+ assert.deepEqual(sourceReviewQuotes([state],{query:'SAWI',level:'Ladang'}),[state]);
+ assert.deepEqual(sourceReviewQuotes([state],{region:'KEDAH'}),[]);
 });

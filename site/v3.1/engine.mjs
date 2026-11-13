@@ -8,6 +8,20 @@ export const PRICE_LEVELS = ['Ladang','Borong','Runcit'];
 const COMPARISON_WINDOWS = {1:6,7:4,30:7};
 const MARKET_FIELDS = ['negeri','daerah','lokasi','sublevel'];
 const DECIMAL_PRICE = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
+const SOURCE_REVIEW_RATIO=10,MARKET_REVIEW_RATIO=2,MARKET_REVIEW_POINTS=10;
+
+export function sourcePriceNeedsReview(row,price=validPrice(row.harga)){
+  const reference=validPrice(row.average14);
+  return price!==null&&reference>0&&price>=reference*SOURCE_REVIEW_RATIO;
+}
+
+function marketNeedsReview(now,before,nowTotal,beforeTotal,percent){
+  if(now===before||Math.max(now,before)<Math.min(now,before)*MARKET_REVIEW_RATIO)return false;
+  const remainingBefore=beforeTotal-before;
+  if(remainingBefore<=0)return true;
+  const withoutMarket=(nowTotal-now-remainingBefore)/remainingBefore*100;
+  return Math.abs(percent-withoutMarket)>=MARKET_REVIEW_POINTS;
+}
 
 // Keep V3.1's browser identity identical to scraper.market_math.product_key.
 export function productIdentity(row) {
@@ -18,9 +32,10 @@ export function productIdentity(row) {
 function addMarket(markets,row,price){
   const identity=MARKET_FIELDS.map(key=>String(row[key]??'').trim());
   const key=JSON.stringify(identity);
-  const bucket=markets.get(key)||{identity,sum:0,count:0};
+  const bucket=markets.get(key)||{identity,sum:0,count:0,review:false};
   bucket.sum+=price;
   bucket.count++;
+  bucket.review ||= sourcePriceNeedsReview(row,price);
   markets.set(key,bucket);
 }
 
@@ -48,7 +63,8 @@ function marketsInScope(markets,state){
 
 function matchedMarketStats(current,previous,includeDetails=false){
   if(!current?.size||!previous?.size)return null;
-  let count=0,currentTotal=0,previousTotal=0;
+  let currentTotal=0,previousTotal=0;
+  const pairs=[];
   const details=[];
   for(const [key,now] of current){
     const before=previous.get(key);
@@ -56,26 +72,35 @@ function matchedMarketStats(current,previous,includeDetails=false){
     const currentMean=now.sum/now.count,previousMean=before.sum/before.count;
     currentTotal+=currentMean;
     previousTotal+=previousMean;
-    count++;
+    const sourceReview=now.review||before.review;
+    pairs.push({currentMean,previousMean,sourceReview});
     if(includeDetails){
       const [state,district,location,sublevel]=now.identity;
       const difference=currentMean-previousMean;
       details.push({state,district,location,sublevel,currentMean,previousMean,difference,
         percent:previousMean>0?difference/previousMean*100:null,
-        currentObservations:now.count,previousObservations:before.count});
+        currentObservations:now.count,previousObservations:before.count,sourceReview});
     }
   }
+  const count=pairs.length;
   if(!count||previousTotal<=0)return null;
   const now=currentTotal/count,before=previousTotal/count;
   const rmDifference=now-before,rawPercent=rmDifference/before*100;
   const currentCoverage=count/current.size,previousCoverage=count/previous.size;
+  const marketImpact=({currentMean,previousMean})=>count>=3&&
+    marketNeedsReview(currentMean,previousMean,currentTotal,previousTotal,rawPercent);
+  const reviewReasons=[
+    pairs.some(pair=>pair.sourceReview)&&'source-price',
+    pairs.some(marketImpact)&&'market-impact'
+  ].filter(Boolean);
   return {
     current:now,previous:before,rmDifference,rawPercent,
     percent:Math.abs(rawPercent)<0.05?0:rawPercent,
     markets:count,currentMarkets:current.size,previousMarkets:previous.size,
     currentCoverage,previousCoverage,
     eligible:count>=3&&currentCoverage>=0.5&&previousCoverage>=0.5,
-    ...(includeDetails?{details}:{})
+    ...(reviewReasons.length?{reviewReasons}:{}),
+    ...(includeDetails?{details:details.map(row=>({...row,marketImpact:marketImpact(row)}))}:{})
   };
 }
 
@@ -113,7 +138,8 @@ export function localLevelPrices(rows) {
     const markets=byLevel.get(level);
     if(!markets?.size)return {level,price:null,markets:0,observations:0};
     return {level,price:marketMean(markets),
-      markets:markets.size,observations:[...markets.values()].reduce((sum,v)=>sum+v.count,0)};
+      markets:markets.size,observations:[...markets.values()].reduce((sum,v)=>sum+v.count,0),
+      ...([...markets.values()].some(bucket=>bucket.review)?{priceReview:true}:{})};
   });
 }
 
@@ -125,7 +151,8 @@ export function productScopePrices(prices, rows, {productKey,state='',district='
   }
   return PRICE_LEVELS.map(level=>{
     const q=prices.find(p=>p.product_key===productKey&&p.level===level&&p.state===state);
-    return {level,price:q?.price??null,markets:q?.markets??0,observations:q?.observations??0};
+    return {level,price:q?.price??null,markets:q?.markets??0,observations:q?.observations??0,
+      ...(q?.priceReview?{priceReview:true}:{})};
   });
 }
 
@@ -172,6 +199,13 @@ export function quoteChange(quote, period) {
   return changed?.eligible && Number.isFinite(changed.percent) ? changed : null;
 }
 
+export function comparisonReviewReasons(change){
+  return [
+    ...(Math.abs(change?.percent)>=50?['large-change']:[]),
+    ...(change?.reviewReasons||[]).filter(reason=>reason!=='large-change')
+  ];
+}
+
 function equalNumber(a,b){
   return Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=1e-9*Math.max(1,Math.abs(b));
 }
@@ -201,9 +235,9 @@ export function comparisonEvidence(quote,period,surveyDate=quote?.date){
     productKey:quote.product_key,product:quote.varieti,grade:quote.gred,unit:quote.unit,
     level:quote.level,region:quote.state,period,actualDays,
     currentDate:surveyDate,previousDate:change.previousDate,
-    currentMean:current,previousMean:previous,rmDifference,percent,markets,
+    currentMean:current,previousMean:previous,rmDifference,percent,rawPercent,markets,
     currentMarkets,previousMarkets,currentCoverage:change.currentCoverage,
-    previousCoverage:change.previousCoverage
+    previousCoverage:change.previousCoverage,reviewReasons:comparisonReviewReasons(change)
   };
 }
 
@@ -225,7 +259,8 @@ export function comparisonMarketDetails(rowsByDate,evidence,supersededByDate={})
   if(!result?.eligible||result.markets!==evidence.markets||
     result.currentMarkets!==evidence.currentMarkets||result.previousMarkets!==evidence.previousMarkets||
     !equalNumber(result.current,evidence.currentMean)||!equalNumber(result.previous,evidence.previousMean)||
-    !equalNumber(result.rmDifference,evidence.rmDifference)||!equalNumber(result.percent,evidence.percent))
+    !equalNumber(result.rmDifference,evidence.rmDifference)||!equalNumber(result.percent,evidence.percent)||
+    !equalNumber(result.rawPercent,evidence.rawPercent))
     throw Error('原始市场均价未能与比较结果对账。请刷新数据后重试。');
   return result;
 }
@@ -243,12 +278,19 @@ export function matchedMarketStreaks(rowsByDate,{state='',supersededByDate={}}={
       if(markets.some(day=>!day?.size))continue;
       const keys=[...markets.at(-1).keys()].filter(key=>markets.every(day=>day.has(key)));
       if(keys.length<3||markets.some(day=>keys.length/day.size<0.5))continue;
+      if(markets.some(day=>keys.some(key=>day.get(key).review)))continue;
       const prices=markets.map(day=>marketMean(new Map(keys.map(key=>[key,day.get(key)]))));
       const moves=prices.slice(1).map((price,index)=>
         prices[index]>0?(price-prices[index])/prices[index]*100:NaN);
       const rising=moves.every(move=>move>=0.05&&move<50);
       const falling=moves.every(move=>move<=-0.05&&move>-50);
       if(!rising&&!falling)continue;
+      const concentrated=moves.some((move,index)=>keys.some(key=>{
+        const current=markets[index+1].get(key),previous=markets[index].get(key);
+        return marketNeedsReview(current.sum/current.count,previous.sum/previous.count,
+          prices[index+1]*keys.length,prices[index]*keys.length,move);
+      }));
+      if(concentrated)continue;
       trends.push({productKey,level,markets:keys.length,direction:rising?'rise':'fall',
         points:dates.map((date,index)=>({date,price:prices[index]})),
         strength:Math.min(...moves.map(Math.abs))});
@@ -270,13 +312,17 @@ export function dailyStorySignals(prices,period=1) {
   const window=[1,7,30].includes(Number(period))?Number(period):1;
   const comparable=(Array.isArray(prices)?prices:[])
     .filter(quote=>quote.state===''&&quoteChange(quote,window));
-  const extreme=comparable.filter(quote=>Math.abs(quote.changes[String(window)].percent)>=50)
+  const extreme=comparable.filter(quote=>comparisonReviewReasons(quoteChange(quote,window)).length)
     .sort((a,b)=>Math.abs(b.changes[String(window)].percent)-
       Math.abs(a.changes[String(window)].percent));
-  const editorial=comparable.filter(quote=>Math.abs(quote.changes[String(window)].percent)<50);
-  const positives=editorial.filter(q=>q.changes[String(window)].percent>0)
+  const editorial=comparable.filter(quote=>!comparisonReviewReasons(quoteChange(quote,window)).length);
+  const focus=comparable.filter(quote=>{
+    const change=quoteChange(quote,window);
+    return Math.abs(change.percent)<50&&!change.reviewReasons?.includes('source-price');
+  });
+  const positives=focus.filter(q=>q.changes[String(window)].percent>0)
     .sort((a,b)=>b.changes[String(window)].percent-a.changes[String(window)].percent);
-  const negatives=editorial.filter(q=>q.changes[String(window)].percent<0)
+  const negatives=focus.filter(q=>q.changes[String(window)].percent<0)
     .sort((a,b)=>a.changes[String(window)].percent-b.changes[String(window)].percent);
   const products=new Map();
   for(const quote of editorial){
@@ -288,6 +334,7 @@ export function dailyStorySignals(prices,period=1) {
   for(const layers of products.values()){
     if(!PRICE_LEVELS.every(level=>layers.has(level)))continue;
     const levels=PRICE_LEVELS.map(level=>layers.get(level));
+    if(new Set(levels.map(q=>quoteChange(q,window).previousDate)).size!==1)continue;
     const changes=levels.map(q=>q.changes[String(window)].percent);
     const direction=changes.every(value=>value>0)?'up':
       changes.every(value=>value<0)?'down':null;
@@ -468,6 +515,7 @@ export function buildPriceDateSnapshot(rowsByDate,{surveyDate,archiveDates,super
       ...label,kategori:category,level:group.level,state:group.state,
       date:surveyDate,price:marketMean(markets),
       observations:group.rows.length,markets:markets.size,
+      ...([...markets.values()].some(bucket=>bucket.review)?{priceReview:true}:{}),
       changes:Object.fromEntries([1,7,30].map(period=>[String(period),compare(group,period)]))
     });
   }
@@ -576,7 +624,8 @@ export function summarizeRows(rows, supersededByDate = {}) {
       date:r.tarikh_harga,varieti:r.varieti,gred:r.gred,unit:r.unit,
       level,state,price:marketMean(markets),
       markets:markets.size,observations:[...markets.values()].reduce((n,m)=>n+m.count,0),
-      category:r.kategori
+      category:r.kategori,
+      ...([...markets.values()].some(bucket=>bucket.review)?{priceReview:true}:{})
     });
   }
   return output.sort((a,b)=>a.date.localeCompare(b.date)||a.state.localeCompare(b.state)||a.varieti.localeCompare(b.varieti));

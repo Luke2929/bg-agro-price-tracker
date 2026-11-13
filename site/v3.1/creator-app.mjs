@@ -2,10 +2,10 @@
 import {
  WORKSPACE_KEY,emptyWorkspace,readWorkspace,saveRecord,contentMetrics,
  findContentSignals,composeCreatorDraft,observedStreak,formatPercent,formatPrice,
- evidenceForQuote,validateCreatorDraft,draftSettings,statePriceSpreads,matchesTopic,
+ evidenceForQuote,validateCreatorDraft,draftSettings,statePriceSpreads,matchesTopic,reviewMessage,sourceReviewQuotes,
  toCSV,normalizeMetrics,isValidISODate
-} from './creator-core.mjs?rev=price-evidence-1';
-import {escapeHtml,mytDate,comparisonMarketDetails} from './engine.mjs?rev=price-evidence-1';
+} from './creator-core.mjs?rev=price-evidence-2';
+import {escapeHtml,mytDate,comparisonMarketDetails,comparisonReviewReasons} from './engine.mjs?rev=price-evidence-2';
 const $=id=>document.getElementById(id),v=id=>$(id).value;
 const metrics=['reach','likes','comments','shares','messages','joins','orders'];
 const names={idea:'选题',draft:'草稿',scheduled:'计划发布',published:'已发布'};
@@ -69,7 +69,7 @@ function makeCard(signal,platform,settings){
   },'image/png');
 }
 export function createCreatorWorkspace({
-  getOverview,getArchiveDates,loadSnapshot,loadEvidenceRows,loadHistory,loadStreaks,showComparison,notify,navigate
+  getOverview,getArchiveDates,loadSnapshot,loadEvidenceRows,loadHistory,loadStreaks,showComparison,openMarketReview,notify,navigate
 }){
   let workspace=emptyWorkspace(),blocked=false,editingId='',editingEvidence=null,selectedEvidence=null;
   let signals=[],pool=[],signalData=null,verifiedEvidence=null;
@@ -143,10 +143,18 @@ export function createCreatorWorkspace({
     renderTopics(last?.id||selectedEvidence?.id);
     $('creator-signal-summary').textContent=data.survey_date+' · '+signals.length+
       ' 个候选，'+signals.filter(x=>x.publishable).length+' 个可写，'+
-      signals.filter(x=>x.flagged).length+' 个含大幅波动。展示前 80 个。';
+      signals.filter(x=>x.flagged).length+' 个待核实。展示前 80 个。';
+    const flaggedQuotes=sourceReviewQuotes(data.prices,filter);
+    $('creator-source-review').hidden=!(filter.type==='audit'&&flaggedQuotes.length);
+    $('creator-source-review-list').innerHTML=flaggedQuotes.map(q=>
+      '<li><strong>'+escapeHtml([q.varieti,q.gred,q.level,q.state].filter(Boolean).join(' · '))+'</strong><span>'+
+      escapeHtml(formatPrice(q.price,q.unit)+' · '+q.markets+' 个调查市场 · 含待核实报价')+
+      '</span><button type="button" class="text-button" data-review-market="'+
+      escapeHtml(JSON.stringify([q.date,q.state,q.varieti,q.level]))+'">查看原始市场记录</button></li>').join('');
     $('creator-signal-list').innerHTML=signals.slice(0,80).map((s,i)=>{
-      const tags=[s.aligned?'三层同向':'',s.divergent?'层级分化':'',s.flagged?'波动待核实':'']
+      const tags=[s.aligned?'三层同向':'',s.divergent?'层级分化':'',s.flagged?'待核实':'']
         .filter(Boolean).map(x=>'<span class="creator-pill">'+x+'</span>').join('');
+      const review=s.flagged?reviewMessage(s.reviewReasons)||'同产品其他层级有报价待核实。':'';
       const levels=s.levels.filter(item=>item.level!==s.level).map(item=>
         '<small title="'+escapeHtml(item.previousDate+' → '+item.currentDate)+'">'+item.level+' '+
         escapeHtml(formatPrice(item.previousMean,item.unit)+' → '+formatPrice(item.currentMean,item.unit)+' · '+
@@ -155,7 +163,7 @@ export function createCreatorWorkspace({
       return '<article class="creator-signal-row">'+
         '<div class="creator-signal-name"><strong>'+escapeHtml(s.product)+'</strong><small>'+
         escapeHtml([s.grade,s.unit,s.region||'全国调查样本'].filter(Boolean).join(' · '))+
-        '</small><div class="creator-tags">'+tags+'</div>'+levels+'</div>'+
+        '</small><div class="creator-tags">'+tags+'</div>'+(review?'<small>'+escapeHtml(review)+'</small>':'')+levels+'</div>'+
         '<div class="creator-signal-number"><b class="'+(s.percent>0?'creator-up':'creator-down')+'">'+
         formatPercent(s.percent)+' <span class="price-level-pill price-level-'+s.level.toLowerCase()+'">'+s.level+
         '</span></b><small>'+escapeHtml(formatPrice(s.previousMean,s.unit)+' → '+formatPrice(s.currentMean,s.unit)+
@@ -216,6 +224,7 @@ export function createCreatorWorkspace({
     renderTopics(selectedEvidence?.id);
     $('creator-signal-summary').textContent='正在读取 '+day+' 的调查比较…';
     $('creator-signal-list').replaceChildren();
+    $('creator-source-review').hidden=true;
     $('creator-trends').replaceChildren();
     $('creator-spreads').replaceChildren();
     $('creator-trend-status').textContent='正在读取所选调查日…';
@@ -254,7 +263,9 @@ export function createCreatorWorkspace({
       const source=evidenceForQuote(quote,s.period,data.prices,s.currentDate);
       if(!source?.publishable)throw Error('此选题缺少可发布的合格比较。');
       const {rows,superseded}=await loadEvidenceRows(source);
-      comparisonMarketDetails(rows,source,superseded);
+      const comparison=comparisonMarketDetails(rows,source,superseded);
+      const reasons=comparisonReviewReasons(comparison);
+      if(reasons.length)throw Error(reviewMessage(reasons));
       return source;
     })();
     checks.set(key,pending);
@@ -285,6 +296,16 @@ export function createCreatorWorkspace({
     if(!pool.some(s=>s.id===source.id))pool.unshift(source);
     renderTopics(source.id);
     navigate('studio');
+  }
+  function openAudit(data,period){
+    ++signalRequest;
+    $('creator-signal-date').value=data.survey_date;
+    $('creator-signal-period').value=String(period);
+    $('creator-signal-type').value='audit';
+    for(const id of ['creator-signal-region','creator-signal-category','creator-signal-level','creator-signal-search'])
+      $(id).value='';
+    useSignalSnapshot(data);
+    navigate('signals');
   }
   async function generate(){
     const source=editingId?editingEvidence:active()||selectedEvidence;
@@ -358,7 +379,7 @@ export function createCreatorWorkspace({
       const streak=observedStreak(history,{level:signal.level,state:signal.region,
         endDate:signal.currentDate});
       const points=streak.points.map(p=>p.date+' RM'+p.price.toFixed(2)+
-        '（'+p.markets+' 市场）').join(' → ');
+        '（'+p.markets+' 市场'+(p.priceReview?' · 待核实':'')+'）').join(' → ');
       $('creator-streak').textContent=signal.product+' · '+signal.level+' · '+
         (streak.count?streak.count+' 段有记录调查日的均价'+
         (streak.direction==='rise'?'上行':'下行'):'暂无足够连续方向')+
@@ -552,6 +573,10 @@ export function createCreatorWorkspace({
       const trend=e.target.closest('[data-creator-history]');
       if(trend)inspectHistory(Number(trend.dataset.creatorHistory));
     });
+    $('creator-source-review-list').addEventListener('click',e=>{
+      const row=e.target.closest('[data-review-market]');
+      if(row)openMarketReview(...JSON.parse(row.dataset.reviewMarket));
+    });
     $('creator-calendar-grid').addEventListener('click',e=>{
       const action=e.target.closest('[data-creator-edit]');
       if(action)edit(action.dataset.creatorEdit);
@@ -575,5 +600,5 @@ export function createCreatorWorkspace({
     if(page==='studio')evidence();
     if(page==='calendar')calendarRender();
   }
-  return {bind,render,refresh,openTopic};
+  return {bind,render,refresh,openTopic,openAudit};
 }

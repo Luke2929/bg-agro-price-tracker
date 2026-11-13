@@ -16,7 +16,10 @@ import json
 from pathlib import Path
 
 from .aggregate import DEFAULT_DAILY_DIR, canonicalize_rows, read_rows, LEVELS
-from .market_math import MatchedMarketComparator, market_average, market_key, product_key, valid_price
+from .market_math import (
+    MatchedMarketComparator, market_average, market_key, product_key,
+    source_price_needs_review, valid_price,
+)
 
 DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "site/data/v3/overview.json"
 LOOKBACK_DAYS = 38  # 30D target + up to 7 older calendar days
@@ -92,6 +95,7 @@ def build_overview(archived_rows: list[dict], survey_date: str | None = None) ->
             "observations": average["n"],
             "markets": average["markets"],
             "changes": changes,
+            **({"priceReview": True} if average.get("review") else {}),
         })
 
     return {
@@ -126,6 +130,7 @@ def build_history(archived_rows: list[dict]) -> tuple[dict, dict[str, dict]]:
         lambda: defaultdict(dict)
     )
     labels: dict[str, dict] = {}
+    review_groups = set()
     for row in canonical:
         day = (row.get("tarikh_harga") or "").strip()
         level = (row.get("peringkat") or "").strip()
@@ -144,10 +149,13 @@ def build_history(archived_rows: list[dict]) -> tuple[dict, dict[str, dict]]:
         # uses precisely the same observations, not the mean of state means.
         state = (row.get("negeri") or "").strip()
         for scope in ("", state) if state else ("",):
-            group = buckets[key][(day, level, scope)]
+            scope_key = (day, level, scope)
+            group = buckets[key][scope_key]
             entry = group.setdefault(market, [0.0, 0.0])
             entry[0] += price
             entry[1] += 1
+            if source_price_needs_review(row, price):
+                review_groups.add((key, scope_key))
 
     manifest_items = []
     files: dict[str, dict] = {}
@@ -164,6 +172,7 @@ def build_history(archived_rows: list[dict]) -> tuple[dict, dict[str, dict]]:
             observations.append({
                 "date": day, "level": level, "state": state,
                 "price": mean, "markets": len(markets), "observations": count,
+                **({"priceReview": True} if (key, (day, level, state)) in review_groups else {}),
             })
         item = {"product_key": key, **labels[key], "path": "history/" + name}
         manifest_items.append(item)
