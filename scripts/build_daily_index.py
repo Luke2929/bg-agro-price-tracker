@@ -7,6 +7,7 @@ Run after CSV changes are committed: python -m scripts.build_daily_index
 from dataclasses import dataclass
 from scripts.daily_audit import load_audit, sha256_file
 from datetime import date, datetime
+import json
 from pathlib import Path
 import re
 import subprocess
@@ -141,15 +142,72 @@ def render_data_status(filename: str, record: dict | None, archive_dir: Path) ->
     return f"✅ Snapshot matched; {title}{retained} · {checked}"
 
 
+HISTORICAL_SCHEMA = "bg-agro/fama-historical-log-evidence/v1"
+TRUSTED_HISTORY_REPOS = {
+    "Luke2929/bg-agro-price-tracker",
+    "ipohbot-png/fama-price-tracker",
+}
+
+
+def load_historical_checks(path: Path) -> dict:
+    """Read historical Actions logs, kept separate from current CSV SHA audits."""
+    if not path.is_file():
+        return {"schema": HISTORICAL_SCHEMA, "dates": {}}
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(document, dict)
+        or document.get("schema") != HISTORICAL_SCHEMA
+        or not isinstance(document.get("dates"), dict)
+    ):
+        raise ValueError(f"Invalid historical log evidence manifest: {path}")
+    return document
+
+
+def render_historical_status(record: dict | None) -> str:
+    """Label *historical fetch evidence*, never claim present-file verification."""
+    if not isinstance(record, dict):
+        return "⚪ Not audited"
+
+    source = record.get("source_repo")
+    run_id = record.get("run_id")
+    expected, fetched = record.get("expected"), record.get("fetched")
+    if (
+        source not in TRUSTED_HISTORY_REPOS
+        or not isinstance(run_id, str)
+        or not run_id.isdigit()
+        or not isinstance(expected, int)
+        or isinstance(expected, bool)
+        or expected <= 0
+        or fetched != expected
+        or record.get("status") not in ("ok", "ok+archive")
+    ):
+        return "⚠️ Invalid historical evidence"
+
+    try:
+        date_myt = format_commit_time(record["log_at_utc"])
+    except (TypeError, KeyError, ValueError):
+        return "⚠️ Invalid historical evidence"
+
+    repo_label = "Own Actions" if source == "Luke2929/bg-agro-price-tracker" else "Original project"
+    link = f"https://github.com/{source}/actions/runs/{run_id}"
+    return (
+        f"📜 Historical match; "
+        f"[FAMA {expected:,}/{fetched:,}]({link}) · "
+        f"{date_myt} ({repo_label}; current CSV not rechecked)"
+    )
+
+
 def build_index(
     filenames: list[str],
     commit_info: dict[str, CommitInfo] | None = None,
     audit: dict | None = None,
     archive_dir: Path = ARCHIVE_DIR,
+    historical_checks: dict | None = None,
 ) -> str:
     """Render actual CSV links in descending date order with Git metadata."""
     commits = commit_info if commit_info is not None else {}
     verified_dates = audit.get("dates", {}) if isinstance(audit, dict) else {}
+    history = historical_checks.get("dates", {}) if isinstance(historical_checks, dict) else {}
     lines = [
         "# FAMA Daily CSV Index — Newest First",
         "",
@@ -177,7 +235,11 @@ def build_index(
                     f"({COMMIT_URL}{info.sha})"
                 )
                 committed = format_commit_time(info.timestamp)
-            status_text = render_data_status(filename, verified_dates.get(filename[:-4]), archive_dir)
+            survey_date = filename[:-4]
+            if survey_date in verified_dates:
+                status_text = render_data_status(filename, verified_dates.get(survey_date), archive_dir)
+            else:
+                status_text = render_historical_status(history.get(survey_date))
             lines.append(
                 f"| [{filename}](data/daily/{filename}){label} "
                 f"| {message} | {committed} | {status_text} |"
@@ -196,7 +258,12 @@ def build_index(
         "has not changed since. FAMA may add or correct rows later. "
         "**⚠️ Source blanks** means some source fields were empty and archived "
         "values were preserved; **⚪ Not audited** means no saved per-day verification "
-        "evidence (especially older dates). A failed Actions run does not erase the "
+        "evidence (especially older dates). **📜 Historical match** is evidence "
+        "from a past successful GitHub Actions run that matched FAMA counts "
+        "at that earlier time; it **does not verify the currently archived CSV**. "
+        "Historical run records are stored separately in "
+        "[data/fama_historical_checks.json](data/fama_historical_checks.json). "
+        "A failed Actions run does not erase the "
         "previous valid audit; [review latest workflow runs]("
         "https://github.com/Luke2929/bg-agro-price-tracker/actions/workflows/scrape.yml) "
         "for job failures. GitHub\'s native file browser keeps its own ordering.",
@@ -210,7 +277,11 @@ def build_index(
 
 def main() -> None:
     audit = load_audit(REPO_ROOT / "data" / "fama_fetch_audit.json")
-    content = build_index(archived_csv_names(ARCHIVE_DIR), latest_csv_commits(), audit)
+    historical = load_historical_checks(REPO_ROOT / "data" / "fama_historical_checks.json")
+    content = build_index(
+        archived_csv_names(ARCHIVE_DIR), latest_csv_commits(), audit,
+        historical_checks=historical,
+    )
     if not INDEX_FILE.exists() or INDEX_FILE.read_text(encoding="utf-8") != content:
         INDEX_FILE.write_text(content, encoding="utf-8")
         print(f"Updated {INDEX_FILE.name}")
