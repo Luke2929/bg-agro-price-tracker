@@ -39,7 +39,7 @@ The dashboard uses a transparent, stock-style **survey price** model, not an exc
 | **Data & Export** | Filter original observations by date range, product, state, level, grade and market. |
 | **Excel Downloads** | Export **Summary Data** for analysis or **Full Raw Data** with all 17 original FAMA fields. |
 | **PDF Downloads** | Export a 4-page mobile **Quick View** or a **Full Mobile Report** with source records, navigable PDF contents, price-ID audit lines, and selected survey-date range (up to 45 archived survey days; full report max 6,500 source records per download). |
-| **Daily CSV Index** | [Browse archived daily CSVs newest-first](DAILY_PRICE_INDEX.md), with each CSV's last Git commit message, commit link and exact Malaysia-time commit date. Automatically rebuilt during scraper workflow runs. |
+| **Daily CSV Index** | [Browse archived daily CSVs newest-first](DAILY_PRICE_INDEX.md), including last Git commit details and a per-date FAMA source snapshot verification status. A verified snapshot only means the fetched row count matched FAMA's control count at that check; it does not certify final publication completeness. |
 | **Automatic Updates** | GitHub Actions and an external cron scheduler check recent FAMA observations and verify the full rolling window nightly (best-effort timing). |
 
 ## Using the Dashboard

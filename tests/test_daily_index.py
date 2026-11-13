@@ -6,6 +6,7 @@ from scripts.build_daily_index import (
     build_index,
     format_commit_time,
     parse_git_log,
+    render_data_status,
 )
 
 
@@ -34,7 +35,8 @@ def test_daily_index_orders_existing_files_newest_first(tmp_path):
     assert "[2026-11-13.csv](data/daily/2026-11-13.csv)" in markdown
     assert markdown.index("2026-11-13.csv") < markdown.index("2026-11-12.csv")
     assert markdown.index("2026-11-12.csv") < markdown.index("2026-11-11.csv")
-    assert "| Last commit message | Last commit date (MYT) |" in markdown
+    assert "| Last commit message | Last commit date (MYT) | Data status (FAMA snapshot) |" in markdown
+    assert "⚪ Not audited" in markdown
     assert "2026-02-30" not in markdown
     assert "2026-11-14" not in markdown
 
@@ -76,3 +78,40 @@ def test_empty_archive_does_not_invent_dates(tmp_path):
     markdown = build_index([])
     assert "No dated CSV files have been archived." in markdown
     assert "Latest archived survey date" not in markdown
+
+
+def test_audit_requires_hash_match_and_source_control_counts(tmp_path):
+    from scripts.daily_audit import sha256_file
+
+    csv = tmp_path / "2026-11-13.csv"
+    csv.write_text("priceid\n1\n2\n", encoding="utf-8")
+    info = {
+        "expected": 2, "fetched": 2, "archive_rows": 2,
+        "preserved_fields": 0,
+        "csv_sha256": sha256_file(csv),
+        "run_id": "123",
+        "verified_at_utc": "2026-11-13T03:17:00+00:00",
+    }
+    status = render_data_status(csv.name, info, tmp_path)
+    assert "✅ Snapshot matched" in status
+    assert "2/2" in status
+    assert "2026-11-13 11:17 MYT" in status
+    assert "/actions/runs/123" in status
+
+    # A CSV can be silently replaced without a fresh upstream audit.
+    csv.write_text("priceid\n1\n2\n3\n", encoding="utf-8")
+    assert render_data_status(csv.name, info, tmp_path) == "⚠️ Changed since check"
+
+    info["csv_sha256"] = sha256_file(csv)
+    info["preserved_fields"] = 2
+    assert "⚠️ Source blanks" in render_data_status(csv.name, info, tmp_path)
+
+    info["expected"] = 4
+    assert render_data_status(csv.name, info, tmp_path) == "⚠️ Invalid audit"
+
+
+def test_unverified_archive_never_claims_complete(tmp_path):
+    (tmp_path / "2026-07-01.csv").write_text("priceid\n1\n", encoding="utf-8")
+    markdown = build_index(["2026-07-01.csv"], {}, {"dates": {}}, tmp_path)
+    assert "⚪ Not audited" in markdown
+    assert "| [2026-07-01.csv](data/daily/2026-07-01.csv) **(Latest)** | — | — | ⚪ Not audited |" in markdown
