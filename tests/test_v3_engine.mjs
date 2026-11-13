@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {ageDays,mytDate,rankMovers,filterQuotes,historySeries,parseCSV,
-  summarizeRows,FAMA_COLUMNS,productIdentity,canonicalDailyRows,productAreaRows,
+  summarizeRows,FAMA_COLUMNS,sortQuotesByChange,productIdentity,canonicalDailyRows,productAreaRows,
   localLevelPrices,productScopePrices,productAreaOptions} from '../site/v3.1/engine.mjs';
 import {buildXlsx} from '../site/v3.1/excel.mjs';
 
@@ -165,4 +165,35 @@ test('V3.1 district engine reconciles against every real latest V3 product price
     assert.equal(actual.markets,quote.markets);
     assert.equal(actual.observations,quote.observations);
   }
+});
+
+test('price-change ranking covers 1/7/30 days, both directions and biggest swings without changing source rows',()=>{
+  const make=(name,p1,p7,p30,eligible=true)=>({
+    varieti:name,level:'Borong',state:'',gred:'A',unit:'Kilogram',kategori:'Vegetables',
+    changes:{
+      1:{percent:p1,eligible},7:{percent:p7,eligible},30:{percent:p30,eligible}
+    }
+  });
+  const prices=[
+    make('ABC',3,-4,6),make('DEF',19,10,-15),make('GHI',-28,-13,4),
+    make('JKL',5,0,50),make('MNO',null,0,0),make('ZZZ',100,100,100,false)
+  ];
+  const filtered=filterQuotes(prices,{state:''});
+  assert.deepEqual(sortQuotesByChange(filtered,{period:1,order:'rise'}).map(x=>x.varieti),['DEF','JKL','ABC']);
+  assert.deepEqual(sortQuotesByChange(filtered,{period:7,order:'fall'}).map(x=>x.varieti),['GHI','ABC']);
+  assert.deepEqual(sortQuotesByChange(filtered,{period:30,order:'swing'}).map(x=>x.varieti),['JKL','DEF','ABC','GHI','MNO']);
+  assert.deepEqual(sortQuotesByChange(filtered,{period:7,order:'name'}).map(x=>x.varieti),filtered.map(x=>x.varieti));
+  assert.equal(filtered.length,prices.length,'sorting does not remove source quotations');
+  assert.equal(sortQuotesByChange(filtered,{period:7,order:'rise'}).some(x=>x.varieti==='ZZZ'),false);
+});
+
+test('price change filters apply within existing geographic and level filters without cross-state mixing',()=>{
+  const make=(state,level,pct)=>({
+    varieti:'CILI',state,level,gred:'A',unit:'Kilogram',kategori:'Vegetables',
+    changes:{7:{percent:pct,eligible:true}}
+  });
+  const prices=[make('', 'Borong',8),make('PERAK','Borong',22),make('PERAK','Runcit',-11)];
+  assert.deepEqual(sortQuotesByChange(filterQuotes(prices,{state:'PERAK',level:'Borong'}),{period:7,order:'rise'}).map(x=>x.state),['PERAK']);
+  assert.equal(sortQuotesByChange(filterQuotes(prices,{state:'PERAK',level:'Borong'}),{period:7,order:'fall'}).length,0);
+  assert.equal(sortQuotesByChange(filterQuotes(prices,{state:'PERAK',level:'Runcit'}),{period:7,order:'fall'}).length,1);
 });
