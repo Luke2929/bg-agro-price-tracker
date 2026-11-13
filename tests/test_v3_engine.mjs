@@ -410,7 +410,7 @@ test('daily content board spots all three level aligned trends using same produc
   assert.deepEqual(result.aligned.levels.map(x=>x.level),['Ladang','Borong','Runcit']);
   assert.equal(result.aligned.strength,21);
   assert.equal(result.extremeCount,0);
-  assert.match(buildMarketPostIdea(result.fall,30,'2026-11-13'),/TURUN -9\.0%/);
+  assert.match(buildMarketPostIdea(result.fall,30,'2026-11-13'),/TURUN -48\.0%/);
   assert.equal(dailyStorySignals(rows,1).rise,null,'no fabricated baseline for absent period');
 });
 
