@@ -32,7 +32,39 @@
     <main class="main" id="main">
       <div class="notice" id="error-banner" role="alert" hidden></div>
       <section data-screen="overview" class="screen active" aria-labelledby="overview-title">
-        <div class="hero"><div class="hero-copy"><span class="eyebrow">MALAYSIA AGRICULTURAL PRICE DATA</span><h1 id="overview-title">把农产品价格，<br><em>看得更清楚。</em></h1><p>真实 FAMA 调查数据 · 农场 / 批发 / 零售 · 价格不估算、不补齐。</p><div class="hero-actions"><button type="button" class="primary-button" data-go="prices">查看最新价格 <span>→</span></button><button type="button" class="secondary-button" data-go="history">查看历史趋势</button></div></div><div class="hero-graphic" aria-hidden="true"><div class="ring ring-1"></div><div class="ring ring-2"></div><div class="hero-leaf">❋</div><div class="hero-floating"><small>LATEST SURVEY</small><strong id="hero-date">—</strong><span>FAMA · Malaysia</span></div></div></div>
+        <section class="insight-board" aria-labelledby="overview-title">
+          <div class="insight-board-head">
+            <div class="insight-board-title">
+              <span class="insight-kicker">FAMA MARKET INTELLIGENCE · CONTENT IDEAS</span>
+              <h1 id="overview-title">每日农价内容灵感板</h1>
+              <p>用真实调查行情找选题，不把涨跌当成利润，也不猜测市场变化原因。</p>
+            </div>
+            <div class="insight-board-tools">
+              <span class="insight-date" id="insight-date">正在读取调查日期…</span>
+              <div class="insight-periods" role="group" aria-label="每日农价灵感比较窗口">
+                <button type="button" data-insight-period="1" class="active">昨日</button>
+                <button type="button" data-insight-period="7">7 天</button>
+                <button type="button" data-insight-period="30">30 天</button>
+              </div>
+            </div>
+          </div>
+          <div class="insight-main-grid">
+            <article class="insight-story insight-story-rise" id="insight-rise" aria-label="最大可比涨幅">
+              <p class="insight-loading">正在分析上涨幅度…</p>
+            </article>
+            <article class="insight-story insight-story-fall" id="insight-fall" aria-label="最大可比跌幅">
+              <p class="insight-loading">正在分析下跌幅度…</p>
+            </article>
+          </div>
+          <div class="insight-aux-grid">
+            <article class="insight-aux" id="insight-aligned" aria-label="农场批发零售同步变化">正在筛选三个价格层级的同步变化…</article>
+            <article class="insight-aux insight-audit" id="insight-warning" aria-label="需要核实的大幅波动">正在检查异常波动…</article>
+          </div>
+          <div class="insight-board-foot">
+            <span id="insight-method">仅选全国同市场可比数据；需 ≥ 3 个共同市场且双方覆盖率 ≥ 50%。</span>
+            <button type="button" class="insight-open-prices" data-go="prices">查看全部价格明细 →</button>
+          </div>
+        </section>
 
         <div class="stat-grid">
           <article class="stat"><span>最新调查日期</span><strong id="stat-survey">—</strong><small id="stat-age">以官方价格日期为准</small></article>
