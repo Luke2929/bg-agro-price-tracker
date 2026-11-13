@@ -109,6 +109,80 @@ export function rankMovers(prices, period, direction, limit = 5) {
     .slice(0,limit);
 }
 
+// Editorial discovery only: quoteChange() is the source of eligibility.
+// Large moves remain observable but are not promoted into ready-to-post claims.
+export function dailyStorySignals(prices,period=1) {
+  const window=[1,7,30].includes(Number(period))?Number(period):1;
+  const comparable=(Array.isArray(prices)?prices:[])
+    .filter(quote=>quote.state===''&&quoteChange(quote,window));
+  const extreme=comparable.filter(quote=>Math.abs(quote.changes[String(window)].percent)>=50)
+    .sort((a,b)=>Math.abs(b.changes[String(window)].percent)-
+      Math.abs(a.changes[String(window)].percent));
+  const editorial=comparable.filter(quote=>Math.abs(quote.changes[String(window)].percent)<50);
+  const positives=editorial.filter(q=>q.changes[String(window)].percent>0)
+    .sort((a,b)=>b.changes[String(window)].percent-a.changes[String(window)].percent);
+  const negatives=editorial.filter(q=>q.changes[String(window)].percent<0)
+    .sort((a,b)=>a.changes[String(window)].percent-b.changes[String(window)].percent);
+  const products=new Map();
+  for(const quote of editorial){
+    const key=quote.product_key||productIdentity(quote);
+    if(!products.has(key))products.set(key,new Map());
+    products.get(key).set(quote.level,quote);
+  }
+  const aligned=[];
+  for(const layers of products.values()){
+    if(!PRICE_LEVELS.every(level=>layers.has(level)))continue;
+    const levels=PRICE_LEVELS.map(level=>layers.get(level));
+    const changes=levels.map(q=>q.changes[String(window)].percent);
+    const direction=changes.every(value=>value>0)?'up':
+      changes.every(value=>value<0)?'down':null;
+    if(!direction)continue;
+    aligned.push({
+      product_key:levels[0].product_key||productIdentity(levels[0]),
+      varieti:levels[0].varieti,levels,
+      direction,strength:Math.min(...changes.map(Math.abs))
+    });
+  }
+  aligned.sort((a,b)=>b.strength-a.strength||a.varieti.localeCompare(b.varieti));
+  return {
+    period:window,comparableCount:comparable.length,upCount:positives.length,
+    downCount:negatives.length,rise:positives[0]||null,fall:negatives[0]||null,
+    aligned:aligned[0]||null,extreme:extreme[0]||null,
+    extremeCount:extreme.length
+  };
+}
+
+// A short, sourced Malay-language discussion starter; never invent causes,
+// farm profit, a grower's testimony or an exact calendar-day gap.
+export function buildMarketPostIdea(quote,period,surveyDate) {
+  const change=quoteChange(quote,period);
+  if(!change||!surveyDate||quote.state!==''||Math.abs(change.percent)>=50||change.percent===0)
+    return '';
+  const direction=change.percent>0?'NAIK':'TURUN';
+  const sign=change.percent>0?'+':'';
+  const dateLabel=surveyDate+' berbanding '+change.previousDate;
+  const scope=quote.level==='Ladang'?'ladang':
+    quote.level==='Borong'?'borong':'runcit';
+  return [
+    'HARGA '+quote.varieti+' '+direction+' '+sign+change.percent.toFixed(1)+'% — APA CERITA DI TEMPAT ANDA?',
+    '',
+    'Saya semak data tinjauan FAMA bagi '+dateLabel+'.',
+    'Untuk '+quote.varieti+' ('+quote.gred+', '+quote.unit+
+      '), purata harga peringkat '+scope+' berubah '+sign+
+      change.percent.toFixed(1)+'% berdasarkan '+change.markets+
+      ' lokasi pasaran yang sama pada dua tarikh tersebut.',
+    '',
+    'Petani dan peniaga di kawasan anda nampak perubahan yang sama tak? '+
+      'Macam mana dengan kos dan harga jual sebenar sekarang?',
+    '',
+    'Sumber: FAMA AMI | Tarikh harga: '+surveyDate+
+      ' | Perbandingan '+period+' hari (tarikh rujukan sebenar: '+
+      change.previousDate+').',
+    'Nota: Purata tinjauan, bukan harga tetap atau bukti keuntungan petani. '+
+      'Keadaan setempat mungkin berbeza.'
+  ].join('\n');
+}
+
 export function filterQuotes(prices, {search='',level='',state='',category=''}={}) {
   const needle=search.trim().toLocaleUpperCase();
   return prices.filter(p=>p.state===state && (!level||p.level===level) &&
