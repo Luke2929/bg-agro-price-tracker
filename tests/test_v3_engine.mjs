@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {ageDays,mytDate,rankMovers,dailyStorySignals,buildMarketPostIdea,filterQuotes,quoteChange,historySeries,parseCSV,
+import {ageDays,mytDate,rankMovers,dailyStorySignals,filterQuotes,quoteChange,historySeries,parseCSV,
   summarizeRows,FAMA_COLUMNS,sortQuotesByChange,groupQuotesByProduct,archiveComparisonDates,
   buildPriceDateSnapshot,shiftSurveyDate,productIdentity,canonicalDailyRows,productAreaRows,
-  localLevelPrices,productScopePrices,productAreaOptions} from '../site/v3.1/engine.mjs';
+  localLevelPrices,productScopePrices,productAreaOptions,comparisonEvidence,comparisonMarketDetails,
+  matchedMarketStreaks,validPrice} from '../site/v3.1/engine.mjs';
+import {buildMarketPostIdea,formatPercent} from '../site/v3.1/creator-core.mjs';
 import {buildXlsx} from '../site/v3.1/excel.mjs';
 
 function quote({state='',pct=5,eligible=true,grade='A',level='Borong'}={}){
@@ -53,6 +55,23 @@ test('CSV parser retains 17 columns, escaped quotes, embedded newlines and missi
   assert.equal(rows[0].lokasi,'Market "A"\nBlock 2');
   assert.equal(rows[0].harga,'');
   assert.throws(()=>parseCSV('x,y\n1,2'),/缺少必需字段/);
+});
+
+test('CSV contract keeps original market fields and rejects invalid width, quotes and dates',()=>{
+  const header=FAMA_COLUMNS.join(',');
+  const record=['42','2026-11-13','','PERAK','KINTA','" PASAR ""A"", IPOH\r\nBLOCK B "',
+    'Borong','20','','','','BAYAM','A','Kilogram','0','',''].join(',');
+  const [item]=parseCSV('\ufeff'+header+'\r\n'+record,'2026-11-13');
+  assert.equal(item.lokasi,' PASAR "A", IPOH\r\nBLOCK B ');
+  assert.equal(validPrice(item.harga),0);
+  for(const bad of ['',null,'NaN','0x10','1_000','-2'])assert.equal(validPrice(bad),null);
+  assert.throws(()=>parseCSV(header+'\n'+record.slice(0,-1)),/列数不符/);
+  assert.throws(()=>parseCSV(header+'\n'+record+',x'),/列数不符/);
+  assert.throws(()=>parseCSV(header.replace(',supply',',average14')+'\n'+record),/字段重复/);
+  assert.throws(()=>parseCSV(header+'\n'+record.replace('BLOCK B "','BLOCK B "x')),/引号位置/);
+  assert.throws(()=>parseCSV(header+'\n'+record.replace('BLOCK B "','BLOCK B ')),/引号未正确闭合/);
+  assert.throws(()=>parseCSV(header+'\n'+record.replace('2026-11-13','2026-02-30')),/调查日期/);
+  assert.throws(()=>parseCSV(header+'\n'+record,'2026-11-12'),/调查日期/);
 });
 
 function row(id,date,location,harga,grade='A'){
@@ -364,8 +383,9 @@ test('matched date lookup never substitutes an invalid candidate with older one'
 test('daily content board selects actual eligible nationwide rises and falls, without state or low-market duplicates',()=>{
   const make=(name,level,pct,{eligible=true,state='',markets=16,prev='2026-11-06'}={})=>({
     varieti:name,product_key:name+'||F.A.Q||Kilogram',gred:'F.A.Q',unit:'Kilogram',
-    level,state,changes:{7:{percent:pct,eligible,markets,previousDate:prev,
-      currentCoverage:1,previousCoverage:1}}
+    level,state,date:'2026-11-13',changes:{7:{percent:pct,eligible,markets,previousDate:prev,
+      currentDate:'2026-11-13',days:7,actualDays:7,previous:100,current:100+pct,rmDifference:pct,
+      currentMarkets:markets,previousMarkets:markets,currentCoverage:1,previousCoverage:1}}
   });
   const quotes=[
     make('TOMATO','Runcit',11.44),
@@ -386,8 +406,9 @@ test('daily content board selects actual eligible nationwide rises and falls, wi
   const post=buildMarketPostIdea(analysis.rise,7,'2026-11-13');
   assert.match(post,/TOMATO NAIK \+11\.4%/);
   assert.match(post,/2026-11-13 berbanding 2026-11-06/);
-  assert.match(post,/16 lokasi pasaran yang sama/);
-  assert.match(post,/bukan harga tetap atau bukti keuntungan petani/);
+  assert.match(post,/16 pasaran yang sama/);
+  assert.match(post,/RM100\.00\/kg.+RM111\.44\/kg/);
+  assert.doesNotMatch(post,/petani (pasti|dah) untung/i);
   assert.equal(buildMarketPostIdea(analysis.extreme,7,'2026-11-13'),'');
   assert.equal(buildMarketPostIdea(quotes[5],7,'2026-11-13'),'');
   assert.equal(buildMarketPostIdea(quotes[6],7,'2026-11-13'),'');
@@ -395,8 +416,10 @@ test('daily content board selects actual eligible nationwide rises and falls, wi
 
 test('daily content board spots all three level aligned trends using same product grade and unit',()=>{
   const q=(name,level,pct,unit='Kilogram')=>({
-    varieti:name,gred:'F.A.Q',unit,product_key:name+'||F.A.Q||'+unit,state:'',
-    level,changes:{30:{eligible:true,percent:pct,markets:9,previousDate:'2026-10-14'}}
+    varieti:name,gred:'F.A.Q',unit,product_key:name+'||F.A.Q||'+unit,state:'',date:'2026-11-13',
+    level,changes:{30:{eligible:true,percent:pct,markets:9,previousDate:'2026-10-14',
+      currentDate:'2026-11-13',days:30,actualDays:30,previous:100,current:100+pct,rmDifference:pct,
+      currentMarkets:9,previousMarkets:9,currentCoverage:1,previousCoverage:1}}
   });
   const rows=[
     q('TIMUN HIJAU','Ladang',41),q('TIMUN HIJAU','Borong',28),q('TIMUN HIJAU','Runcit',21),
@@ -426,4 +449,76 @@ test('daily editorial guards an extreme increase, mismatched levels, and non-pri
   assert.equal(analysis.aligned,null);
   assert.equal(buildMarketPostIdea(one(0),1,'2026-11-13'),'');
   assert.equal(buildMarketPostIdea(null,1,'2026-11-13'),'');
+});
+
+test('pinned archived comparisons reconcile browser means, market rows and display rounding',()=>{
+  const fixture=JSON.parse(readFileSync(new URL('./fixtures/v34_archive_comparisons.json',import.meta.url),'utf8'));
+  const meta=JSON.parse(readFileSync(new URL('../site/data/meta.json',import.meta.url),'utf8'));
+  const archiveDates=meta.archive_dates.filter(day=>day<=fixture.current_date);
+  const rows=new Map(archiveComparisonDates(archiveDates,fixture.current_date).map(day=>[day,
+    parseCSV(readFileSync(new URL('../data/daily/'+day+'.csv',import.meta.url),'utf8'),day)]));
+  const snapshot=buildPriceDateSnapshot(rows,{surveyDate:fixture.current_date,
+    archiveDates,supersededByDate:meta.superseded_priceids});
+  for(const expected of fixture.comparisons){
+    const quote=snapshot.prices.find(q=>q.state===''&&q.level===expected.level&&
+      q.product_key===[expected.product,fixture.grade,fixture.unit].join('||'));
+    const c=comparisonEvidence(quote,30);
+    assert.ok(c,expected.product+' '+expected.level);
+    assert.equal(c.previousDate,fixture.previous_date);
+    assert.equal(c.currentDate,fixture.current_date);
+    assert.equal(c.actualDays,30);
+    assert.equal(c.markets,expected.markets);
+    assert.ok(Math.abs(c.previousMean-expected.previous)<1e-9);
+    assert.ok(Math.abs(c.currentMean-expected.current)<1e-9);
+    assert.ok(Math.abs(c.percent-expected.percent)<1e-8);
+    assert.equal(formatPercent(c.percent),expected.display);
+    assert.notEqual(c.currentMean,quote.price,'comparison is based on paired prices');
+    const details=comparisonMarketDetails(rows,c,meta.superseded_priceids);
+    assert.equal(details.details.length,c.markets);
+    for(const field of ['previous','current']){
+      const equalWeight=details.details.reduce((sum,m)=>sum+m[field+'Mean'],0)/c.markets;
+      assert.ok(Math.abs(equalWeight-c[field+'Mean'])<1e-12);
+    }
+    assert.throws(()=>comparisonMarketDetails(rows,{...c,markets:c.markets+1},meta.superseded_priceids),/对账/);
+  }
+});
+
+test('market details preserve sublevels, location punctuation, latest duplicates and zero prices',()=>{
+  const old='2026-11-05',day='2026-11-06';
+  const markets=[{location:'A||B',sublevel:'C'},{location:'A',sublevel:'B||C'},
+    {location:'A',sublevel:'other'}];
+  const rows=new Map([
+    [old,[...markets.map((market,i)=>marketRow('old'+i,{date:old,...market,price:String(i*4)})),
+      marketRow('moved',{date:old,...markets[2],price:'999'})]],
+    [day,[marketRow('new0',{date:day,...markets[0],price:'999'}),
+      ...markets.map((market,i)=>marketRow('new'+i,{date:day,...market,price:String(i*6)})),
+      marketRow('moved',{date:day,...markets[2],price:'12'}),
+      marketRow('retail',{date:day,...markets[0],level:'Runcit',price:'999'})]]
+  ]);
+  const supersededByDate={[old]:['moved']};
+  const snapshot=buildPriceDateSnapshot(rows,{surveyDate:day,archiveDates:[old,day],supersededByDate});
+  const c=comparisonEvidence(snapshot.prices.find(q=>!q.state&&q.level==='Borong'),1);
+  assert.equal(c.markets,3);
+  assert.equal(c.previousMean,4);
+  assert.equal(c.currentMean,6);
+  const {details}=comparisonMarketDetails(rows,c,supersededByDate);
+  assert.deepEqual(details.map(m=>[m.location,m.sublevel,m.previousMean,m.currentMean,
+    m.previousObservations,m.currentObservations]),[
+    ['A||B','C',0,0,1,1],['A','B||C',4,6,1,1],['A','other',8,12,1,2]
+  ]);
+  assert.equal(details[0].percent,null);
+});
+
+test('streaks use the same three or more markets across every observation date',()=>{
+  const days=['2026-11-09','2026-11-11','2026-11-13'];
+  const rows=new Map(days.map((day,i)=>[day,[
+    ...['A','B','C'].map(name=>marketRow(day+name,{date:day,location:name,price:String(10+i)})),
+    marketRow(day+'D',{date:day,location:'D'+i,price:String(1000-i*300)})
+  ]]));
+  const [trend]=matchedMarketStreaks(rows);
+  assert.equal(trend.direction,'rise');
+  assert.equal(trend.markets,3);
+  assert.deepEqual(trend.points,days.map((date,i)=>({date,price:10+i})));
+  rows.get(days[0]).splice(2,1);
+  assert.deepEqual(matchedMarketStreaks(rows),[]);
 });

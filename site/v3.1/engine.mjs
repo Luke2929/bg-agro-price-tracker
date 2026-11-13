@@ -5,10 +5,78 @@ export const FAMA_COLUMNS = [
   'harga','average14','supply'
 ];
 export const PRICE_LEVELS = ['Ladang','Borong','Runcit'];
+const COMPARISON_WINDOWS = {1:6,7:4,30:7};
+const MARKET_FIELDS = ['negeri','daerah','lokasi','sublevel'];
+const DECIMAL_PRICE = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
 
 // Keep V3.1's browser identity identical to scraper.market_math.product_key.
 export function productIdentity(row) {
-  return ['varieti','gred','unit'].map(key=>String(row?.[key]??'').trim()).join('||');
+  return ['varieti','gred','unit'].map(key=>
+    String(row?.[key]??'').trim().replaceAll('%','%25').replaceAll('|','%7C')).join('||');
+}
+
+function addMarket(markets,row,price){
+  const identity=MARKET_FIELDS.map(key=>String(row[key]??'').trim());
+  const key=JSON.stringify(identity);
+  const bucket=markets.get(key)||{identity,sum:0,count:0};
+  bucket.sum+=price;
+  bucket.count++;
+  markets.set(key,bucket);
+}
+
+function marketMean(markets){
+  return [...markets.values()].reduce((sum,bucket)=>sum+bucket.sum/bucket.count,0)/markets.size;
+}
+
+function marketGroups(rows){
+  const levels=new Map();
+  for(const row of rows){
+    const price=validPrice(row.harga),level=String(row.peringkat??'').trim();
+    if(price===null||!PRICE_LEVELS.includes(level)||!String(row.varieti??'').trim())continue;
+    const product=productIdentity(row);
+    if(!levels.has(level))levels.set(level,new Map());
+    const products=levels.get(level);
+    if(!products.has(product))products.set(product,new Map());
+    addMarket(products.get(product),row,price);
+  }
+  return levels;
+}
+
+function marketsInScope(markets,state){
+  return state&&markets?new Map([...markets].filter(([,bucket])=>bucket.identity[0]===state)):markets;
+}
+
+function matchedMarketStats(current,previous,includeDetails=false){
+  if(!current?.size||!previous?.size)return null;
+  let count=0,currentTotal=0,previousTotal=0;
+  const details=[];
+  for(const [key,now] of current){
+    const before=previous.get(key);
+    if(!before)continue;
+    const currentMean=now.sum/now.count,previousMean=before.sum/before.count;
+    currentTotal+=currentMean;
+    previousTotal+=previousMean;
+    count++;
+    if(includeDetails){
+      const [state,district,location,sublevel]=now.identity;
+      const difference=currentMean-previousMean;
+      details.push({state,district,location,sublevel,currentMean,previousMean,difference,
+        percent:previousMean>0?difference/previousMean*100:null,
+        currentObservations:now.count,previousObservations:before.count});
+    }
+  }
+  if(!count||previousTotal<=0)return null;
+  const now=currentTotal/count,before=previousTotal/count;
+  const rmDifference=now-before,rawPercent=rmDifference/before*100;
+  const currentCoverage=count/current.size,previousCoverage=count/previous.size;
+  return {
+    current:now,previous:before,rmDifference,rawPercent,
+    percent:Math.abs(rawPercent)<0.05?0:rawPercent,
+    markets:count,currentMarkets:current.size,previousMarkets:previous.size,
+    currentCoverage,previousCoverage,
+    eligible:count>=3&&currentCoverage>=0.5&&previousCoverage>=0.5,
+    ...(includeDetails?{details}:{})
+  };
 }
 
 // Apply the same latest-in-file priceid rule as the Python archive canonicalizer.
@@ -27,8 +95,8 @@ export function canonicalDailyRows(rows, excludedPriceIds=[]) {
 
 export function productAreaRows(rows, {productKey,state='',district='',location='',excludedPriceIds=[]}={}) {
   return canonicalDailyRows(rows,excludedPriceIds).filter(row=>
-    productIdentity(row)===productKey&&(!state||row.negeri===state)&&
-    (!district||row.daerah===district)&&(!location||row.lokasi===location));
+    productIdentity(row)===productKey&&(!state||String(row.negeri??'').trim()===state)&&
+    (!district||String(row.daerah??'').trim()===district)&&(!location||String(row.lokasi??'').trim()===location));
 }
 
 // A single distinct market votes once, even when multiple FAMA entries exist.
@@ -39,16 +107,12 @@ export function localLevelPrices(rows) {
     const price=validPrice(row.harga),level=String(row.peringkat??'').trim();
     if(price===null||!PRICE_LEVELS.includes(level))continue;
     if(!byLevel.has(level))byLevel.set(level,new Map());
-    const markets=byLevel.get(level);
-    const market=['negeri','daerah','lokasi','sublevel'].map(k=>String(row[k]??'').trim()).join('||');
-    const bucket=markets.get(market)||{sum:0,count:0};
-    bucket.sum+=price;bucket.count++;markets.set(market,bucket);
+    addMarket(byLevel.get(level),row,price);
   }
   return PRICE_LEVELS.map(level=>{
     const markets=byLevel.get(level);
     if(!markets?.size)return {level,price:null,markets:0,observations:0};
-    const averages=[...markets.values()].map(v=>v.sum/v.count);
-    return {level,price:averages.reduce((a,b)=>a+b,0)/averages.length,
+    return {level,price:marketMean(markets),
       markets:markets.size,observations:[...markets.values()].reduce((sum,v)=>sum+v.count,0)};
   });
 }
@@ -85,6 +149,12 @@ export function fmtDate(iso) {
   return /^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? iso : '—';
 }
 
+export function isValidISODate(day){
+  if(typeof day!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(day)||day.startsWith('0000'))return false;
+  const timestamp=Date.parse(day+'T00:00:00Z');
+  return Number.isFinite(timestamp)&&new Date(timestamp).toISOString().slice(0,10)===day;
+}
+
 export function ageDays(iso, today) {
   const a = Date.parse(`${iso}T00:00:00Z`), b = Date.parse(`${today}T00:00:00Z`);
   return Number.isFinite(a) && Number.isFinite(b) ? Math.floor((b-a)/86400000) : null;
@@ -100,6 +170,91 @@ export function mytDate(now = new Date()) {
 export function quoteChange(quote, period) {
   const changed = quote?.changes?.[String(period)];
   return changed?.eligible && Number.isFinite(changed.percent) ? changed : null;
+}
+
+function equalNumber(a,b){
+  return Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=1e-9*Math.max(1,Math.abs(b));
+}
+
+// Public claims use these paired-market prices, never the quote's all-market price.
+export function comparisonEvidence(quote,period,surveyDate=quote?.date){
+  const change=quoteChange(quote,period);
+  if(!change||![1,7,30].includes(period)||!isValidISODate(surveyDate)||
+    !isValidISODate(change.previousDate)||change.currentDate!==surveyDate||
+    quote.date!==surveyDate||change.days!==period||
+    typeof quote.state!=='string'||!quote.varieti||typeof quote.gred!=='string'||!quote.unit||
+    !PRICE_LEVELS.includes(quote.level)||quote.product_key!==productIdentity(quote))return null;
+  const {previous,current,rmDifference,percent,markets,currentMarkets,previousMarkets}=change;
+  const actualDays=ageDays(change.previousDate,surveyDate);
+  if(actualDays!==change.actualDays||actualDays<period||actualDays>period+COMPARISON_WINDOWS[period]||
+    !Number.isInteger(markets)||markets<3||!Number.isInteger(currentMarkets)||
+    !Number.isInteger(previousMarkets)||currentMarkets<markets||previousMarkets<markets||
+    markets/currentMarkets<0.5||markets/previousMarkets<0.5||
+    !equalNumber(change.currentCoverage,markets/currentMarkets)||
+    !equalNumber(change.previousCoverage,markets/previousMarkets)||
+    !Number.isFinite(previous)||previous<=0||!Number.isFinite(current)||current<0)return null;
+  const rawPercent=(current-previous)/previous*100;
+  if(!equalNumber(rmDifference,current-previous)||
+    !equalNumber(percent,Math.abs(rawPercent)<0.05?0:rawPercent)||
+    (change.rawPercent!==undefined&&!equalNumber(change.rawPercent,rawPercent)))return null;
+  return {
+    productKey:quote.product_key,product:quote.varieti,grade:quote.gred,unit:quote.unit,
+    level:quote.level,region:quote.state,period,actualDays,
+    currentDate:surveyDate,previousDate:change.previousDate,
+    currentMean:current,previousMean:previous,rmDifference,percent,markets,
+    currentMarkets,previousMarkets,currentCoverage:change.currentCoverage,
+    previousCoverage:change.previousCoverage
+  };
+}
+
+export function comparisonMarketDetails(rowsByDate,evidence,supersededByDate={}){
+  const {currentDate,previousDate,level,productKey,region}=evidence;
+  if(!isValidISODate(previousDate)||!isValidISODate(currentDate)||previousDate>=currentDate||
+    ageDays(previousDate,currentDate)!==evidence.actualDays||
+    productIdentity({varieti:evidence.product,gred:evidence.grade,unit:evidence.unit})!==productKey||
+    typeof region!=='string'||!PRICE_LEVELS.includes(level))
+    throw Error('比较日期、产品或层级无法核对。');
+  const marketsFor=day=>{
+    const raw=rowsByDate.get(day);
+    if(!Array.isArray(raw)||raw.some(row=>row.tarikh_harga!==day))
+      throw Error(day+' 原始调查记录缺失或日期不一致。');
+    const rows=canonicalDailyRows(raw,supersededByDate[day]||[]);
+    return marketsInScope(marketGroups(rows).get(level)?.get(productKey),region);
+  };
+  const result=matchedMarketStats(marketsFor(currentDate),marketsFor(previousDate),true);
+  if(!result?.eligible||result.markets!==evidence.markets||
+    result.currentMarkets!==evidence.currentMarkets||result.previousMarkets!==evidence.previousMarkets||
+    !equalNumber(result.current,evidence.currentMean)||!equalNumber(result.previous,evidence.previousMean)||
+    !equalNumber(result.rmDifference,evidence.rmDifference)||!equalNumber(result.percent,evidence.percent))
+    throw Error('原始市场均价未能与比较结果对账。请刷新数据后重试。');
+  return result;
+}
+
+// Use one common market set across the whole sequence, with adequate coverage
+// on each observed date. These are research signals, separate from 1/7/30D.
+export function matchedMarketStreaks(rowsByDate,{state='',supersededByDate={}}={}){
+  const dates=[...rowsByDate.keys()].sort();
+  if(dates.length<3)return [];
+  const days=dates.map(day=>marketGroups(canonicalDailyRows(rowsByDate.get(day),supersededByDate[day]||[])));
+  const trends=[];
+  for(const [level,products] of days.at(-1)){
+    for(const [productKey] of products){
+      const markets=days.map(day=>marketsInScope(day.get(level)?.get(productKey),state));
+      if(markets.some(day=>!day?.size))continue;
+      const keys=[...markets.at(-1).keys()].filter(key=>markets.every(day=>day.has(key)));
+      if(keys.length<3||markets.some(day=>keys.length/day.size<0.5))continue;
+      const prices=markets.map(day=>marketMean(new Map(keys.map(key=>[key,day.get(key)]))));
+      const moves=prices.slice(1).map((price,index)=>
+        prices[index]>0?(price-prices[index])/prices[index]*100:NaN);
+      const rising=moves.every(move=>move>=0.05&&move<50);
+      const falling=moves.every(move=>move<=-0.05&&move>-50);
+      if(!rising&&!falling)continue;
+      trends.push({productKey,level,markets:keys.length,direction:rising?'rise':'fall',
+        points:dates.map((date,index)=>({date,price:prices[index]})),
+        strength:Math.min(...moves.map(Math.abs))});
+    }
+  }
+  return trends.sort((a,b)=>b.strength-a.strength||b.markets-a.markets);
 }
 
 export function rankMovers(prices, period, direction, limit = 5) {
@@ -152,37 +307,6 @@ export function dailyStorySignals(prices,period=1) {
   };
 }
 
-// A short, sourced Malay-language discussion starter; never invent causes,
-// farm profit, a grower's testimony or an exact calendar-day gap.
-export function buildMarketPostIdea(quote,period,surveyDate) {
-  const change=quoteChange(quote,period);
-  if(!change||!surveyDate||quote.state!==''||Math.abs(change.percent)>=50||change.percent===0)
-    return '';
-  const direction=change.percent>0?'NAIK':'TURUN';
-  const sign=change.percent>0?'+':'';
-  const dateLabel=surveyDate+' berbanding '+change.previousDate;
-  const scope=quote.level==='Ladang'?'ladang':
-    quote.level==='Borong'?'borong':'runcit';
-  return [
-    'HARGA '+quote.varieti+' '+direction+' '+sign+change.percent.toFixed(1)+'% — APA CERITA DI TEMPAT ANDA?',
-    '',
-    'Saya semak data tinjauan FAMA bagi '+dateLabel+'.',
-    'Untuk '+quote.varieti+' ('+quote.gred+', '+quote.unit+
-      '), purata harga peringkat '+scope+' berubah '+sign+
-      change.percent.toFixed(1)+'% berdasarkan '+change.markets+
-      ' lokasi pasaran yang sama pada dua tarikh tersebut.',
-    '',
-    'Petani dan peniaga di kawasan anda nampak perubahan yang sama tak? '+
-      'Macam mana dengan kos dan harga jual sebenar sekarang?',
-    '',
-    'Sumber: FAMA AMI | Tarikh harga: '+surveyDate+
-      ' | Perbandingan '+period+' hari (tarikh rujukan sebenar: '+
-      change.previousDate+').',
-    'Nota: Purata tinjauan, bukan harga tetap atau bukti keuntungan petani. '+
-      'Keadaan setempat mungkin berbeza.'
-  ].join('\n');
-}
-
 export function filterQuotes(prices, {search='',level='',state='',category=''}={}) {
   const needle=search.trim().toLocaleUpperCase();
   return prices.filter(p=>p.state===state && (!level||p.level===level) &&
@@ -213,7 +337,7 @@ export function sortQuotesByChange(quotes,{period=7,order='name'}={}) {
 // the other levels remain visible for context (even if their direction differs).
 export function groupQuotesByProduct(quotes,{period=7,order='name'}={}) {
   const keyOf=p=>JSON.stringify([
-    p.product_key||[p.varieti,p.gred,p.unit].map(v=>String(v??'').trim()).join('||'),
+    p.product_key||productIdentity(p),
     String(p.state??'')
   ]);
   const groups=new Map();
@@ -251,9 +375,8 @@ export function groupQuotesByProduct(quotes,{period=7,order='name'}={}) {
 export function archiveComparisonDates(archiveDates, surveyDate) {
   if(!Array.isArray(archiveDates)||!archiveDates.includes(surveyDate))return [];
   const needed=new Set([surveyDate]);
-  const periods={1:6,7:4,30:7};
   const available=new Set(archiveDates);
-  for(const [daysText,backtrack] of Object.entries(periods)){
+  for(const [daysText,backtrack] of Object.entries(COMPARISON_WINDOWS)){
     const days=Number(daysText);
     for(let step=days;step<=days+backtrack;step++){
       const date=shiftSurveyDate(surveyDate,-step);
@@ -264,9 +387,8 @@ export function archiveComparisonDates(archiveDates, surveyDate) {
 }
 
 export function shiftSurveyDate(iso,deltaDays) {
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))throw Error('FAMA 调查日期格式无效');
+  if(!isValidISODate(iso))throw Error('FAMA 调查日期无效');
   const instant=Date.parse(iso+'T12:00:00Z');
-  if(!Number.isFinite(instant))throw Error('FAMA 调查日期无效');
   return new Date(instant+deltaDays*86400000).toISOString().slice(0,10);
 }
 
@@ -292,26 +414,16 @@ export function buildPriceDateSnapshot(rowsByDate,{surveyDate,archiveDates,super
     if(raw.some(row=>row.tarikh_harga!==day))
       throw Error(day+' 原始 CSV 存在调查日期不匹配');
     const canonical=canonicalDailyRows(raw,supersededByDate[day]||[]);
-    const levels=new Map();
-    days.set(day,levels);
+    days.set(day,marketGroups(canonical));
+    if(day!==surveyDate)continue;
+    latestRows=canonical.length;
     for(const row of canonical){
-      if(day===surveyDate)latestRows++;
       const price=validPrice(row.harga),level=String(row.peringkat||'').trim(),
         variety=String(row.varieti||'').trim();
       if(price===null||!PRICE_LEVELS.includes(level)||!variety)continue;
-      if(day===surveyDate)validLatestRows++;
+      validLatestRows++;
       const product=productIdentity(row);
       const state=String(row.negeri||'').trim();
-      const market=['negeri','daerah','lokasi','sublevel']
-        .map(key=>String(row[key]??'').trim()).join('||');
-      if(!levels.has(level))levels.set(level,new Map());
-      const products=levels.get(level);
-      if(!products.has(product))products.set(product,new Map());
-      const locations=products.get(product);
-      const bucket=locations.get(market)||{sum:0,count:0};
-      bucket.sum+=price;bucket.count++;
-      locations.set(market,bucket);
-      if(day!==surveyDate)continue;
       if(!labels.has(product))labels.set(product,{
         product_key:product,varieti:variety,
         gred:String(row.gred||'').trim(),unit:String(row.unit||'').trim()
@@ -328,49 +440,18 @@ export function buildPriceDateSnapshot(rowsByDate,{surveyDate,archiveDates,super
     }
   }
 
-  const scopedMarkets=(day,level,product,state)=>{
-    const all=days.get(day)?.get(level)?.get(product);
-    if(!all)return null;
-    if(!state)return all;
-    const prefix=state+'||';
-    const selected=new Map([...all].filter(([key])=>key.startsWith(prefix)));
-    return selected.size?selected:null;
-  };
-  const averageFor=(markets)=>{
-    const averages=[...markets.values()].map(bucket=>bucket.sum/bucket.count);
-    return averages.reduce((a,b)=>a+b,0)/averages.length;
-  };
+  const scopedMarkets=(day,level,product,state)=>marketsInScope(days.get(day)?.get(level)?.get(product),state);
   const compare=(group,period)=>{
     const current=scopedMarkets(surveyDate,group.level,group.product,group.state);
     if(!current?.size)return null;
     const target=shiftSurveyDate(surveyDate,-period);
-    const backtrack={1:6,7:4,30:7}[period];
-    const earliest=shiftSurveyDate(target,-backtrack);
+    const earliest=shiftSurveyDate(target,-COMPARISON_WINDOWS[period]);
     for(const previousDate of needed){
       if(previousDate>target||previousDate<earliest)continue;
       const previous=scopedMarkets(previousDate,group.level,group.product,group.state);
-      if(!previous?.size)continue;
-      let matched=0,nowTotal=0,oldTotal=0;
-      for(const [key,now] of current){
-        const before=previous.get(key);
-        if(!before||!now.count||!before.count)continue;
-        nowTotal+=now.sum/now.count;
-        oldTotal+=before.sum/before.count;
-        matched++;
-      }
-      if(!matched)continue;
-      const nowMean=nowTotal/matched,oldMean=oldTotal/matched;
-      if(oldMean<=0)continue;
-      const rawPercent=(nowMean-oldMean)/oldMean*100;
-      return {
-        current:nowMean,previous:oldMean,rmDifference:nowMean-oldMean,
-        percent:Math.abs(rawPercent)<0.05?0:rawPercent,
-        markets:matched,currentDate:surveyDate,previousDate,
-        days:period,actualDays:Math.round((Date.parse(surveyDate)-Date.parse(previousDate))/86400000),
-        currentMarkets:current.size,previousMarkets:previous.size,
-        currentCoverage:matched/current.size,previousCoverage:matched/previous.size,
-        eligible:matched>=3&&matched/current.size>=0.5&&matched/previous.size>=0.5
-      };
+      const result=matchedMarketStats(current,previous);
+      if(result)return {...result,currentDate:surveyDate,previousDate,days:period,
+        actualDays:ageDays(previousDate,surveyDate)};
     }
     return null;
   };
@@ -385,7 +466,7 @@ export function buildPriceDateSnapshot(rowsByDate,{surveyDate,archiveDates,super
     if(group.state)states.add(group.state);
     prices.push({
       ...label,kategori:category,level:group.level,state:group.state,
-      date:surveyDate,price:averageFor(markets),
+      date:surveyDate,price:marketMean(markets),
       observations:group.rows.length,markets:markets.size,
       changes:Object.fromEntries([1,7,30].map(period=>[String(period),compare(group,period)]))
     });
@@ -417,67 +498,84 @@ export function statePrices(prices, productKey, level) {
     .sort((a,b)=>b.price-a.price);
 }
 
-export function parseCSV(input) {
+export function parseCSV(input,expectedDate) {
   const text=String(input??'').replace(/^\uFEFF/,'');
-  const output=[];let headers=null,positions=[],cells=[],field='',quoted=false;
+  const output=[];
+  let positions=null,cells=[],field='',mode='plain',record=1;
+  const fail=message=>{throw Error('FAMA CSV 第 '+record+' 条记录：'+message);};
   const finish=()=>{
-    cells.push(field);field='';
-    if(cells.every(value=>value==='')){cells=[];return;}
-    if(headers===null){
-      headers=cells.map(v=>v.trim().toLowerCase());
-      const required=['priceid','tarikh_harga','negeri','lokasi','peringkat','varieti','gred','unit','harga'];
-      if(required.some(name=>!headers.includes(name))) throw Error('FAMA CSV 缺少必需字段');
+    if(!cells.length&&!field&&mode==='plain')return;
+    cells.push(field);
+    if(positions===null){
+      const headers=cells.map(v=>v.trim().toLowerCase());
+      if(headers.length!==FAMA_COLUMNS.length||FAMA_COLUMNS.some(name=>!headers.includes(name)))
+        fail('缺少必需字段、字段重复或列数不符。');
       positions=FAMA_COLUMNS.map(name=>headers.indexOf(name));
     }else{
-      const item={};
-      FAMA_COLUMNS.forEach((name,i)=>item[name]=positions[i]<0?'':String(cells[positions[i]]??'').trim());
+      if(cells.length!==FAMA_COLUMNS.length)fail('列数不符。');
+      const item=Object.fromEntries(FAMA_COLUMNS.map((name,i)=>[name,cells[positions[i]]]));
+      if(!isValidISODate(item.tarikh_harga)||(expectedDate&&item.tarikh_harga!==expectedDate))
+        fail('调查日期无效或与档案日期不一致。');
       output.push(item);
     }
     cells=[];
+    field='';
+    mode='plain';
+    record++;
   };
   for(let i=0;i<text.length;i++){
     const ch=text[i];
-    if(quoted){if(ch==='"'&&text[i+1]==='"'){field+='"';i++;}else if(ch==='"') quoted=false;else field+=ch;}
-    else if(ch==='"') quoted=true;else if(ch===','){cells.push(field);field='';}
-    else if(ch==='\r'||ch==='\n'){finish();if(ch==='\r'&&text[i+1]==='\n')i++;}
+    if(mode==='quoted'){
+      if(ch==='"'&&text[i+1]==='"'){field+='"';i++;}
+      else if(ch==='"')mode='closed';
+      else field+=ch;
+    }else if(ch===','){
+      cells.push(field);field='';mode='plain';
+    }else if(ch==='\r'||ch==='\n'){
+      finish();
+      if(ch==='\r'&&text[i+1]==='\n')i++;
+    }else if(mode==='closed'||(ch==='"'&&field)){
+      fail('引号位置无效。');
+    }else if(ch==='"')mode='quoted';
     else field+=ch;
   }
-  if(quoted)throw Error('FAMA CSV 引号未正确闭合');
-  if(field!==''||cells.length)finish();
+  if(mode==='quoted')fail('引号未正确闭合。');
+  finish();
+  if(positions===null)fail('缺少必需字段。');
   return output;
 }
 
 export function validPrice(value) {
-  if(String(value??'').trim()==='')return null;
-  const number=Number(value);
+  const text=String(value??'').trim();
+  if(!DECIMAL_PRICE.test(text))return null;
+  const number=Number(text);
   return Number.isFinite(number)&&number>=0 ? number : null;
 }
 
 export function summarizeRows(rows, supersededByDate = {}) {
-  const excluded = new Set(Object.entries(supersededByDate).flatMap(([date,ids])=>
-    (Array.isArray(ids)?ids:[]).map(id=>`${date}|${id}`)));
-  const seen = new Set();
+  const days=new Map();
+  for(const row of rows){
+    if(!isValidISODate(row.tarikh_harga))continue;
+    if(!days.has(row.tarikh_harga))days.set(row.tarikh_harga,[]);
+    days.get(row.tarikh_harga).push(row);
+  }
   const groups = new Map();
-  for(const r of rows){
-    const date=r.tarikh_harga,id=String(r.priceid||'');
-    if(id && (excluded.has(`${date}|${id}`)||seen.has(`${date}|${id}`)))continue;
-    if(id)seen.add(`${date}|${id}`);
-    const price=validPrice(r.harga);
-    if(price===null||!date||!r.varieti||!['Ladang','Borong','Runcit'].includes(r.peringkat))continue;
-    const groupKey=[date,r.varieti,r.gred,r.unit,r.peringkat,r.negeri].join('\u001F');
-    const marketKey=[r.negeri,r.daerah,r.lokasi,r.sublevel].join('\u001F');
-    if(!groups.has(groupKey))groups.set(groupKey,{r,markets:new Map()});
-    const markets=groups.get(groupKey).markets;
-    const bucket=markets.get(marketKey)||{sum:0,count:0};
-    bucket.sum+=price;bucket.count++;markets.set(marketKey,bucket);
+  for(const [date,raw] of days){
+    for(const r of canonicalDailyRows(raw,supersededByDate[date]||[])){
+      const price=validPrice(r.harga),level=String(r.peringkat??'').trim();
+      const state=String(r.negeri??'').trim();
+      if(price===null||!String(r.varieti??'').trim()||!PRICE_LEVELS.includes(level))continue;
+      const groupKey=JSON.stringify([date,productIdentity(r),level,state]);
+      if(!groups.has(groupKey))groups.set(groupKey,{r,level,state,markets:new Map()});
+      addMarket(groups.get(groupKey).markets,r,price);
+    }
   }
   const output=[];
-  for(const {r,markets} of groups.values()){
-    const averages=[...markets.values()].map(m=>m.sum/m.count);
+  for(const {r,level,state,markets} of groups.values()){
     output.push({
       date:r.tarikh_harga,varieti:r.varieti,gred:r.gred,unit:r.unit,
-      level:r.peringkat,state:r.negeri,price:averages.reduce((a,b)=>a+b,0)/averages.length,
-      markets:averages.length,observations:[...markets.values()].reduce((n,m)=>n+m.count,0),
+      level,state,price:marketMean(markets),
+      markets:markets.size,observations:[...markets.values()].reduce((n,m)=>n+m.count,0),
       category:r.kategori
     });
   }

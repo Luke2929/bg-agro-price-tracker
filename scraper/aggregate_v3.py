@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 
 from .aggregate import DEFAULT_DAILY_DIR, canonicalize_rows, read_rows, LEVELS
-from .market_math import MatchedMarketComparator, market_average, product_key, valid_price
+from .market_math import MatchedMarketComparator, market_average, market_key, product_key, valid_price
 
 DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "site/data/v3/overview.json"
 LOOKBACK_DAYS = 38  # 30D target + up to 7 older calendar days
@@ -29,7 +29,7 @@ def build_overview(archived_rows: list[dict], survey_date: str | None = None) ->
     result includes *only* products actually surveyed on ``survey_date``;
     consumers must not claim absent products had a same-day quote.
     """
-    canonical, superseded = canonicalize_rows(archived_rows)
+    canonical, _ = canonicalize_rows(archived_rows)
     observed_dates = sorted({r.get("tarikh_harga", "") for r in canonical if r.get("tarikh_harga")})
     if not observed_dates:
         raise ValueError("The canonical archive has no survey dates")
@@ -101,7 +101,7 @@ def build_overview(archived_rows: list[dict], survey_date: str | None = None) ->
         "first_archived_date": observed_dates[0],
         "archived_rows": len(archived_rows),
         "canonical_rows": len(canonical),
-        "superseded_rows": sum(map(len, superseded.values())),
+        "superseded_rows": len(archived_rows) - len(canonical),
         "latest_survey_rows": raw_latest,
         "valid_latest_rows": sum(1 for r in recent if r.get("tarikh_harga") == latest_date
                                  and valid_price(r.get("harga")) is not None),
@@ -122,7 +122,7 @@ def build_history(archived_rows: list[dict]) -> tuple[dict, dict[str, dict]]:
     canonical, _superseded = canonicalize_rows(archived_rows)
     # Bucket prices by actual market; multiple observations within one location
     # first average together before locations receive one vote apiece.
-    buckets: dict[str, dict[tuple[str, str, str], dict[str, list[float]]]] = defaultdict(
+    buckets: dict[str, dict[tuple[str, str, str], dict[tuple[str, ...], list[float]]]] = defaultdict(
         lambda: defaultdict(dict)
     )
     labels: dict[str, dict] = {}
@@ -139,9 +139,7 @@ def build_history(archived_rows: list[dict]) -> tuple[dict, dict[str, dict]]:
             "unit": (row.get("unit") or "").strip(),
             "kategori": (row.get("kategori") or "").strip(),
         })
-        market = "||".join(str(row.get(k) or "") for k in (
-            "negeri", "daerah", "lokasi", "sublevel"
-        ))
+        market = market_key(row)
         # National counts all distinct surveyed markets; state-level breakdown
         # uses precisely the same observations, not the mean of state means.
         state = (row.get("negeri") or "").strip()

@@ -95,8 +95,10 @@ test('price explorer date selector recalculates historic matched-market comparis
   assert.match(html,/id="price-date"/);
   assert.match(html,/id="price-date-latest"/);
   assert.match(html,/id="price-date-status"/);
-  assert.match(code,/archiveComparisonDates\(store\.meta\.archive_dates,selected\)/);
+  assert.match(code,/const \{archive_dates,superseded_priceids\}=store\.meta/);
+  assert.match(code,/archiveComparisonDates\(archive_dates,selected\)/);
   assert.match(code,/buildPriceDateSnapshot\(archive,/);
+  assert.match(code,/const snapshot=await loadSnapshot\(selected\)/);
   assert.match(code,/store\.priceData=snapshot/);
   assert.match(code,/filterQuotes\(store\.priceData\.prices,filters\(\)\)/);
   assert.match(code,/store\.priceData\.survey_date/);
@@ -117,14 +119,27 @@ test('overview replaces giant promotional hero with FAMA daily story board and c
   assert.doesNotMatch(html,/class="hero"/);
   assert.doesNotMatch(code,/\$\('hero-date'\)/);
   assert.match(code,/renderDailyInsights\(\)/);
-  assert.match(code,/dailyStorySignals\(store\.overview\.prices,period\)/);
-  assert.match(code,/buildMarketPostIdea\(quote,store\.period,store\.overview\.survey_date\)/);
+  assert.match(code,/dailyStorySignals\(data\.prices,period\)/);
+  assert.match(code,/buildMarketPostIdea\(quote,period,data\.survey_date,data\.prices\)/);
+  assert.match(code,/comparisonMarketDetails\(rows,evidence,superseded\)/);
   assert.match(code,/navigator\.clipboard\.writeText\(message\)/);
   assert.match(code,/data-insight-copy=/);
   assert.match(code,/data-insight-view=/);
   assert.match(code,/renderMovers\(\);renderDailyInsights\(\)/,'period buttons remain in sync');
   assert.match(style,/\.insight-board/);
   assert.match(style,/\.insight-aux-grid/);
+});
+
+test('price evidence dialog and public content actions use the shared archive and validation',()=>{
+  for(const id of ['insight-survey-date','creator-signal-date','comparison-dialog','comparison-sort',
+    'creator-source','creator-validation','creator-studio-details'])assert.match(html,new RegExp('id="'+id+'"'));
+  assert.match(html,/<dialog id="comparison-dialog"/);
+  assert.match(html,/class="table-scroll comparison-table"/);
+  const creator=readFileSync(new URL('../site/v3.1/creator-app.mjs',import.meta.url),'utf8');
+  assert.match(creator,/comparisonMarketDetails\(rows,source,superseded\)/);
+  assert.match(creator,/validateCreatorDraft\(draft,verifiedEvidence,options\(\)\)/);
+  assert.match(creator,/if\(!validation\.valid\)throw Error\(validation\.message\)/);
+  assert.match(creator,/makeCard\(verifiedEvidence,platform,options\(\)\.settings\)/);
 });
 
 
