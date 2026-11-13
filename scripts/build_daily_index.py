@@ -5,6 +5,7 @@ Run after CSV changes are committed: python -m scripts.build_daily_index
 """
 
 from dataclasses import dataclass
+from scripts.daily_audit import load_audit, sha256_file
 from datetime import date, datetime
 from pathlib import Path
 import re
@@ -101,12 +102,54 @@ def format_commit_time(timestamp: str) -> str:
     return committed.astimezone(MALAYSIA_TIME).strftime("%Y-%m-%d %H:%M MYT")
 
 
+def render_data_status(filename: str, record: dict | None, archive_dir: Path) -> str:
+    """Report matched source snapshot only if the audited CSV is still identical."""
+    if not isinstance(record, dict):
+        return "⚪ Not audited"
+    expected = record.get("expected")
+    fetched = record.get("fetched")
+    if (
+        not isinstance(expected, int)
+        or isinstance(expected, bool)
+        or expected <= 0
+        or fetched != expected
+        or not isinstance(record.get("csv_sha256"), str)
+    ):
+        return "⚠️ Invalid audit"
+    csv_path = archive_dir / filename
+    if not csv_path.is_file() or sha256_file(csv_path) != record["csv_sha256"]:
+        return "⚠️ Changed since check"
+
+    run_id = record.get("run_id")
+    title = f"FAMA {fetched:,}/{expected:,}"
+    if isinstance(run_id, str) and run_id.isdigit():
+        title = f"[{title}](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/{run_id})"
+    try:
+        checked = format_commit_time(record["verified_at_utc"])
+    except (KeyError, TypeError, ValueError):
+        return "⚠️ Invalid audit"
+
+    # Source columns may be blank even with the correct upstream row count.
+    if record.get("preserved_fields", 0) > 0:
+        return f"⚠️ Source blanks; {title} · {checked}"
+    archive_rows = record.get("archive_rows")
+    retained = (
+        f"; archive {archive_rows:,}"
+        if isinstance(archive_rows, int) and archive_rows > expected
+        else ""
+    )
+    return f"✅ Snapshot matched; {title}{retained} · {checked}"
+
+
 def build_index(
     filenames: list[str],
     commit_info: dict[str, CommitInfo] | None = None,
+    audit: dict | None = None,
+    archive_dir: Path = ARCHIVE_DIR,
 ) -> str:
     """Render actual CSV links in descending date order with Git metadata."""
     commits = commit_info if commit_info is not None else {}
+    verified_dates = audit.get("dates", {}) if isinstance(audit, dict) else {}
     lines = [
         "# FAMA Daily CSV Index — Newest First",
         "",
@@ -120,7 +163,7 @@ def build_index(
         lines.extend([
             f"**Latest archived survey date:** {filenames[0][:-4]}",
             "",
-            "| Name (newest survey date first) | Last commit message | Last commit date (MYT) |",
+            "| Name (newest survey date first) | Last commit message | Last commit date (MYT) | Data status (FAMA snapshot) |",
             "| --- | --- | --- |",
         ])
         for number, filename in enumerate(filenames):
@@ -134,9 +177,10 @@ def build_index(
                     f"({COMMIT_URL}{info.sha})"
                 )
                 committed = format_commit_time(info.timestamp)
+            status_text = render_data_status(filename, verified_dates.get(filename[:-4]), archive_dir)
             lines.append(
                 f"| [{filename}](data/daily/{filename}){label} "
-                f"| {message} | {committed} |"
+                f"| {message} | {committed} | {status_text} |"
             )
     else:
         lines.append("No dated CSV files have been archived.")
@@ -146,8 +190,16 @@ def build_index(
         "> **Data note:** Survey date is taken from the CSV filename. "
         "Last commit message/date describe the most recent Git change to that "
         "file (MYT), **not** the original FAMA publication time or a guarantee "
-        "that the day's observations are complete. GitHub's native file browser "
-        "still uses its own ordering.",
+        "that the day's observations are complete. **✅ Snapshot matched** means "
+        "the scraper fetched the same number of unique, dated `priceid` records "
+        "as FAMA\'s control query at the recorded check, and the archived CSV "
+        "has not changed since. FAMA may add or correct rows later. "
+        "**⚠️ Source blanks** means some source fields were empty and archived "
+        "values were preserved; **⚪ Not audited** means no saved per-day verification "
+        "evidence (especially older dates). A failed Actions run does not erase the "
+        "previous valid audit; [review latest workflow runs]("
+        "https://github.com/Luke2929/bg-agro-price-tracker/actions/workflows/scrape.yml) "
+        "for job failures. GitHub\'s native file browser keeps its own ordering.",
         "",
         "[Open original CSV folder](data/daily/) · "
         "[Open BG Agro Dashboard](https://luke2929.github.io/bg-agro-price-tracker/)",
@@ -157,7 +209,8 @@ def build_index(
 
 
 def main() -> None:
-    content = build_index(archived_csv_names(ARCHIVE_DIR), latest_csv_commits())
+    audit = load_audit(REPO_ROOT / "data" / "fama_fetch_audit.json")
+    content = build_index(archived_csv_names(ARCHIVE_DIR), latest_csv_commits(), audit)
     if not INDEX_FILE.exists() or INDEX_FILE.read_text(encoding="utf-8") != content:
         INDEX_FILE.write_text(content, encoding="utf-8")
         print(f"Updated {INDEX_FILE.name}")
