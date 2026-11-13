@@ -50,6 +50,10 @@ import datetime as _dt
 import os
 import sys
 
+from pathlib import Path
+
+from scripts.daily_audit import persist_verified_fetches
+
 from .powerbi import (
     ENTITY,
     PowerBIClient,
@@ -359,6 +363,10 @@ def run(argv=None) -> int:
     )
     parser.add_argument("--out-dir", default=DEFAULT_OUT_DIR)
     parser.add_argument(
+        "--audit-file", default=os.environ.get("FAMA_AUDIT_FILE"),
+        help="optional JSON source-count evidence manifest (production workflow)",
+    )
+    parser.add_argument(
         "--dates", nargs="*", default=None,
         help="only these YYYY-MM-DD dates (default: every available date)",
     )
@@ -497,6 +505,7 @@ def run(argv=None) -> int:
                 "written": written,
                 "chunked": info["chunked"],
                 "status": status,
+                "preserved_fields": stats.get("preserved_fields", 0),
             }
         )
         print(
@@ -552,6 +561,15 @@ def run(argv=None) -> int:
     # publication boundary across all dates in the production repository.
     for path, prepared in prepared_updates:
         write_csv(path, prepared)
+
+    # Only successful, fully validated source snapshots can receive evidence.
+    # Aborted/mismatched jobs never publish an audit or any new CSV.
+    if args.audit_file and not args.dry_run and table:
+        changed = persist_verified_fetches(
+            Path(args.audit_file), Path(args.out_dir), table,
+            run_id=os.environ.get("GITHUB_RUN_ID"),
+        )
+        print("FAMA fetch audit %s" % ("updated" if changed else "unchanged"))
     return 0
 
 
