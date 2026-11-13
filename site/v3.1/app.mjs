@@ -4,17 +4,20 @@ import {FAMA_COLUMNS,escapeHtml,fmtMoney,fmtDate,ageDays,mytDate,quoteChange,
   validPrice,summarizeRows,PRICE_LEVELS,productAreaRows,productScopePrices,
   productAreaOptions} from './engine.mjs';
 import {buildXlsx,downloadXlsx} from './excel.mjs';
+import {createCreatorWorkspace} from './creator-app.mjs';
 import {buildFamaPdf,downloadPdf} from '../pdf.mjs';
 
 const $=id=>document.getElementById(id);
 const BASE='../data/v3/';
 const RAW_BASE='https://raw.githubusercontent.com/Luke2929/bg-agro-price-tracker/master/data/daily/';
-const PAGE_NAMES={overview:'农价总览',prices:'价格明细',history:'历史与州别',watchlist:'我的关注',export:'Excel / PDF 导出',system:'运行状态',product:'农产品详情'};
+const PAGE_NAMES={overview:'农价总览',prices:'价格明细',history:'历史与州别',watchlist:'我的关注',signals:'选题情报',studio:'内容工作室',calendar:'内容日历与成效',export:'Excel / PDF 导出',system:'运行状态',product:'农产品详情'};
 const store={overview:null,index:null,meta:null,health:null,history:new Map(),page:'overview',
   period:1,visible:40,watch:[],fetching:false,rawCache:new Map(),dailyPending:new Map(),
   priceData:null,priceDateRequest:0,
   detail:{key:null,origin:'prices',rawRows:null,rawError:'',visible:80,rawRequest:0,historyRequest:0}};
 let historyRequestSequence=0;
+const creator=createCreatorWorkspace({getOverview:()=>store.overview,
+  loadHistory:key=>loadHistory(key),notify:alertUser,navigate:page=>navigate(page)});
 
 async function fetchJson(path,refresh=false){
   const response=await fetch(path+(refresh?(path.includes('?')?'&':'?')+'t='+Date.now():''),
@@ -54,6 +57,7 @@ function navigate(page){
   if(page==='export')renderExportDates();
   if(page==='system'){renderHealth();loadGitHubRunHealth();}
   if(page==='product'&&store.detail.key)renderProductDetail();
+  if(['signals','studio','calendar'].includes(page))creator.render(page);
   window.scrollTo({top:0,behavior:'instant'});
 }
 
@@ -787,6 +791,7 @@ async function load(refresh=false){
     selectOptions($('history-product'),list.map(p=>({value:p.product_key,label:productLabel(p)})),{
       defaultValue:list[0]?.product_key||''});
     renderSummary();renderWatchlist();renderExportDates();renderHealth();
+    creator.refresh();
     loadPriceDate();
     if(store.page==='history')await renderHistory();
     if(store.page==='product'&&store.detail.key){
@@ -800,5 +805,5 @@ async function load(refresh=false){
   }finally{$('reload').disabled=false;}
 }
 
-readWatch();bindEvents();load();
+readWatch();bindEvents();creator.bind();load();
 

@@ -102,7 +102,11 @@ jobs:
 
       - name: Run V3 and V3.1 browser-logic tests
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.execution_mode != 'auto')
-        run: node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs
+        run: |
+          node --check site/v3.1/creator-app.mjs
+          node --check site/v3.1/creator-core.mjs
+          node --check site/v3.1/app.mjs
+          node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs tests/test_v34_creator.mjs
 
       - name: Scrape rolling FAMA price window
         env:

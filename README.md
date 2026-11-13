@@ -146,3 +146,14 @@ The Python scraper uses the standard library. The dashboard is a static HTML/Jav
 - **Price observations:** [Federal Agricultural Marketing Authority (FAMA), Malaysia](https://www.fama.gov.my/).
 
 BG Agro is an **independent project** and is **not an official FAMA website** or endorsed by FAMA. Please verify important price or purchasing decisions against the original source and relevant market participants.
+
+
+## Creator Workspace V3.4 — local-first editorial operations
+
+V3.4 is now included in the same public dashboard URL (`/v3.1/`) to preserve existing links while displaying **V3.4** in the application. It adds three creator sections: **选题情报**, **内容工作室**, and **内容日历与成效**. The original FAMA data, scraper, dates, price calculations, download tools, and other routes are unchanged.
+
+- **V3.2 intelligence:** 1/7/30-day matched-market opportunities, region/category/search filters, 100-point transparent priority score, L/B/R aligned or divergent moves, abnormal ±50% review queue, and on-demand observed-average streaks with market-change warning.
+- **V3.3 content studio:** offline, evidence-based BM/Chinese/bilingual text templates (discussion, story, market analysis, short-video voiceover), editable title/body, clipboard copy, and downloadable **1080×1350 Facebook** / **1080×1920 TikTok PNG** survey cards. These are deterministic templates, **not an AI API**, and do not fabricate farmer testimony or causes.
+- **V3.4 calendar and analytics:** draft → planned → manually published workflow, optional scheduled and posted dates/links, local performance metrics (views, engagement, enquiries, joins, orders), top content, CSV summary, full JSON backup and confirm-before-restore.
+
+**Important limitations:** GitHub Pages is a public static site. Creator documents and metrics are stored only in that **browser's localStorage**, not a private cloud account. They do not automatically synchronize or post to Meta/TikTok/WhatsApp; no platform analytics are fetched without proper API permissions. Scheduled records are planning labels, not jobs or notifications. Export backups regularly and never enter private farmer/customer details.

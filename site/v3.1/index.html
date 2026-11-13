@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f3f6f9">
   <meta name="description" content="马来西亚农产品价格资讯平台 — FAMA 农产品详情、真实历史趋势、州别比较与市场原始记录。">
-  <title>马来西亚农产品价格资讯平台 · V3.1</title>
+  <title>马来西亚农产品价格资讯平台 · Creator V3.4</title>
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="../assets/official-theme.css">
@@ -14,13 +14,17 @@
 <body>
 <div class="shell">
   <aside class="sidebar" aria-label="主导航">
-    <div class="brand"><img class="brand-logo" src="../assets/agro-logo.png" alt="农业数据标志"><div><strong>农业价格资讯</strong><small>MALAYSIA PRICE MONITOR · V3.1</small></div></div>
+    <div class="brand"><img class="brand-logo" src="../assets/agro-logo.png" alt="农业数据标志"><div><strong>农业价格资讯</strong><small>MALAYSIA PRICE MONITOR · V3.4</small></div></div>
     <p class="nav-label">WORKSPACE</p>
     <nav class="navigation" aria-label="功能页面">
       <button type="button" class="nav-item selected" data-page="overview"><span>◫</span> 农价总览</button>
       <button type="button" class="nav-item" data-page="prices"><span>▤</span> 价格明细</button>
       <button type="button" class="nav-item" data-page="history"><span>▥</span> 历史与州别</button>
       <button type="button" class="nav-item" data-page="watchlist"><span>☆</span> 我的关注 <small id="saved-counter">0</small></button>
+      <span class="creator-nav-divider">CREATOR WORKSPACE</span>
+      <button type="button" class="nav-item" data-page="signals"><span>◇</span> 选题情报</button>
+      <button type="button" class="nav-item" data-page="studio"><span>✎</span> 内容工作室</button>
+      <button type="button" class="nav-item" data-page="calendar"><span>▦</span> 内容日历与成效</button>
       <button type="button" class="nav-item" data-page="export"><span>⇩</span> Excel / PDF 导出</button>
       <button type="button" class="nav-item" data-page="system"><span>◉</span> 运行状态</button>
     </nav>
@@ -62,7 +66,7 @@
           </div>
           <div class="insight-board-foot">
             <span id="insight-method">仅选全国同市场可比数据；需 ≥ 3 个共同市场且双方覆盖率 ≥ 50%。</span>
-            <button type="button" class="insight-open-prices" data-go="prices">查看全部价格明细 →</button>
+            <div class="creator-overview-actions"><button type="button" class="insight-open-prices" data-go="prices">价格明细 →</button><button type="button" class="creator-overview-action" data-go="signals">Creator 选题情报 →</button></div>
           </div>
         </section>
 
@@ -147,6 +151,72 @@
 
       <section data-screen="watchlist" class="screen" aria-labelledby="watch-title"><div class="page-intro"><span class="eyebrow green">MY WATCHLIST</span><h1 id="watch-title">我的关注</h1><p>保存最多 20 组产品 × 价格层级 × 地区，方便每日检查；只保存在当前浏览器。</p></div><section class="panel"><div class="table-scroll"><table><thead><tr><th>农产品 · 规格</th><th>层级</th><th>地区</th><th>最新均价</th><th>1 天</th><th>7 天</th><th>30 天</th><th>操作</th></tr></thead><tbody id="watch-body"></tbody></table></div></section></section>
 
+
+      <section data-screen="signals" class="screen" aria-labelledby="signals-title">
+        <div class="page-intro"><span class="eyebrow green">V3.2 · SIGNAL INTELLIGENCE</span><h1 id="signals-title">选题情报 · 机会评分</h1><p>用 FAMA 同市场比较找选题。评分是透明优先级，不是爆款概率；异常数据单独标示。</p></div>
+        <section class="panel">
+          <div class="filters four">
+            <label>比较周期<select id="creator-signal-period"><option value="1">昨日</option><option value="7" selected>7 天</option><option value="30">30 天</option></select></label>
+            <label>州／地区<select id="creator-signal-region"><option value="">全国</option></select></label>
+            <label>产品分类<select id="creator-signal-category"><option value="">全部分类</option></select></label>
+            <label>信号类型<select id="creator-signal-type"><option value="all">全部选题</option><option value="rise">上涨</option><option value="fall">下跌</option><option value="aligned">L/B/R 同向</option><option value="divergent">L/B/R 分化</option><option value="audit">异常待核实</option></select></label>
+          </div>
+          <label class="creator-field">搜索农产品<input id="creator-signal-search" type="search" placeholder="例如 CILI, TIMUN, BAYAM"></label>
+          <div class="creator-signal-summary" id="creator-signal-summary" aria-live="polite">等候真实 FAMA 报价…</div>
+          <p class="creator-help">机会评分最高 100：涨跌幅 30 + 同市场证据 30 + 地区相关性 20 + 讨论潜力 20。只用合格比较；分数不是价格预测，也不是预估流量。绝对涨跌 ≥ 50% 标为待核实。</p>
+          <div id="creator-signal-list" class="creator-signal-list" aria-live="polite"></div>
+        </section>
+        <section class="panel"><div class="panel-heading"><div><h2>历史均价趋势 · 辅助调查</h2><p>查看最近真实调查日的均价变化；不同日期的调查市场可能不一样，这不是同市场连续涨跌证据。</p></div></div><div id="creator-streak" class="creator-streak">点击选题中的「检查历史」，查看真实观察序列。</div></section>
+      </section>
+
+      <section data-screen="studio" class="screen" aria-labelledby="studio-title">
+        <div class="page-intro"><span class="eyebrow green">V3.3 · CONTENT STUDIO</span><h1 id="studio-title">内容工作室</h1><p>以 FAMA 原始比较证据制作可编辑文案、短视频脚本及 PNG 价格图卡。不接入外部 AI，不能凭空编造农民经历。</p></div>
+        <section class="panel">
+          <div class="filters four">
+            <label>选题<select id="creator-topic"><option value="">等候行情数据…</option></select></label>
+            <label>平台<select id="creator-channel"><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="whatsapp">WhatsApp</option></select></label>
+            <label>语言<select id="creator-language"><option value="bm">马来文</option><option value="zh">简体中文</option><option value="both">BM + 中文</option></select></label>
+            <label>表达方式<select id="creator-format"><option value="discussion">互动讨论</option><option value="story">真实数据故事</option><option value="analysis">市场分析</option><option value="video">短视频脚本</option></select></label>
+          </div>
+          <div id="creator-evidence" class="creator-evidence">请选择有合格市场比较证据的选题。</div>
+          <div class="creator-actions"><button type="button" class="primary-button" id="creator-generate">生成有来源的文案</button><button type="button" class="secondary-button" id="creator-copy">复制正文</button><span class="creator-inline-status" id="creator-editing-status">新文章</span></div>
+          <label class="creator-field">标题<input id="creator-title" maxlength="300" type="text" placeholder="自动生成后可手动修改"></label>
+          <label class="creator-field">正文 / 短视频口播<textarea id="creator-body" rows="14" maxlength="10000" placeholder="选择选题和类型后生成，也可继续编辑。"></textarea></label>
+          <div class="filters four">
+            <label>状态<select id="creator-status"><option value="idea">选题</option><option value="draft" selected>草稿</option><option value="scheduled">计划发布（不会自动发布）</option><option value="published">已发布（人工确认）</option></select></label>
+            <label>计划日期<input id="creator-scheduled-date" type="date"></label>
+            <label>实际发布日期<input id="creator-posted-date" type="date"></label>
+            <label>已发布网址<input id="creator-post-url" type="url" placeholder="https://..."></label>
+          </div>
+          <label class="creator-field">备注 / 待核实问题<textarea id="creator-notes" rows="2" maxlength="2000" placeholder="图片素材、农民访谈、验证事项…"></textarea></label>
+          <div class="creator-actions"><button type="button" class="primary-button" id="creator-save">保存到内容日历</button><button type="button" class="secondary-button" id="creator-new">新建草稿</button><button type="button" class="secondary-button" id="creator-export-fb">FB 1080×1350 PNG</button><button type="button" class="secondary-button" id="creator-export-tiktok">TikTok 1080×1920 PNG</button></div>
+          <p class="creator-help">图卡是 FAMA 数据图形，不是农场实拍；文案是基于规则的离线草稿，不是外部 AI 生成。发布前核查日期、基准市场和内容。计划发布日期不会自动发帖。</p>
+        </section>
+      </section>
+
+      <section data-screen="calendar" class="screen" aria-labelledby="calendar-title">
+        <div class="page-intro"><span class="eyebrow green">V3.4 · CONTENT OPERATIONS</span><h1 id="calendar-title">内容日历与表现追踪</h1><p>集中管理草稿、排期及已发布内容。所有 Reach、留言、DM、入群和订单数据需要手动录入。</p></div>
+        <div class="creator-kpi-grid" id="creator-kpis" aria-live="polite"></div>
+        <section class="panel"><div class="filters four"><label>月份<input id="creator-calendar-month" type="month"></label><label>状态<select id="creator-calendar-state"><option value="">全部</option><option value="idea">选题</option><option value="draft">草稿</option><option value="scheduled">计划发布</option><option value="published">已发布</option></select></label><label>平台<select id="creator-calendar-platform"><option value="">全部平台</option><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="whatsapp">WhatsApp</option></select></label></div><div id="creator-calendar-grid" class="creator-month-grid" aria-label="每月内容发布计划"></div><div id="creator-schedule" class="creator-calendar-list" aria-live="polite"></div></section>
+        <section class="panel"><div class="panel-heading"><div><h2>社媒表现（手动记录）</h2><p>仅填写汇总数值，不记录粉丝、农民或客户的个人资料。</p></div></div>
+          <div class="creator-metric-edit">
+            <label>已发布内容<select id="creator-metric-post"><option value="">请选择</option></select></label>
+            <label>Reach / Views<input id="creator-metric-reach" type="number" min="0" step="1" value="0"></label>
+            <label>Likes<input id="creator-metric-likes" type="number" min="0" step="1" value="0"></label>
+            <label>Comments<input id="creator-metric-comments" type="number" min="0" step="1" value="0"></label>
+            <label>Shares<input id="creator-metric-shares" type="number" min="0" step="1" value="0"></label>
+            <label>询价 DM<input id="creator-metric-messages" type="number" min="0" step="1" value="0"></label>
+            <label>入群人数<input id="creator-metric-joins" type="number" min="0" step="1" value="0"></label>
+            <label>订单<input id="creator-metric-orders" type="number" min="0" step="1" value="0"></label>
+          </div><button type="button" class="primary-button" id="creator-metric-save">保存表现数据</button><div id="creator-top-posts" class="creator-top-posts"></div>
+        </section>
+        <section class="panel"><div class="panel-heading"><div><h2>本地备份 / 数据导出</h2><p>只保存在此浏览器，不同步 GitHub、其他设备或 Facebook。请定期下载 JSON 备份。</p></div></div><div class="creator-actions">
+          <button type="button" class="secondary-button" id="creator-backup-json">下载完整 JSON 备份</button>
+          <button type="button" class="secondary-button" id="creator-export-csv">下载内容效果 CSV</button>
+          <label class="creator-import-label">导入 JSON 备份<input id="creator-import-json" type="file" accept=".json,application/json"></label>
+        </div><p id="creator-storage-note" class="creator-help" aria-live="polite">计划发布不等于自动发布；数据恢复需要选择备份并确认覆盖。</p></section>
+      </section>
+
       <section data-screen="export" class="screen" aria-labelledby="export-title">
         <div class="page-intro"><span class="eyebrow green">DATA EXPORTS</span><h1 id="export-title">Excel / PDF 数据导出</h1><p>选好日期范围、州属和价格层级，再下载适合分析或 WhatsApp 分享的文件。</p></div>
         <section class="panel">
@@ -164,7 +234,7 @@
 
       <section data-screen="system" class="screen" aria-labelledby="system-title"><div class="page-intro"><span class="eyebrow green">SYSTEM HEALTH</span><h1 id="system-title">运行状态与数据质量</h1><p>区分“GitHub 执行成功”和“FAMA 已发布新价格”；两者不是同一件事。</p></div><div class="health-grid"><article class="panel"><h2>数据完整性</h2><dl id="archive-health"></dl></article><article class="panel"><h2>自动化监控</h2><dl id="job-health"><div><dt>运行状态</dt><dd>等待检测…</dd></div></dl></article></div><section class="panel"><h2>数据处理规则</h2><ul class="explanation"><li>原始 <code>data/daily/*.csv</code> 是审计档案，不会因 V3 迁移而删除或覆盖。</li><li>同一天同产品先按市场计算平均；各市场在州或全国平均中等权。</li><li>涨跌比较只匹配相同产品、等级、单位、价格层级与市场。</li><li>最新调查日期和程序运行时间分别显示；缺失数据不会被估算。</li><li>GitHub Actions 预约执行不是强保证。备用调度与外部告警需要另行授权配置。</li></ul></section></section>
     </main>
-    <footer class="footer">马来西亚农产品价格资讯平台 · V3.1 <span>来源：FAMA AMI · 独立资讯整理，非 FAMA 官方网站或交易报价</span></footer>
+    <footer class="footer">马来西亚农产品价格资讯平台 · Creator V3.4 <span>来源：FAMA AMI · 独立资讯整理，非 FAMA 官方网站或交易报价</span></footer>
   </div>
 </div>
 <div id="toast" role="status" class="toast" hidden></div>

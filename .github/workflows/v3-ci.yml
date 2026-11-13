@@ -37,7 +37,11 @@ jobs:
           node-version: "22"
 
       - name: Run V3 and V3.1 dashboard comparison tests
-        run: node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs
+        run: |
+          node --check site/v3.1/creator-app.mjs
+          node --check site/v3.1/creator-core.mjs
+          node --check site/v3.1/app.mjs
+          node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs tests/test_v34_creator.mjs
 
       - name: Build complete V3 contracts from real, unchanged archive
         run: |
