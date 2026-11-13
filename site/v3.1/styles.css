@@ -65,3 +65,11 @@
 #price-table-body tr.price-group-first:hover>td,
 #price-table-body tr.price-group-follow:hover>td{background:#f4faf5}
 @media(max-width:790px){.price-product-cell{min-width:160px}}
+
+/* Historical "as of" survey-date selector for independent 1/7/30-day comparisons. */
+.price-date-toolbar{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px 15px;padding:14px 15px;margin:-3px 0 15px;background:#edf5f2;border:1px solid #d5e8db;border-radius:12px}
+.price-date-toolbar label{display:flex;flex-direction:column;min-width:200px;gap:6px;color:#486e57;font-size:11px;font-weight:750}
+.price-date-toolbar select{min-height:39px;border:1px solid #c9dfce;border-radius:9px;background:#fff;padding:0 12px;color:#295e46;outline-color:#6eac88}
+.price-date-toolbar .secondary-button{min-height:39px}
+.price-date-note{flex:1 1 365px;margin:0;color:#668372;font-size:11px;line-height:1.7}
+@media(max-width:790px){.price-date-toolbar{padding:12px}.price-date-toolbar label{flex:1 1 150px}.price-date-note{flex-basis:100%}}
