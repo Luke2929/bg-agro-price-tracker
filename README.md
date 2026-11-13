@@ -4,7 +4,7 @@
 
 An independent BG Agro dashboard built from publicly available **FAMA (Federal Agricultural Marketing Authority)** market price observations. Search produce prices, compare Malaysian states, inspect price changes and export original records for review.
 
-**[Open Latest Dashboard V3.1](https://luke2929.github.io/bg-agro-price-tracker/)** · [Original CSV Archive](data/daily/) · [Automated Updates](https://github.com/Luke2929/bg-agro-price-tracker/actions/workflows/scrape.yml)
+**[Open Latest Dashboard V3.1](https://luke2929.github.io/bg-agro-price-tracker/)** · [Newest-first CSV Index](DAILY_PRICE_INDEX.md) · [Original CSV Archive](data/daily/) · [Automated Updates](https://github.com/Luke2929/bg-agro-price-tracker/actions/workflows/scrape.yml)
 
 > **中文简介：** BG Agro 将 FAMA 的农业市场调查价格整理成简洁的 Dashboard。你可以按蔬菜、州属、日期和价格层级查询，比较历史变化，也可以将指定日期范围的原始数据下载成 Excel。数据按计划自动更新，**不是即时交易报价**。
 
@@ -39,6 +39,7 @@ The dashboard uses a transparent, stock-style **survey price** model, not an exc
 | **Data & Export** | Filter original observations by date range, product, state, level, grade and market. |
 | **Excel Downloads** | Export **Summary Data** for analysis or **Full Raw Data** with all 17 original FAMA fields. |
 | **PDF Downloads** | Export a 4-page mobile **Quick View** or a **Full Mobile Report** with source records, navigable PDF contents, price-ID audit lines, and selected survey-date range (up to 45 archived survey days; full report max 6,500 source records per download). |
+| **Daily CSV Index** | [Browse archived daily CSVs newest-first](DAILY_PRICE_INDEX.md), with direct GitHub file links. Automatically rebuilt during each scraper workflow run. |
 | **Automatic Updates** | GitHub Actions and an external cron scheduler check recent FAMA observations and verify the full rolling window nightly (best-effort timing). |
 
 ## Using the Dashboard
