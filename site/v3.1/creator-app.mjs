@@ -62,7 +62,7 @@ function makeCard(signal,platform){
   },'image/png');
 }
 export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}){
-  let workspace=emptyWorkspace(),blocked=false,editingId='',editingEvidence=null;
+  let workspace=emptyWorkspace(),blocked=false,editingId='',editingEvidence=null,selectedEvidence=null;
   let signals=[],pool=[],historicalRequest=0;
   const tell=(s,bad=false)=>notify(s,bad);
   const choose=(el,items,initial)=>{
@@ -79,7 +79,7 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
     localStorage.setItem(WORKSPACE_KEY,JSON.stringify(next));workspace=next;
   }
   const active=()=>pool[Number(v('creator-topic'))]||null;
-  const currentEvidence=()=>editingId&&editingEvidence?editingEvidence:active();
+  const currentEvidence=()=>editingId?editingEvidence:selectedEvidence;
   function evidence(){
     const s=currentEvidence();
     $('creator-evidence').textContent=s?
@@ -113,6 +113,7 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
        (s.publishable?'':' disabled')+'>写这条选题</button></div></article>';
     }).join('')||'<p class="empty">没有符合条件的市场信号。可以改变周期、地区或筛选类型。</p>';
     pool=usable;
+    if(selectedEvidence&&!pool.some(x=>x.id===selectedEvidence.id))selectedEvidence=null;
     const sel=$('creator-topic'),last=sel.value;sel.replaceChildren();
     sel.add(new Option('请选择实际报价选题',''));
     pool.forEach((s,i)=>sel.add(new Option(s.product+' · '+s.level+' · '+
@@ -130,6 +131,8 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
   function generate(){
     editingId='';editingEvidence=null;
     const s=active();if(!s)return tell('请先选定符合样本条件的农产品。',true);
+    selectedEvidence=s;
+    ['creator-notes','creator-scheduled-date','creator-posted-date','creator-post-url'].forEach(id=>$(id).value='');
     try{
       const draft=composeCreatorDraft(s,{channel:v('creator-channel'),
         language:v('creator-language'),format:v('creator-format')});
@@ -139,7 +142,7 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
     }catch(e){tell(e.message,true);}
   }
   function reset(){
-    editingId='';editingEvidence=null;
+    editingId='';editingEvidence=null;selectedEvidence=null;
     ['creator-title','creator-body','creator-notes','creator-scheduled-date','creator-posted-date',
       'creator-post-url'].forEach(id=>$(id).value='');
     $('creator-status').value='draft';$('creator-editing-status').textContent='新文章';
@@ -151,6 +154,8 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
       if(!title||!body)throw Error('标题及正文不能为空');
       if(v('creator-status')==='scheduled'&&!isValidISODate(v('creator-scheduled-date')))
         throw Error('计划发布需要有效日期');
+      if(v('creator-status')==='published'&&!isValidISODate(v('creator-posted-date')))
+        throw Error('已发布内容需要填写实际发布日期');
       const earlier=workspace.records.find(r=>r.id===editingId),now=new Date().toISOString();
       const s=currentEvidence();
       const record={
@@ -170,7 +175,7 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
   }
   function edit(id){
     const r=workspace.records.find(x=>x.id===id);if(!r)return;
-    editingId=r.id;editingEvidence=r.evidence||null;
+    editingId=r.id;editingEvidence=r.evidence||null;selectedEvidence=null;
     const fields={'creator-title':r.title,'creator-body':r.body,'creator-status':r.status,
       'creator-channel':r.channel,'creator-language':r.language,
       'creator-format':r.format,'creator-scheduled-date':r.scheduledDate,
@@ -308,7 +313,7 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
       .forEach(id=>$(id).addEventListener('change',signalsRender));
     $('creator-signal-search').addEventListener('input',signalsRender);
     $('creator-topic').addEventListener('change',()=>{
-      editingId='';editingEvidence=null;evidence();
+      editingId='';editingEvidence=null;selectedEvidence=active();evidence();
     });
     $('creator-generate').addEventListener('click',generate);
     $('creator-save').addEventListener('click',save);
@@ -341,7 +346,7 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
         const s=signals[Number(topic.dataset.creatorDraft)];
         if(!s?.publishable)return;
         const index=pool.findIndex(x=>x.id===s.id);
-        if(index>=0){reset();$('creator-topic').value=String(index);evidence();navigate('studio');}
+        if(index>=0){reset();$('creator-topic').value=String(index);selectedEvidence=s;evidence();navigate('studio');}
       }
       const trend=e.target.closest('[data-creator-history]');
       if(trend)inspectHistory(Number(trend.dataset.creatorHistory));
