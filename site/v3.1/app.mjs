@@ -1,5 +1,6 @@
 import {FAMA_COLUMNS,escapeHtml,fmtMoney,fmtDate,ageDays,mytDate,quoteChange,
   rankMovers,filterQuotes,sortQuotesByChange,groupQuotesByProduct,productLabel,historySeries,statePrices,parseCSV,
+  archiveComparisonDates,buildPriceDateSnapshot,shiftSurveyDate,
   validPrice,summarizeRows,PRICE_LEVELS,productAreaRows,productScopePrices,
   productAreaOptions} from './engine.mjs';
 import {buildXlsx,downloadXlsx} from './excel.mjs';
@@ -10,7 +11,8 @@ const BASE='../data/v3/';
 const RAW_BASE='https://raw.githubusercontent.com/Luke2929/bg-agro-price-tracker/master/data/daily/';
 const PAGE_NAMES={overview:'农价总览',prices:'价格明细',history:'历史与州别',watchlist:'我的关注',export:'Excel / PDF 导出',system:'运行状态',product:'农产品详情'};
 const store={overview:null,index:null,meta:null,health:null,history:new Map(),page:'overview',
-  period:1,visible:40,watch:[],fetching:false,rawCache:new Map(),
+  period:1,visible:40,watch:[],fetching:false,rawCache:new Map(),dailyPending:new Map(),
+  priceData:null,priceDateRequest:0,
   detail:{key:null,origin:'prices',rawRows:null,rawError:'',visible:80,rawRequest:0,historyRequest:0}};
 let historyRequestSequence=0;
 
@@ -117,7 +119,7 @@ function renderMovers(){
 function filters(){return {search:$('price-search').value,level:$('price-level').value,
   state:$('price-state').value,category:$('price-category').value};}
 function priceLevelCells(quote){
-  const id=store.overview.prices.indexOf(quote);
+  const id=store.priceData.prices.indexOf(quote);
   const levelClass=PRICE_LEVELS.includes(quote.level)?quote.level.toLowerCase():'other';
   return `<td><span class="price-level-pill price-level-${levelClass}">${escapeHtml(quote.level)}</span></td><td>${escapeHtml(quote.state||'全马')}</td><td class="price-cell">${fmtMoney(quote.price)}</td><td>${percentMarkup(quote,1)}</td><td>${percentMarkup(quote,7)}</td><td>${percentMarkup(quote,30)}</td><td>${quote.markets}<small>${quote.observations} 条记录</small></td><td><button class="star ${isSaved(quote)?'saved':''}" data-watch-index="${id}" aria-label="${isSaved(quote)?'取消关注':'加入关注'}：${escapeHtml(quote.varieti)} ${escapeHtml(quote.level)}">${isSaved(quote)?'★':'☆'}</button></td>`;
 }
@@ -126,21 +128,21 @@ function priceProductCell(quote,rowspan=1,leader=null,period=7,order='name'){
   const rank=leader&&order!=='name'?quoteChange(leader,period):null;
   const rankLabel=rank?`${escapeHtml(leader.level)} ${rank.percent>0?'+':''}${rank.percent.toFixed(1)}%`:'';
   const descriptor=escapeHtml([quote.gred,quote.unit].filter(Boolean).join(' · '));
-  return `<td class="price-product-cell"${rowspan>1?` rowspan="${rowspan}"`:''}><button type="button" class="product-link" data-product-open="${escapeHtml(quote.product_key)}">${escapeHtml(quote.varieti)} ↗</button><small>${descriptor}</small>${rank?`<small class="price-rank-note">排序依据 · ${period} 天 · ${rankLabel}</small>`:''}</td>`;
+  return `<td class="price-product-cell"${rowspan>1?` rowspan="${rowspan}"`:''}><button type="button" class="product-link" data-product-open="${escapeHtml(quote.product_key)}" title="${store.priceData.survey_date!==store.overview.survey_date?'产品详情显示最新调查日，而非本页所选历史日期':'打开产品详情'}">${escapeHtml(quote.varieti)} ↗</button><small>${descriptor}</small>${rank?`<small class="price-rank-note">排序依据 · ${period} 天 · ${rankLabel}</small>`:''}</td>`;
 }
 
 function renderPrices(){
-  if(!store.overview)return;
+  if(!store.priceData)return;
   const period=Number($('price-change-period').value);
   const order=$('price-change-order').value;
   const mode=$('price-display-mode').value;
-  const filtered=filterQuotes(store.overview.prices,filters());
+  const filtered=filterQuotes(store.priceData.prices,filters());
   const matches=sortQuotesByChange(filtered,{period,order});
   const grouped=mode==='group';
   const groups=grouped?groupQuotesByProduct(filtered,{period,order}):[];
   const visible=grouped?groups.slice(0,store.visible):matches.slice(0,store.visible);
   const sortLabels={name:'按产品名称',rise:'涨幅最大优先',fall:'跌幅最大优先',swing:'绝对波动最大优先'};
-  const prefix=fmtDate(store.overview.survey_date)+' · ';
+  const prefix=fmtDate(store.priceData.survey_date)+' · ';
   const criteria=order==='name'?sortLabels.name:period+' 天'+sortLabels[order];
   $('price-table-status').textContent=prefix+
     (grouped?`${groups.length} 种产品 · ${groups.reduce((n,g)=>n+g.quotes.length,0)} 组层级报价`:`${matches.length} 组层级报价`)+
@@ -177,16 +179,78 @@ function renderPrices(){
   }
 }
 
+async function loadPriceDate(){
+  if(!store.meta||!store.overview)return;
+  const selected=$('price-date').value;
+  const sequence=++store.priceDateRequest;
+  store.visible=40;
+  store.priceData=null;
+  $('price-table-body').innerHTML='<tr><td colspan="9" class="empty">正在读取所选调查日及真实历史基准…</td></tr>';
+  $('price-table-status').textContent=selected+' · 正在计算市场涨跌…';
+  $('price-visible').textContent='等待历史数据';
+  $('more-prices').disabled=true;
+  $('price-date-latest').disabled=selected===store.overview.survey_date;
+  const status=$('price-date-status');
+  if(!store.meta.archive_dates.includes(selected)){
+    status.textContent='请从已归档的 FAMA 调查日期中选择，不能填写不存在的报价日期。';
+    $('price-table-status').textContent='日期不在档案中';
+    return;
+  }
+  try{
+    let snapshot;
+    if(selected===store.overview.survey_date){
+      snapshot=store.overview; // Reuse already-validated production V3 prices.
+    }else{
+      const required=archiveComparisonDates(store.meta.archive_dates,selected);
+      const archive=new Map();
+      for(let i=0;i<required.length;i+=4){
+        const batch=required.slice(i,i+4);
+        const fetched=await Promise.all(batch.map(day=>loadDaily(day)));
+        if(sequence!==store.priceDateRequest)return;
+        batch.forEach((day,index)=>archive.set(day,fetched[index]));
+        status.textContent=`正在核对历史原始 CSV · ${archive.size} / ${required.length} 个真实调查日…`;
+      }
+      snapshot=buildPriceDateSnapshot(archive,{
+        surveyDate:selected,archiveDates:store.meta.archive_dates,
+        supersededByDate:store.meta.superseded_priceids||{}
+      });
+    }
+    if(sequence!==store.priceDateRequest)return;
+    store.priceData=snapshot;
+    selectOptions($('price-state'),snapshot.states,{initialLabel:'全马平均'});
+    selectOptions($('price-category'),
+      [...new Set(snapshot.prices.map(p=>p.kategori).filter(Boolean))].sort(),
+      {initialLabel:'全部分类'});
+    const targets=[1,7,30].map(n=>`${n} 天：${shiftSurveyDate(selected,-n)}`).join(' · ');
+    status.textContent=`当前基准日 ${selected} · ${targets}。无同市场可比记录显示「—」；具体实际比较日可查看涨跌幅提示。产品详情页目前仍显示最新调查日。`;
+    renderPrices();
+  }catch(error){
+    if(sequence!==store.priceDateRequest)return;
+    store.priceData=null;
+    status.textContent=`${selected} 历史价格计算失败：${error.message}。没有使用其他日期冒充所选日期。`;
+    $('price-table-status').textContent=selected+' · 读取失败';
+    $('price-table-body').innerHTML='<tr><td colspan="9" class="empty">原始 CSV 未能全部验证，当前不显示未经确认的价格。请重选日期或刷新。</td></tr>';
+    $('price-visible').textContent='无可显示数据';
+    alertUser('历史数据读取失败：'+error.message,true);
+  }
+}
+
 async function loadDaily(date){
   if(store.rawCache.has(date))return store.rawCache.get(date);
-  const revision=store.meta.archive_versions?.[date]||store.meta.generated_at_utc||'';
-  const url=RAW_BASE+encodeURIComponent(date)+'.csv'+(revision?'?rev='+encodeURIComponent(revision):'');
-  const response=await fetch(url);
-  if(!response.ok)throw Error(`${date} 原始档案 HTTP ${response.status}。`);
-  const rows=parseCSV(await response.text());
-  if(rows.some(row=>row.tarikh_harga!==date))throw Error(`${date} CSV 存在调查日期不一致。`);
-  store.rawCache.set(date,rows);
-  return rows;
+  if(store.dailyPending.has(date))return store.dailyPending.get(date);
+  const pending=(async()=>{
+    const revision=store.meta.archive_versions?.[date]||store.meta.generated_at_utc||'';
+    const url=RAW_BASE+encodeURIComponent(date)+'.csv'+(revision?'?rev='+encodeURIComponent(revision):'');
+    const response=await fetch(url);
+    if(!response.ok)throw Error(`${date} 原始档案 HTTP ${response.status}。`);
+    const rows=parseCSV(await response.text());
+    if(rows.some(row=>row.tarikh_harga!==date))throw Error(`${date} CSV 存在调查日期不一致。`);
+    store.rawCache.set(date,rows);
+    return rows;
+  })();
+  store.dailyPending.set(date,pending);
+  try{return await pending;}
+  finally{if(store.dailyPending.get(date)===pending)store.dailyPending.delete(date);}
 }
 
 function renderMarketRows(){
@@ -578,6 +642,11 @@ function bindEvents(){
   for(const id of ['price-search','price-level','price-state','price-category']){
     $(id).addEventListener(id==='price-search'?'input':'change',()=>{store.visible=40;renderPrices();});
   }
+  $('price-date').addEventListener('change',()=>loadPriceDate());
+  $('price-date-latest').addEventListener('click',()=>{
+    $('price-date').value=store.overview.survey_date;
+    loadPriceDate();
+  });
   for(const id of ['price-change-period','price-change-order','price-display-mode']){
     $(id).addEventListener('change',()=>{store.visible=40;renderPrices();});
   }
@@ -602,7 +671,7 @@ function bindEvents(){
     $(id).addEventListener(id==='market-state'?'change':'input',renderMarketRows);
   $('price-table-body').addEventListener('click',event=>{
     const btn=event.target.closest('[data-watch-index]');
-    if(btn){const quote=store.overview.prices[Number(btn.dataset.watchIndex)];if(quote)toggleSaved(quote);}
+    if(btn){const quote=store.priceData?.prices[Number(btn.dataset.watchIndex)];if(quote)toggleSaved(quote);}
   });
   $('watch-body').addEventListener('click',event=>{
     const btn=event.target.closest('[data-watch-remove]');if(!btn)return;
@@ -620,6 +689,7 @@ function bindEvents(){
 async function load(refresh=false){
   $('error-banner').hidden=true;$('reload').disabled=true;$('source-badge').textContent='正在核对最新调查数据';
   try{
+    ++store.priceDateRequest; // Invalidate an older selected-date fetch during refresh.
     const [overview,index,meta,health]=await Promise.all([
       fetchJson(BASE+'overview.json',true),fetchJson(BASE+'history-index.json',true),
       fetchJson('../data/meta.json',true),fetchJson(BASE+'health.json',true).catch(()=>null)
@@ -629,7 +699,8 @@ async function load(refresh=false){
        !Array.isArray(meta.archive_dates))throw Error('V3 数据结构不完整，不能显示不可靠的报价。');
     if(overview.survey_date!==meta.window.max)throw Error('V3 最新调查日与原始 FAMA 清单不一致，请先重新生成数据。');
     store.overview=overview;store.index=index;store.meta=meta;store.health=health;store.history.clear();
-    store.rawCache.clear();
+    store.rawCache.clear();store.dailyPending.clear();store.priceData=null;
+    selectOptions($('price-date'),[...meta.archive_dates].reverse(),{defaultValue:overview.survey_date});
     selectOptions($('price-state'),overview.states,{initialLabel:'全马平均'});
     selectOptions($('export-state'),overview.states,{initialLabel:'全马'});
     selectOptions($('history-state'),overview.states,{initialLabel:'全马平均'});
@@ -639,7 +710,8 @@ async function load(refresh=false){
     const list=index.products.filter(p=>overview.prices.some(q=>q.product_key===p.product_key));
     selectOptions($('history-product'),list.map(p=>({value:p.product_key,label:productLabel(p)})),{
       defaultValue:list[0]?.product_key||''});
-    renderSummary();renderPrices();renderWatchlist();renderExportDates();renderHealth();
+    renderSummary();renderWatchlist();renderExportDates();renderHealth();
+    loadPriceDate();
     if(store.page==='history')await renderHistory();
     if(store.page==='product'&&store.detail.key){
       store.detail.rawRows=null;store.detail.rawError='';store.detail.rawRequest++;
