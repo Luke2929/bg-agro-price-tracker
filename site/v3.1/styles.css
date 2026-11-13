@@ -165,3 +165,18 @@
 @media(max-width:1250px){.creator-signal-row{grid-template-columns:1fr 1fr;gap:12px}.creator-kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.creator-metric-edit{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:790px){.creator-kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.creator-signal-row{grid-template-columns:1fr}.creator-score{text-align:left;flex-direction:row;align-items:baseline;gap:8px}.creator-metric-edit{grid-template-columns:repeat(2,minmax(0,1fr))}.creator-calendar-entry{flex-direction:column;align-items:flex-start}.creator-leader{flex-direction:column;align-items:flex-start}.creator-nav-divider{display:none}}
 @media(max-width:450px){.creator-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.creator-metric-edit{grid-template-columns:1fr}.creator-overview-actions{align-items:flex-start}.creator-signal-number b{font-size:20px}}
+
+/* True month-view calendar, Monday-first; undated drafts remain in the list below. */
+.creator-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-bottom:20px}
+.creator-day-title{text-align:center;padding:8px 3px;color:#688b73;background:#f2f7f2;font-size:10px;font-weight:750;border-radius:5px}
+.creator-day{min-width:0;min-height:106px;border:1px solid #e2ede4;border-radius:8px;padding:6px;background:#fbfdfb}
+.creator-day-blank{border-color:transparent;background:none}
+.creator-day-today{border-color:#7aae8b;background:#f1f8f1}
+.creator-day-number{display:block;color:#6f8777;font-size:11px;font-weight:750;margin:0 0 5px}
+.creator-day-event{display:block;background:#e8f2e9;border:0;color:#35644d;padding:5px 6px;border-radius:5px;font-size:10px;line-height:1.35;max-width:100%;width:100%;text-align:left;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.creator-day-event:hover{background:#d3ead8}
+.creator-event-scheduled{background:#f2eacc;color:#796323}
+.creator-event-published{background:#e5eafb;color:#5064a4}
+.creator-day small{font-size:9px;color:#8c9d8d}
+@media(max-width:900px){.creator-month-grid{gap:3px}.creator-day{padding:4px;min-height:75px}.creator-day-event{font-size:9px;padding:3px 4px}}
+@media(max-width:620px){.creator-day{min-height:60px}.creator-day-event{font-size:8px}.creator-day-number{font-size:10px}}
