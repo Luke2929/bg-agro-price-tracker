@@ -114,4 +114,4 @@ def test_unverified_archive_never_claims_complete(tmp_path):
     (tmp_path / "2026-07-01.csv").write_text("priceid\n1\n", encoding="utf-8")
     markdown = build_index(["2026-07-01.csv"], {}, {"dates": {}}, tmp_path)
     assert "⚪ Not audited" in markdown
-    assert "✅ Snapshot matched" not in markdown
+    assert "| [2026-07-01.csv](data/daily/2026-07-01.csv) **(Latest)** | — | — | ⚪ Not audited |" in markdown
