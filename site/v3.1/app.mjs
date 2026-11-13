@@ -1,5 +1,5 @@
 import {FAMA_COLUMNS,escapeHtml,fmtMoney,fmtDate,ageDays,mytDate,quoteChange,
-  rankMovers,filterQuotes,productLabel,historySeries,statePrices,parseCSV,
+  rankMovers,filterQuotes,sortQuotesByChange,productLabel,historySeries,statePrices,parseCSV,
   validPrice,summarizeRows,PRICE_LEVELS,productAreaRows,productScopePrices,
   productAreaOptions} from './engine.mjs';
 import {buildXlsx,downloadXlsx} from './excel.mjs';
@@ -118,13 +118,22 @@ function filters(){return {search:$('price-search').value,level:$('price-level')
   state:$('price-state').value,category:$('price-category').value};}
 function renderPrices(){
   if(!store.overview)return;
-  const matches=filterQuotes(store.overview.prices,filters());
+  const period=Number($('price-change-period').value);
+  const order=$('price-change-order').value;
+  const matches=sortQuotesByChange(filterQuotes(store.overview.prices,filters()),{period,order});
   const visible=matches.slice(0,store.visible);
-  $('price-table-status').textContent=`${fmtDate(store.overview.survey_date)} · ${matches.length} 组可见报价`;
+  const sortLabels={name:'按产品名称',rise:'涨幅最大优先',fall:'跌幅最大优先',swing:'绝对波动最大优先'};
+  $('price-table-status').textContent=fmtDate(store.overview.survey_date)+' · '+matches.length+' 组报价 · '+(order==='name'?sortLabels.name:period+' 天'+sortLabels[order]);
+  document.querySelectorAll('[data-price-period]').forEach(btn=>{
+    const active=Number(btn.dataset.pricePeriod)===period&&order!=='name';
+    btn.classList.toggle('active',active);
+    btn.querySelector('.sort-arrow').textContent=active?(order==='rise'?'↑':order==='fall'?'↓':'↕'):'↕';
+    btn.closest('th').setAttribute('aria-sort',active?(order==='rise'?'descending':order==='fall'?'ascending':'other'):'none');
+  });
   $('price-table-body').innerHTML=visible.map(p=>{
     const id=store.overview.prices.indexOf(p);
     return `<tr><td><button type="button" class="product-link" data-product-open="${escapeHtml(p.product_key)}">${escapeHtml(p.varieti)} ↗</button><small>${escapeHtml([p.gred,p.unit].filter(Boolean).join(' · '))}</small></td><td>${escapeHtml(p.level)}</td><td>${escapeHtml(p.state||'全马')}</td><td class="price-cell">${fmtMoney(p.price)}</td><td>${percentMarkup(p,1)}</td><td>${percentMarkup(p,7)}</td><td>${percentMarkup(p,30)}</td><td>${p.markets}<small>${p.observations} 条记录</small></td><td><button class="star ${isSaved(p)?'saved':''}" data-watch-index="${id}" aria-label="${isSaved(p)?'取消关注':'加入关注'}">${isSaved(p)?'★':'☆'}</button></td></tr>`;
-  }).join('')||'<tr><td colspan="9" class="empty">当前条件没有 FAMA 调查报价。</td></tr>';
+  }).join('')||'<tr><td colspan="9" class="empty">当前筛选／涨跌排序没有符合条件的可比报价，请换一个周期或选择「产品名称」。</td></tr>';
   $('price-visible').textContent=`显示 ${visible.length} / ${matches.length} 组`;
   $('more-prices').disabled=matches.length<=store.visible;
 }
@@ -530,6 +539,20 @@ function bindEvents(){
   for(const id of ['price-search','price-level','price-state','price-category']){
     $(id).addEventListener(id==='price-search'?'input':'change',()=>{store.visible=40;renderPrices();});
   }
+  for(const id of ['price-change-period','price-change-order']){
+    $(id).addEventListener('change',()=>{store.visible=40;renderPrices();});
+  }
+  document.querySelectorAll('[data-price-period]').forEach(btn=>btn.addEventListener('click',()=>{
+    const period=btn.dataset.pricePeriod;
+    const order=$('price-change-order');
+    const prior=$('price-change-period').value;
+    // Click 1: biggest increase; click 2: biggest decrease; click 3: reset.
+    order.value=prior===period&&order.value==='rise'?'fall':
+      prior===period&&order.value==='fall'?'name':'rise';
+    $('price-change-period').value=period;
+    store.visible=40;
+    renderPrices();
+  }));
   $('more-prices').addEventListener('click',()=>{store.visible+=40;renderPrices();});
   $('fetch-markets').addEventListener('click',loadMarkets);
   $('market-date').addEventListener('change',()=>{

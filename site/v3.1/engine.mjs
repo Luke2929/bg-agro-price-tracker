@@ -117,6 +117,22 @@ export function filterQuotes(prices, {search='',level='',state='',category=''}={
     .sort((a,b)=>a.varieti.localeCompare(b.varieti)||a.gred.localeCompare(b.gred)||a.level.localeCompare(b.level));
 }
 
+// Sort only price comparisons that are actually visible and eligible in the table.
+// This never interprets missing baseline data as 0% or mixes different states.
+export function sortQuotesByChange(quotes,{period=7,order='name'}={}) {
+  if(order==='name'||!['rise','fall','swing'].includes(order)||![1,7,30].includes(Number(period)))
+    return [...quotes];
+  const rows=quotes.map((quote,index)=>({quote,index,percent:quoteChange(quote,period)?.percent}))
+    .filter(row=>Number.isFinite(row.percent)&&
+      (order==='rise'?row.percent>0:order==='fall'?row.percent<0:true));
+  rows.sort((a,b)=>{
+    const difference=order==='rise'?b.percent-a.percent:
+      order==='fall'?a.percent-b.percent:Math.abs(b.percent)-Math.abs(a.percent);
+    return difference||a.index-b.index;
+  });
+  return rows.map(row=>row.quote);
+}
+
 export function productLabel(item) {
   return [item?.varieti,item?.gred,item?.unit].filter(Boolean).join(' · ');
 }
