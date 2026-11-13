@@ -1,5 +1,5 @@
 /* V3.4 Creator Workspace — pure data transforms; zero external services. */
-import {comparisonEvidence,quoteChange,PRICE_LEVELS,productIdentity,isValidISODate} from './engine.mjs';
+import {comparisonEvidence,quoteChange,PRICE_LEVELS,productIdentity,isValidISODate} from './engine.mjs?rev=price-evidence-1';
 
 export {isValidISODate};
 
