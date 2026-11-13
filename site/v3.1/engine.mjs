@@ -133,6 +133,43 @@ export function sortQuotesByChange(quotes,{period=7,order='name'}={}) {
   return rows.map(row=>row.quote);
 }
 
+// Collapse display rows by the *full* product identity and selected geography.
+// A group is only a view: its price levels are never averaged together.
+// When ranking, the strongest eligible level determines the product's position;
+// the other levels remain visible for context (even if their direction differs).
+export function groupQuotesByProduct(quotes,{period=7,order='name'}={}) {
+  const keyOf=p=>JSON.stringify([
+    p.product_key||[p.varieti,p.gred,p.unit].map(v=>String(v??'').trim()).join('||'),
+    String(p.state??'')
+  ]);
+  const groups=new Map();
+  for(const quote of quotes){
+    const key=keyOf(quote);
+    if(!groups.has(key))groups.set(key,{key,quotes:[],leader:null});
+    groups.get(key).quotes.push(quote);
+  }
+  const byLevel={Ladang:0,Borong:1,Runcit:2};
+  for(const group of groups.values()){
+    group.quotes.sort((a,b)=>
+      (byLevel[a.level]??99)-(byLevel[b.level]??99)||
+      String(a.level).localeCompare(String(b.level)));
+  }
+  if(order==='name'||!['rise','fall','swing'].includes(order))
+    return [...groups.values()];
+  const ranked=sortQuotesByChange(quotes,{period,order});
+  const ordered=[];
+  const seen=new Set();
+  for(const quote of ranked){
+    const key=keyOf(quote);
+    if(seen.has(key))continue;
+    seen.add(key);
+    const group=groups.get(key);
+    group.leader=quote;
+    ordered.push(group);
+  }
+  return ordered;
+}
+
 export function productLabel(item) {
   return [item?.varieti,item?.gred,item?.unit].filter(Boolean).join(' · ');
 }
