@@ -115,3 +115,18 @@ test('real FAMA CSV generates both PDF variants without synthetic observations',
   assert.ok(buildFamaPdf(rows,{...options,type:'full'}).length>50000);
 });
 
+test('PDF summary uses the canonical row before filtering and keeps suspect source prices marked',()=>{
+  const day='2026-11-06';
+  const rows=[sample({priceid:'20',harga:'99'}),sample({priceid:'20',negeri:'KEDAH',harga:'8'}),
+    sample({priceid:'21',harga:'1200',average14:'13.06'}),
+    sample({priceid:'22',harga:'0x10'}),sample({priceid:'23',harga:'0'})];
+  const options={from:day,to:day,state:'PERAK'};
+  const quick=new TextDecoder().decode(buildFamaPdf(rows,{...options,type:'quick'}));
+  assert.match(quick,/R 0\.00-1200\.00 \*/);
+  assert.doesNotMatch(quick,/KEDAH|RM 99\.00/);
+  const full=new TextDecoder().decode(buildFamaPdf(rows,{...options,type:'full'}));
+  assert.match(full,/RM 99\.00 \| ID 20 \[PINDAAN\]/);
+  assert.match(full,/RM 1200\.00 \* \| ID 21/);
+  assert.doesNotMatch(full,/RM 16\.00/);
+});
+

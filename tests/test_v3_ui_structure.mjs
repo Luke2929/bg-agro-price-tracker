@@ -148,10 +148,15 @@ test('Pages loads the same cache revision for the dashboard and its price eviden
   assert.ok(html.includes('./styles.css?rev='+revision));
   const creator=readFileSync(new URL('../site/v3.1/creator-app.mjs',import.meta.url),'utf8');
   const core=readFileSync(new URL('../site/v3.1/creator-core.mjs',import.meta.url),'utf8');
+  const pdf=readFileSync(new URL('../site/pdf.mjs',import.meta.url),'utf8');
+  const pdfCore=readFileSync(new URL('../site/pdf-v3.mjs',import.meta.url),'utf8');
   for(const [source,names] of [[code,['engine','creator-app','creator-core']],
     [creator,['engine','creator-core']],[core,['engine']]]){
     for(const name of names)assert.ok(source.includes("'./"+name+".mjs?rev="+revision+"'"));
   }
+  assert.ok(code.includes("'../pdf.mjs?rev="+revision+"'"));
+  assert.ok(pdf.includes("'./pdf-v3.mjs?rev="+revision+"'"));
+  assert.ok(pdfCore.includes("'./v3.1/engine.mjs?rev="+revision+"'"));
 });
 
 

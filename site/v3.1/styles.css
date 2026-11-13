@@ -199,6 +199,9 @@
 .comparison-link{border:0;padding:1px 3px;background:transparent;color:#285b43;font-weight:800;text-decoration:underline;text-underline-offset:3px}
 .comparison-link.delta-negative{color:#965030}.comparison-link.delta-positive{color:#276d4b}
 .comparison-cell small{line-height:1.45;white-space:nowrap}
+.price-review{color:#935426;font-weight:750}
+small.price-review{display:block}
+.insight-story .price-review{margin-top:5px}
 .comparison-dialog{width:min(1100px,calc(100% - 26px));max-height:calc(100dvh - 28px);overflow:auto;box-sizing:border-box;padding:20px;color:#203b35;background:#fffefa;border:1px solid #ccded0;border-radius:16px}
 .comparison-dialog::backdrop{background:#163127a3}
 .comparison-dialog>header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
@@ -216,6 +219,12 @@
 .creator-research ul{padding:0;list-style:none}
 .creator-research li+li{border-top:1px solid #dceadf;margin-top:7px;padding-top:7px}
 .creator-research li span{display:block;overflow-wrap:anywhere}
+.creator-source-review{padding:12px 14px;margin:0 0 15px;background:#fcf7ef;border:1px solid #e8dbca;border-radius:10px}
+.creator-source-review h3,.creator-source-review p{margin:0 0 6px}
+.creator-source-review ul{padding:0;list-style:none;margin:0}
+.creator-source-review li{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:8px 0;font-size:12px}
+.creator-source-review li+li{border-top:1px solid #e8dbca}
+.market-review-filter{display:flex;align-items:center;gap:6px}
 .creator-draft-settings{margin:12px 0}
 .creator-checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:8px;margin-top:10px}
 .creator-checks label{display:flex;align-items:center;gap:7px;font-size:12px;min-height:30px}

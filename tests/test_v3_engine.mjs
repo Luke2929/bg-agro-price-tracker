@@ -5,7 +5,7 @@ import {ageDays,mytDate,rankMovers,dailyStorySignals,filterQuotes,quoteChange,hi
   summarizeRows,FAMA_COLUMNS,sortQuotesByChange,groupQuotesByProduct,archiveComparisonDates,
   buildPriceDateSnapshot,shiftSurveyDate,productIdentity,canonicalDailyRows,productAreaRows,
   localLevelPrices,productScopePrices,productAreaOptions,comparisonEvidence,comparisonMarketDetails,
-  matchedMarketStreaks,validPrice} from '../site/v3.1/engine.mjs';
+  matchedMarketStreaks,validPrice,sourcePriceNeedsReview} from '../site/v3.1/engine.mjs';
 import {buildMarketPostIdea,formatPercent} from '../site/v3.1/creator-core.mjs';
 import {buildXlsx} from '../site/v3.1/excel.mjs';
 
@@ -472,6 +472,7 @@ test('pinned archived comparisons reconcile browser means, market rows and displ
     assert.ok(Math.abs(c.currentMean-expected.current)<1e-9);
     assert.ok(Math.abs(c.percent-expected.percent)<1e-8);
     assert.equal(formatPercent(c.percent),expected.display);
+    assert.deepEqual(c.reviewReasons,expected.reviewReasons||[]);
     assert.notEqual(c.currentMean,quote.price,'comparison is based on paired prices');
     const details=comparisonMarketDetails(rows,c,meta.superseded_priceids);
     assert.equal(details.details.length,c.markets);
@@ -521,4 +522,34 @@ test('streaks use the same three or more markets across every observation date',
   assert.deepEqual(trend.points,days.map((date,i)=>({date,price:10+i})));
   rows.get(days[0]).splice(2,1);
   assert.deepEqual(matchedMarketStreaks(rows),[]);
+});
+
+test('an individual market can trigger review below a 50 percent headline change',()=>{
+  const day='2026-11-13',old='2026-11-06';
+  const build=(date,prices)=>prices.map((price,i)=>marketRow(date+'-'+i,{date,
+    location:'MARKET '+i,price:String(price),level:'Ladang'}));
+  const rows=new Map([[day,build(day,[4.2,2,2])],[old,build(old,[2,2,2])]]);
+  const snapshot=buildPriceDateSnapshot(rows,{surveyDate:day,archiveDates:[old,day]});
+  const quote=snapshot.prices.find(q=>!q.state);
+  const c=comparisonEvidence(quote,7);
+  assert.equal(c.markets,3);
+  assert.equal(formatPercent(c.percent),'+36.7%');
+  assert.deepEqual(c.reviewReasons,['market-impact']);
+  const detail=comparisonMarketDetails(rows,c);
+  assert.equal(detail.details.filter(r=>r.marketImpact).length,1);
+  assert.equal(dailyStorySignals(snapshot.prices,7).rise,quote);
+  assert.equal(dailyStorySignals(snapshot.prices,7).extreme,quote);
+  assert.equal(buildMarketPostIdea(quote,7,day,snapshot.prices),'');
+});
+
+test('Setiu reference-price anomaly remains in real historical prices with a review marker',()=>{
+  const day='2026-11-10';
+  const rows=parseCSV(readFileSync(new URL('../data/daily/'+day+'.csv',import.meta.url),'utf8'),day);
+  const raw=rows.find(r=>r.priceid==='31156003');
+  assert.equal(raw.harga,'1200');
+  assert.equal(raw.average14,'13.06');
+  assert.equal(sourcePriceNeedsReview(raw),true);
+  const summary=summarizeRows(rows).find(r=>r.varieti==='KACANG BUNCIS'&&r.level==='Runcit'&&r.state==='TERENGGANU');
+  assert.ok(summary.price>200);
+  assert.equal(summary.priceReview,true);
 });

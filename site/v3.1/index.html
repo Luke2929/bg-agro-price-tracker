@@ -7,9 +7,9 @@
   <meta name="description" content="马来西亚农产品价格资讯平台 — FAMA 农产品详情、真实历史趋势、州别比较与市场原始记录。">
   <title>马来西亚农产品价格资讯平台 · Creator V3.4</title>
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
-  <link rel="stylesheet" href="./styles.css?rev=price-evidence-1">
+  <link rel="stylesheet" href="./styles.css?rev=price-evidence-2">
   <link rel="stylesheet" href="../assets/official-theme.css">
-  <script type="module" src="./app.mjs?rev=price-evidence-1"></script>
+  <script type="module" src="./app.mjs?rev=price-evidence-2"></script>
 </head>
 <body>
 <div class="shell">
@@ -95,7 +95,7 @@
           <label>显示方式<select id="price-display-mode" aria-label="价格层级显示方式"><option value="group" selected>合并同产品（推荐）</option><option value="levels">逐层级显示</option></select></label>
           <p class="price-sort-hint">合并模式下，同产品的 Ladang / Borong / Runcit 保留各自的价格与涨跌，不跨层级平均；排序取该产品符合条件的最大涨跌幅作为依据。也可点击「昨日／7 天／30 天比较」表头切换排序。</p>
         </div><div class="table-top"><span id="price-table-status">正在读取官方档案…</span><span class="subtle">所选调查日的实际市场等权均价</span></div><div class="table-scroll"><table><thead><tr><th>农产品 · 规格</th><th>层级</th><th>地区</th><th>均价 (RM)</th><th aria-sort="none"><button type="button" class="price-change-heading" data-price-period="1" title="点击切换此周期的涨幅最大、跌幅最大及默认排序">昨日比较 <span class="sort-arrow" aria-hidden="true">↕</span></button></th><th aria-sort="none"><button type="button" class="price-change-heading" data-price-period="7" title="点击切换此周期的涨幅最大、跌幅最大及默认排序">7 天比较 <span class="sort-arrow" aria-hidden="true">↕</span></button></th><th aria-sort="none"><button type="button" class="price-change-heading" data-price-period="30" title="点击切换此周期的涨幅最大、跌幅最大及默认排序">30 天比较 <span class="sort-arrow" aria-hidden="true">↕</span></button></th><th>市场</th><th>关注</th></tr></thead><tbody id="price-table-body"></tbody></table></div><div class="table-foot"><span id="price-visible"></span><button type="button" class="secondary-button small" id="more-prices">加载更多</button></div></section>
-        <section class="panel"><div class="panel-heading"><div><h2>原始市场报价 · Daerah / Lokasi</h2><p>查看指定调查日的县、采集地点及实际原始报价；已被更新的旧 priceid 不重复展示。</p></div><button type="button" class="secondary-button small" id="fetch-markets">读取市场记录</button></div><div class="filters four"><label>FAMA 调查日期<select id="market-date"></select></label><label>州／直辖区<select id="market-state"><option value="">全部州</option></select></label><label>Daerah / Lokasi<input id="market-search" type="search" placeholder="例如 KINTA, IPOH"></label><label>农产品 / 品级<input id="market-product" type="search" placeholder="例如 TOMATO"></label></div><div class="table-top"><span id="market-status">选择日期并点击「读取市场记录」。</span></div><div class="table-scroll"><table><thead><tr><th>调查日期</th><th>州</th><th>Daerah</th><th>Lokasi</th><th>农产品 / 品级</th><th>层级</th><th>来源价格 (RM)</th></tr></thead><tbody id="market-body"><tr><td colspan="7" class="empty">尚未载入原始市场报价。</td></tr></tbody></table></div></section>
+        <section class="panel"><div class="panel-heading"><div><h2>原始市场报价 · Daerah / Lokasi</h2><p>查看指定调查日的县、采集地点及实际原始报价；已被更新的旧 priceid 不重复展示。</p></div><button type="button" class="secondary-button small" id="fetch-markets">读取市场记录</button></div><div class="filters four"><label>FAMA 调查日期<select id="market-date"></select></label><label>州／直辖区<select id="market-state"><option value="">全部州</option></select></label><label>Daerah / Lokasi<input id="market-search" type="search" placeholder="例如 KINTA, IPOH"></label><label>农产品 / 品级<input id="market-product" type="search" placeholder="例如 TOMATO"></label><label>价格层级<select id="market-level"><option value="">全部层级</option><option>Ladang</option><option>Borong</option><option>Runcit</option></select></label></div><div class="table-top"><span id="market-status">选择日期并点击「读取市场记录」。</span><label class="market-review-filter"><input type="checkbox" id="market-review-only"> 只看待核实</label></div><div class="table-scroll"><table><thead><tr><th>调查日期</th><th>州</th><th>Daerah</th><th>Lokasi</th><th>农产品 / 品级</th><th>层级</th><th>来源价格 (RM)</th></tr></thead><tbody id="market-body"><tr><td colspan="7" class="empty">尚未载入原始市场报价。</td></tr></tbody></table></div></section>
       </section>
 
       <section data-screen="history" class="screen" aria-labelledby="history-title"><div class="page-intro"><span class="eyebrow green">HISTORICAL COMPARISON</span><h1 id="history-title">历史趋势与州别价格</h1><p>只连接真实有记录的调查日；缺失日期不会人工补价。</p></div>
@@ -166,11 +166,14 @@
             <label>搜索农产品<input id="creator-signal-search" type="search" placeholder="例如 CILI, TIMUN, BAYAM"></label>
           </div>
           <div class="creator-signal-summary" id="creator-signal-summary" aria-live="polite">等候真实 FAMA 报价…</div>
-          <p class="creator-help">选题评分综合涨跌幅、市场覆盖、地区和讨论潜力。绝对涨跌 ≥ 50% 时标为待核实。</p>
+          <p class="creator-help">选题评分综合涨跌幅、市场覆盖、地区和讨论潜力。整体涨跌达到 50%、原始报价异常或单一市场影响过大时，会标为待核实。</p>
           <div class="creator-research">
             <details><summary>连续上涨与下跌</summary><p id="creator-trend-status" role="status"></p><ul id="creator-trends"></ul></details>
-            <details><summary>同日州际价差</summary><p>同品种、品级、单位和层级。每州至少 3 个调查市场。按相对价差排序。</p><p id="creator-spread-empty" hidden>当前筛选下暂无足够的州际样本。</p><ul id="creator-spreads"></ul></details>
+            <details><summary>同日州际价差</summary><p>同品种、品级、单位和层级。每州至少 3 个调查市场。排除含待核实报价的州级样本，按相对价差排序。</p><p id="creator-spread-empty" hidden>当前筛选下暂无足够的州际样本。</p><ul id="creator-spreads"></ul></details>
           </div>
+          <section id="creator-source-review" class="creator-source-review" hidden>
+            <h3>原始报价待核实</h3><p>所选调查日中含异常原始报价的州级样本。</p><ul id="creator-source-review-list"></ul>
+          </section>
           <div id="creator-signal-list" class="creator-signal-list" aria-live="polite"></div>
         </section>
         <section class="panel"><div class="panel-heading"><div><h2>历史均价趋势 · 辅助调查</h2><p>查看最近真实调查日的均价变化；不同日期的调查市场可能不一样，这不是同市场连续涨跌证据。</p></div></div><div id="creator-streak" class="creator-streak">点击选题中的「检查历史」，查看真实观察序列。</div></section>
@@ -266,7 +269,7 @@
   <p id="comparison-status" role="status"></p>
   <div id="comparison-result" hidden>
     <p id="comparison-reconciliation" class="creator-evidence"></p>
-    <p class="method-note">同品种、品级、单位、层级及市场。先求各市场当日均价，再对两日共有的市场等权平均。涨跌幅使用未四舍五入的均价。基准为 RM0 的单个市场只显示价差。</p>
+    <p class="method-note">同品种、品级、单位、层级及市场。先求各市场当日均价，再对两日共有的市场等权平均。涨跌幅使用未四舍五入的均价。基准为 RM0 的单个市场只显示价差。地点空白表示来源未填写，按州属、县区与 Sublevel 归组。</p>
     <label class="comparison-sort">排序<select id="comparison-sort"><option value="rise">涨幅最高</option><option value="fall">跌幅最大</option><option value="location">市场名称</option><option value="state">州属</option><option value="difference">绝对 RM 价差</option></select></label>
     <div class="table-scroll comparison-table" tabindex="0" role="region" aria-label="逐市场价格比较">
       <table><thead><tr><th>州属</th><th>县区</th><th>市场 / 地点</th><th>层级</th><th>Sublevel</th><th>基准调查日</th><th>基准均价</th><th>基准记录数</th><th>所选调查日</th><th>所选日均价</th><th>所选日记录数</th><th>价差</th><th>涨跌幅</th></tr></thead><tbody id="comparison-body"></tbody></table>

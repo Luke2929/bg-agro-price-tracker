@@ -1,5 +1,5 @@
 /* V3.4 Creator Workspace — pure data transforms; zero external services. */
-import {comparisonEvidence,quoteChange,PRICE_LEVELS,productIdentity,isValidISODate} from './engine.mjs?rev=price-evidence-1';
+import {comparisonEvidence,comparisonReviewReasons,quoteChange,PRICE_LEVELS,productIdentity,isValidISODate} from './engine.mjs?rev=price-evidence-2';
 
 export {isValidISODate};
 
@@ -66,6 +66,14 @@ export function scoreOpportunity(quote,context={}) {
   };
 }
 
+export function reviewMessage(reasons=[]){
+  return reasons.map(reason=>({
+    'large-change':'整体涨跌达到 50%',
+    'source-price':'参与计算的报价达到 FAMA 14 日参考均价的 10 倍',
+    'market-impact':'单一市场至少翻倍或减半，且移除后整体涨跌改变至少 10 个百分点'
+  })[reason]).filter(Boolean).join('。');
+}
+
 function quoteId(quote,period){
   return JSON.stringify([quote.date,quote.product_key,quote.level,quote.state,period]);
 }
@@ -84,12 +92,21 @@ export function findContentSignals(prices,{period=7,region='',category='',query=
   }
   const results=[];
   for(const quotes of byProduct.values()){
-    const valid=quotes.filter(q=>Math.abs(quoteChange(q,p).percent)<50);
-    const outliers=quotes.filter(q=>Math.abs(quoteChange(q,p).percent)>=50);
-    const allLevels=PRICE_LEVELS.every(l=>valid.some(q=>q.level===l));
-    const signs=valid.map(q=>Math.sign(quoteChange(q,p).percent));
-    const aligned=allLevels&&(signs.every(x=>x>0)||signs.every(x=>x<0));
-    const divergent=signs.some(x=>x>0)&&signs.some(x=>x<0);
+    const valid=quotes.filter(q=>!comparisonReviewReasons(quoteChange(q,p)).length);
+    const outliers=quotes.filter(q=>comparisonReviewReasons(quoteChange(q,p)).length);
+    const byBaseline=new Map();
+    for(const quote of valid){
+      const day=quoteChange(quote,p).previousDate;
+      if(!byBaseline.has(day))byBaseline.set(day,[]);
+      byBaseline.get(day).push(quote);
+    }
+    const aligned=[...byBaseline.values()].some(levels=>{
+      const signs=levels.map(q=>Math.sign(quoteChange(q,p).percent));
+      return PRICE_LEVELS.every(l=>levels.some(q=>q.level===l))&&
+        (signs.every(x=>x>0)||signs.every(x=>x<0));
+    });
+    const divergent=[...byBaseline.values()].some(levels=>
+      levels.some(q=>quoteChange(q,p).percent>0)&&levels.some(q=>quoteChange(q,p).percent<0));
     const risk=outliers.length>0;
     const leaders=type==='audit'||!valid.length?outliers:valid.filter(q=>
       type==='rise'?quoteChange(q,p).percent>0:type==='fall'?quoteChange(q,p).percent<0:true);
@@ -112,7 +129,6 @@ export function findContentSignals(prices,{period=7,region='',category='',query=
     if(type==='aligned'&&!aligned)continue;
     if(type==='divergent'&&!divergent)continue;
     if(type==='audit'&&!risk)continue;
-    if(type==='all'&&!item.publishable&&!item.flagged)continue;
     results.push(item);
   }
   return results.sort((a,b)=>{
@@ -125,6 +141,12 @@ export function findContentSignals(prices,{period=7,region='',category='',query=
   });
 }
 
+export function sourceReviewQuotes(prices,{region='',category='',query='',level=''}={}){
+  return prices.filter(quote=>quote.priceReview&&quote.state&&(region===''||quote.state===region)&&
+    (!level||quote.level===level)&&matchesTopic(quote,category,query)).sort((a,b)=>
+    a.varieti.localeCompare(b.varieti)||a.level.localeCompare(b.level)||a.state.localeCompare(b.state));
+}
+
 export function matchesTopic(quote,category='',query=''){
   return (!category||quote.kategori===category)&&(!query||
     [quote.varieti,quote.gred,quote.unit].join(' ').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
@@ -133,7 +155,7 @@ export function matchesTopic(quote,category='',query=''){
 export function statePriceSpreads(prices,{region='',category='',query=''}={}){
   const groups=new Map();
   for(const quote of prices){
-    if(!quote.state||quote.markets<3||!Number.isFinite(quote.price)||quote.price<0||
+    if(!quote.state||quote.priceReview||quote.markets<3||!Number.isFinite(quote.price)||quote.price<0||
       !matchesTopic(quote,category,query))continue;
     const key=JSON.stringify([quote.product_key,quote.level,quote.date]);
     if(!groups.has(key))groups.set(key,[]);
@@ -168,20 +190,21 @@ export function draftSettings(settings={}){
 export function evidenceForQuote(quote,period,prices=[quote],surveyDate=quote?.date){
   const comparison=comparisonEvidence(quote,period,surveyDate);
   if(!comparison)return null;
-  const flagged=Math.abs(comparison.percent)>=50||prices.some(other=>other.product_key===quote.product_key&&other.state===quote.state&&
-    Math.abs(quoteChange(other,period)?.percent)>=50);
+  const flagged=comparison.reviewReasons.length>0||prices.some(other=>
+    other.product_key===quote.product_key&&other.state===quote.state&&
+    comparisonReviewReasons(quoteChange(other,period)).length);
   return {...comparison,id:quoteId(quote,period),source:'FAMA AMI',flagged,publishable:!flagged};
 }
 
 function checkedEvidence(signal){
-  if(!signal?.publishable||signal.flagged||Math.abs(signal.percent)>=50)
+  if(!signal?.publishable||signal.flagged||signal.reviewReasons?.length||Math.abs(signal.percent)>=50)
     throw Error('此选题缺少可发布的合格数据，请先核实。');
   const quote={
     product_key:signal.productKey,varieti:signal.product,gred:signal.grade,unit:signal.unit,
     level:signal.level,state:signal.region,date:signal.currentDate,
     changes:{[signal.period]:{
       eligible:true,previous:signal.previousMean,current:signal.currentMean,
-      rmDifference:signal.rmDifference,percent:signal.percent,markets:signal.markets,
+      rmDifference:signal.rmDifference,percent:signal.percent,rawPercent:signal.rawPercent,markets:signal.markets,
       previousDate:signal.previousDate,currentDate:signal.currentDate,days:signal.period,
       actualDays:signal.actualDays,currentMarkets:signal.currentMarkets,previousMarkets:signal.previousMarkets,
       currentCoverage:signal.currentCoverage,previousCoverage:signal.previousCoverage
@@ -334,6 +357,7 @@ export function observedStreak(history,{level='Borong',state='',endDate}={}){
   const last=points.slice(-5);
   let sign=0,count=0;
   for(let i=last.length-1;i>=1;i--){
+    if(last[i].priceReview||last[i-1].priceReview)break;
     const diff=last[i].price-last[i-1].price;
     const current=Math.sign(diff);
     if(current===0)break;

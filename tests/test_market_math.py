@@ -103,3 +103,23 @@ def test_v34_archive_price_regressions():
             (change["current"] - change["previous"]) / change["previous"] * 100, abs=1e-12
         )
         assert f'{change["percent"]:+.1f}%' == expected["display"]
+        assert change.get("reviewReasons", []) == expected.get("reviewReasons", [])
+
+
+def test_one_market_can_require_review_below_headline_threshold():
+    day, baseline = "2026-11-13", "2026-11-06"
+    rows = as_rows({"observations": [
+        {"date": day, "market": market, "price": price}
+        for market, price in zip("ABC", (6, 2, 2))
+    ] + [{"date": baseline, "market": market, "price": 2} for market in "ABC"]})
+    rows[0]["average14"] = "0.6"
+    change = MatchedMarketComparator(rows).compare(product_key(rows[0]), day, 7, "Runcit", "PERAK")
+    assert change["eligible"]
+    assert change["percent"] == pytest.approx(100 * 2 / 3)
+    assert change["reviewReasons"] == ["source-price", "market-impact"]
+
+    rows[0]["harga"] = "4.20"
+    del rows[0]["average14"]
+    change = MatchedMarketComparator(rows).compare(product_key(rows[0]), day, 7, "Runcit", "PERAK")
+    assert change["percent"] == pytest.approx(100 * 2.2 / 6)
+    assert change["reviewReasons"] == ["market-impact"]

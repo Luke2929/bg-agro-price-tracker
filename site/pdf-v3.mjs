@@ -2,6 +2,8 @@
  * official CSV rows; no server, dependency, fallback data, or price estimates.
  * Full report retains all source IDs, revisions and missing values.
  */
+import {canonicalDailyRows,isValidISODate,sourcePriceNeedsReview,validPrice} from './v3.1/engine.mjs?rev=price-evidence-2';
+
 const W=420,H=744,LEFT=26,RIGHT=394,CONTENT_END=636;
 const C={ink:'#1B3430',green:'#143B30',accent:'#23654C',bg:'#F4F8F5',white:'#FFFFFF',
   pale:'#E8F2EB',muted:'#607570',border:'#DCE6E0',gold:'#B16E16',blue:'#2B63AA'};
@@ -15,7 +17,7 @@ function plain(v){return String(v??'').replace(/[\u2012-\u2015]/g,'-')
   .normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,'?');}
 function literal(v){return '('+plain(v).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)')+')';}
 function rgb(hex){return [0,2,4].map(i=>(parseInt(hex.slice(1+i,3+i),16)/255).toFixed(3)).join(' ');}
-function price(row){const s=String(row.harga??'').trim();if(!s)return null;const n=Number(s);return Number.isFinite(n)&&n>=0?n:null;}
+function price(row){return validPrice(row.harga);}
 function money(v){return Number.isFinite(v)?'RM '+v.toFixed(2):'-';}
 function key(row,cols){return cols.map(c=>String(row[c]??'').trim()).join('\u001e');}
 function productName(row){return [row.varieti,row.gred,row.unit].filter(Boolean).join(' / ')||'Komoditi tidak dinyatakan';}
@@ -41,18 +43,17 @@ function wrapLines(text,maxWidth,size=10,bold=false){
   if(line)lines.push(line);
   return lines.length?lines:['-'];
 }
-function priceRange(values,compact=false){
+function priceRange(values){
   const valid=values.filter(v=>v!==null);
   if(!valid.length)return '-';
   const min=Math.min(...valid),max=Math.max(...valid);
-  if(min===max)return compact?min.toFixed(2):money(min);
-  return compact?min.toFixed(2)+'-'+max.toFixed(2):money(min)+' - '+money(max);
+  return min===max?min.toFixed(2):min.toFixed(2)+'-'+max.toFixed(2);
 }
 export function canonicalPdfRows(rows,superseded={}){
-  const last=new Map();
-  rows.forEach((r,i)=>{if(String(r.priceid??'').trim())last.set(key(r,['tarikh_harga','priceid']),i);});
-  return rows.filter((r,i)=>!new Set(superseded[r.tarikh_harga]||[]).has(String(r.priceid??''))&&
-    (!String(r.priceid??'').trim()||last.get(key(r,['tarikh_harga','priceid']))===i));
+  const days=byKey(rows,['tarikh_harga']);
+  const canonical=new Set([...days.values()].flatMap(daily=>
+    canonicalDailyRows(daily,superseded[daily[0].tarikh_harga]||[])));
+  return rows.filter(row=>canonical.has(row));
 }
 export function pdfPriceRanges(rows){
   const groups=new Map();
@@ -169,8 +170,12 @@ function bodyPage(doc,title,{anchor,parent,subtitle,section}={}){
   const p=doc.page(title,{anchor,parent,subtitle,section});
   return p;
 }
-function tierValues(rows,level){return rows.filter(r=>r.peringkat===level).map(price);}
-function rangeCompact(rows,level){const vals=tierValues(rows,level);return vals.some(v=>v!==null)?'RM '+priceRange(vals,true):'-';}
+function tierRange(rows,level,withCurrency=false){
+  const tier=rows.filter(row=>row.peringkat===level);
+  const range=priceRange(tier.map(price));
+  const marker=tier.some(row=>sourcePriceNeedsReview(row))?' *':'';
+  return (withCurrency&&range!=='-'?'RM ':'')+range+marker;
+}
 function byKey(rows,fields){const map=new Map();for(const r of rows){
   const id=key(r,fields);if(!map.has(id))map.set(id,[]);map.get(id).push(r);
 }return map;}
@@ -195,7 +200,7 @@ function reportCover(doc,rows,{from,to,full}){
   p.wrap('3. Pilih tarikh, negeri, daerah dan lokasi. Tekan kotak untuk melompat.',LEFT,499,355,10,C.ink,false,17);
   p.fill(LEFT,551,RIGHT-LEFT,78,C.pale);
   p.text('PERINGATAN',LEFT+13,569,9.6,C.green,true);
-  p.wrap('Liputan tidak semestinya lengkap bagi semua negeri. Tanda (-) bermaksud tiada harga direkodkan, bukan RM0.',
+  p.wrap('(-) Tiada harga. (*) Semak harga dan unit; ada rekod sekurang-kurangnya 10 kali purata rujukan FAMA 14 hari.',
     LEFT+13,591,336,8.9,C.ink,false,14);
   if(full){
     button(p,'QUICK VIEW','guide',LEFT,648,164);
@@ -273,7 +278,7 @@ function quickStatePages(doc,rows,canonical,ctx,{full}){
     let cy=y+42;
     for(const item of items){
       cy=p.wrap(item.name,LEFT+12,cy,337,8.8,C.ink,true,11);
-      p.text(LEVELS.map((l,i)=>l[0]+' '+priceRange(tierValues(item.group,l),true)).join('      '),
+      p.text(LEVELS.map(l=>l[0]+' '+tierRange(item.group,l)).join('      '),
         LEFT+12,cy+1,8.2,C.muted);
       cy+=22;
     }
@@ -364,13 +369,13 @@ function renderLocation(doc,{date,state,district,location,rows,canonical,anchor,
       LEVELS.forEach((level,i)=>{
         const x=LEFT+12+i*121;
         p.text(level.toUpperCase(),x,cy,8.1,[C.accent,C.gold,C.blue][i],true);
-        p.text(rangeCompact(valid,level),x,cy+18,9.4,C.ink,true);
+        p.text(tierRange(valid,level,true),x,cy+18,9.4,C.ink,true);
       });
       cy+=43;
       p.text('Rekod asal ('+group.length+')'+(offset?' - sambungan':''),LEFT+12,cy,8.1,C.muted,true);
       cy+=15;
       for(const r of group.slice(offset,offset+count)){
-        p.text(r.peringkat+' '+money(price(r))+' | ID '+(r.priceid||'-')+
+        p.text(r.peringkat+' '+money(price(r))+(sourcePriceNeedsReview(r)?' *':'')+' | ID '+(r.priceid||'-')+
           (canonicalSet.has(r)?'':' [PINDAAN]'),LEFT+12,cy,8,C.muted);
         cy+=13;
       }
@@ -420,11 +425,15 @@ function quickReport(rows,{from,to,canonical}){
   const doc=new Pdf();quickAndCover(doc,rows,canonical,{from,to,full:false});return doc.finish();
 }
 export function buildFamaPdf(records,{from,to,state='',level='',type='quick',superseded={}}={}){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||from>to)
+  if(!isValidISODate(from)||!isValidISODate(to)||from>to)
     throw Error('Invalid PDF date range');
   if(!Array.isArray(records)||!records.length)throw Error('No FAMA records for PDF');
-  if(records.some(r=>r.tarikh_harga<from||r.tarikh_harga>to))throw Error('PDF date mismatch');
-  const canonical=canonicalPdfRows(records,superseded),rows=orderRows(records);
+  if(records.some(r=>!isValidISODate(r.tarikh_harga)||r.tarikh_harga<from||r.tarikh_harga>to))
+    throw Error('PDF date mismatch');
+  const inScope=row=>(!state||row.negeri===state)&&(!level||row.peringkat===level);
+  const rows=orderRows(records.filter(inScope));
+  if(!rows.length)throw Error('No FAMA records for PDF');
+  const canonical=canonicalPdfRows(records,superseded).filter(inScope);
   if(type==='quick')return quickReport(rows,{from,to,state,level,canonical});
   if(type==='full')return fullReport(rows,{from,to,state,level,canonical});
   throw Error('Unknown PDF report type');
