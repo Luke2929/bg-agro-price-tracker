@@ -4,8 +4,8 @@ import {
  findContentSignals,composeCreatorDraft,observedStreak,formatPercent,formatPrice,
  evidenceForQuote,validateCreatorDraft,draftSettings,statePriceSpreads,matchesTopic,
  toCSV,normalizeMetrics,isValidISODate
-} from './creator-core.mjs';
-import {escapeHtml,mytDate,comparisonMarketDetails} from './engine.mjs';
+} from './creator-core.mjs?rev=price-evidence-1';
+import {escapeHtml,mytDate,comparisonMarketDetails} from './engine.mjs?rev=price-evidence-1';
 const $=id=>document.getElementById(id),v=id=>$(id).value;
 const metrics=['reach','likes','comments','shares','messages','joins','orders'];
 const names={idea:'选题',draft:'草稿',scheduled:'计划发布',published:'已发布'};

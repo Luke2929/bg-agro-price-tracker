@@ -3,10 +3,10 @@ import {FAMA_COLUMNS,escapeHtml,fmtMoney,fmtDate,ageDays,mytDate,quoteChange,
   archiveComparisonDates,buildPriceDateSnapshot,shiftSurveyDate,
   validPrice,summarizeRows,PRICE_LEVELS,canonicalDailyRows,productAreaRows,productScopePrices,
   comparisonEvidence,comparisonMarketDetails,matchedMarketStreaks,
-  productAreaOptions} from './engine.mjs';
+  productAreaOptions} from './engine.mjs?rev=price-evidence-1';
 import {buildXlsx,downloadXlsx} from './excel.mjs';
-import {createCreatorWorkspace} from './creator-app.mjs';
-import {buildMarketPostIdea,evidenceForQuote,formatPercent,formatPrice} from './creator-core.mjs';
+import {createCreatorWorkspace} from './creator-app.mjs?rev=price-evidence-1';
+import {buildMarketPostIdea,evidenceForQuote,formatPercent,formatPrice} from './creator-core.mjs?rev=price-evidence-1';
 import {buildFamaPdf,downloadPdf} from '../pdf.mjs';
 
 const $=id=>document.getElementById(id);

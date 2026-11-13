@@ -22,7 +22,7 @@ test('all six V3.1 routes have a navigation target and screen',()=>{
   }
 });
 test('V3.1 uses modular local scripts, no CDN or external JavaScript dependencies',()=>{
-  assert.match(html,/script type="module" src="\.\/app\.mjs"/);
+  assert.match(html,/script type="module" src="\.\/app\.mjs\?rev=[^"]+"/);
   assert.doesNotMatch(html,/<script[^>]+https?:\/\//);
   assert.match(style,/@media\(max-width:790px\)/);
 });
@@ -142,6 +142,18 @@ test('price evidence dialog and public content actions use the shared archive an
   assert.match(creator,/makeCard\(verifiedEvidence,platform,options\(\)\.settings\)/);
 });
 
+test('Pages loads the same cache revision for the dashboard and its price evidence modules',()=>{
+  const revision=html.match(/src="\.\/app\.mjs\?rev=([^"]+)"/)?.[1];
+  assert.ok(revision);
+  assert.ok(html.includes('./styles.css?rev='+revision));
+  const creator=readFileSync(new URL('../site/v3.1/creator-app.mjs',import.meta.url),'utf8');
+  const core=readFileSync(new URL('../site/v3.1/creator-core.mjs',import.meta.url),'utf8');
+  for(const [source,names] of [[code,['engine','creator-app','creator-core']],
+    [creator,['engine','creator-core']],[core,['engine']]]){
+    for(const name of names)assert.ok(source.includes("'./"+name+".mjs?rev="+revision+"'"));
+  }
+});
+
 
 test('V3.4 creator routes and workflows are wired to the original dashboard',()=>{
   const creator=readFileSync(new URL('../site/v3.1/creator-app.mjs',import.meta.url),'utf8');
@@ -151,7 +163,7 @@ test('V3.4 creator routes and workflows are wired to the original dashboard',()=
     assert.match(html,new RegExp('data-page="'+page+'"'));
   }
   assert.match(html,/MALAYSIA PRICE MONITOR · V3\.4/);
-  assert.match(code,/import \{createCreatorWorkspace\} from '\.\/creator-app\.mjs'/);
+  assert.match(code,/import \{createCreatorWorkspace\} from '\.\/creator-app\.mjs\?rev=[^']+'/);
   assert.match(code,/creator\.bind\(\)/);
   assert.match(code,/creator\.refresh\(\)/);
   assert.match(code,/creator\.render\(page\)/);
