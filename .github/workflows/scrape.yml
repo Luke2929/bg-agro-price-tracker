@@ -151,60 +151,63 @@ jobs:
             python -m scripts.health_v3
           fi
 
-      - name: Refresh newest-first daily CSV archive index
-        run: python -m scripts.build_daily_index
-
       # A successful scrape is not necessarily a new daily price publication.
       # Show a warning and a separate GitHub summary when FAMA's data is old,
       # without discarding valid archive rows or preventing Pages deployment.
       - name: Audit latest FAMA survey date
         run: python -m scripts.check_freshness
 
-      - name: Commit updated FAMA data
+      - name: Commit updated FAMA data and refresh GitHub CSV index
         id: commit_data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add data site/data DAILY_PRICE_INDEX.md
+          # Commit CSV and dashboard data first. Last-commit metadata must
+          # come from the actual committed CSV change, not stale HEAD data.
+          git add data site/data
+          data_changed=false
 
-          # Ignore commits containing only the generated timestamp
+          # Ignore changes containing only the regenerated meta timestamp.
           if git diff --cached --quiet -- ':!site/data/meta.json'; then
-
             echo "No new FAMA price changes detected."
-            echo "Skipping data commit."
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-
             git reset -q
-
+            git restore -- site/data/meta.json
           else
-
-            echo "New FAMA data detected."
-
             git commit -m "data: scrape $(date -u +'%Y-%m-%d %H:%M') UTC"
+            data_changed=true
+          fi
 
+          # A second, small index commit captures the correct last commit for
+          # CSVs just committed above. No CSV is edited by the index generator.
+          python -m scripts.build_daily_index
+          git add DAILY_PRICE_INDEX.md
+          index_changed=false
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: refresh daily CSV index and commit metadata"
+            index_changed=true
+          fi
+
+          if [ "$data_changed" = false ] && [ "$index_changed" = false ]; then
+            echo "No CSV or index changes detected; skipping push."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
             pushed=0
-
             for i in 1 2 3; do
-
               if git pull --rebase origin master && git push origin master; then
-                echo "Successfully pushed updated FAMA data."
+                echo "Successfully pushed updated FAMA archive/index."
                 pushed=1
                 break
               fi
-
               echo "Push attempt $i failed."
               sleep $((i * 10))
-
             done
 
             if [ "$pushed" -ne 1 ]; then
-              echo "ERROR: Failed to push FAMA data."
+              echo "ERROR: Failed to push FAMA archive/index."
               exit 1
             fi
-
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
-
           fi
 
       # Prepare GitHub Pages
