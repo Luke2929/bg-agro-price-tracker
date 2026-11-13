@@ -144,6 +144,9 @@ test('V3.4 creator routes and workflows are wired to the original dashboard',()=
   assert.match(html,/id="creator-kpis"/);
   assert.match(html,/id="creator-body"/);
   assert.match(html,/id="creator-calendar-month"/);
+  assert.match(html,/id="creator-calendar-grid"/);
+  assert.match(creator,/const firstDay=new Date\(Date\.UTC\(year,mon-1,1\)\)/);
+  assert.match(creator,/data-creator-edit/);
   assert.match(html,/id="creator-import-json"/);
   assert.match(creator,/navigator\.clipboard\.writeText/);
   assert.match(creator,/canvas\.toBlob/);
