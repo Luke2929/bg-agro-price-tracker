@@ -7,6 +7,8 @@ from scripts.build_daily_index import (
     format_commit_time,
     parse_git_log,
     render_data_status,
+    render_historical_status,
+    load_historical_checks,
 )
 
 
@@ -115,3 +117,70 @@ def test_unverified_archive_never_claims_complete(tmp_path):
     markdown = build_index(["2026-07-01.csv"], {}, {"dates": {}}, tmp_path)
     assert "⚪ Not audited" in markdown
     assert "| [2026-07-01.csv](data/daily/2026-07-01.csv) **(Latest)** | — | — | ⚪ Not audited |" in markdown
+
+
+
+def test_historical_control_match_is_not_current_csv_verification(tmp_path):
+    log_entry = {
+        "source_repo": "ipohbot-png/fama-price-tracker",
+        "run_id": "39150661545",
+        "expected": 63,
+        "fetched": 63,
+        "status": "ok+archive",
+        "log_at_utc": "2026-10-18T17:41:21.9092894Z",
+    }
+    result = render_historical_status(log_entry)
+    assert "📜 Historical match" in result
+    assert "current CSV not rechecked" in result
+    assert "FAMA 63/63" in result
+    assert "2026-10-19 01:41 MYT" in result
+    assert "ipohbot-png/fama-price-tracker/actions/runs/39150661545" in result
+
+    # This is a historical source-control match, not proof of today's CSV.
+    md = build_index(
+        ["2026-09-20.csv"], {}, {"dates": {}}, tmp_path,
+        {"dates": {"2026-09-20": log_entry}},
+    )
+    row = next(line for line in md.splitlines() if "2026-09-20.csv](data/daily/" in line)
+    assert "Historical match" in row
+    assert "Snapshot matched" not in row
+
+
+def test_live_audit_supersedes_historical_evidence(tmp_path):
+    from scripts.daily_audit import sha256_file
+
+    csv = tmp_path / "2026-10-14.csv"
+    csv.write_text("priceid\n1\n2\n", encoding="utf-8")
+    live = {"dates": {"2026-10-14": {
+        "expected": 2, "fetched": 2, "archive_rows": 2,
+        "preserved_fields": 0, "csv_sha256": sha256_file(csv),
+        "verified_at_utc": "2026-11-13T04:11:57+00:00", "run_id": "12345",
+    }}}
+    history = {"dates": {"2026-10-14": {
+        "source_repo": "Luke2929/bg-agro-price-tracker",
+        "run_id": "41166427506", "expected": 5202, "fetched": 5202,
+        "log_at_utc": "2026-10-31T03:56:59Z", "status": "ok",
+    }}}
+    md = build_index(["2026-10-14.csv"], {}, live, tmp_path, history)
+    row = next(line for line in md.splitlines() if "2026-10-14.csv](data/daily/" in line)
+    assert "✅ Snapshot matched" in row
+    assert "Historical match" not in row
+
+
+def test_invalid_historical_log_evidence_cannot_claim_match():
+    record = {
+        "source_repo": "ipohbot-png/fama-price-tracker",
+        "run_id": "1", "expected": 100, "fetched": 99,
+        "status": "MISMATCH", "log_at_utc": "2026-10-01T00:00:00Z",
+    }
+    assert render_historical_status(record) == "⚠️ Invalid historical evidence"
+    assert render_historical_status(None) == "⚪ Not audited"
+
+
+def test_historical_log_loader_checks_schema(tmp_path):
+    import json
+    path = tmp_path / "history.json"
+    path.write_text(json.dumps({"schema": "other", "dates": {}}), encoding="utf-8")
+    import pytest
+    with pytest.raises(ValueError):
+        load_historical_checks(path)
