@@ -106,3 +106,23 @@ test('price explorer date selector recalculates historic matched-market comparis
   assert.match(code,/selectOptions\(\$\('price-date'\),\[\.\.\.meta\.archive_dates\]\.reverse\(\)/);
   assert.match(style,/\.price-date-toolbar/);
 });
+
+
+test('overview replaces giant promotional hero with FAMA daily story board and copy controls',()=>{
+  assert.match(html,/class="insight-board"/);
+  for(const id of ['insight-date','insight-rise','insight-fall',
+    'insight-aligned','insight-warning','insight-method'])
+    assert.match(html,new RegExp('id="'+id+'"'));
+  for(const period of [1,7,30])assert.match(html,new RegExp('data-insight-period="'+period+'"'));
+  assert.doesNotMatch(html,/class="hero"/);
+  assert.doesNotMatch(code,/\$\('hero-date'\)/);
+  assert.match(code,/renderDailyInsights\(\)/);
+  assert.match(code,/dailyStorySignals\(store\.overview\.prices,period\)/);
+  assert.match(code,/buildMarketPostIdea\(quote,store\.period,store\.overview\.survey_date\)/);
+  assert.match(code,/navigator\.clipboard\.writeText\(message\)/);
+  assert.match(code,/data-insight-copy=/);
+  assert.match(code,/data-insight-view=/);
+  assert.match(code,/renderMovers\(\);renderDailyInsights\(\)/,'period buttons remain in sync');
+  assert.match(style,/\.insight-board/);
+  assert.match(style,/\.insight-aux-grid/);
+});
