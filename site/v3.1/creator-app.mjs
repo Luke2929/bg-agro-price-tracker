@@ -220,6 +220,8 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
       tell('人工表现数据已保存；未连接社媒平台。');
     }catch(e){tell(e.message,true);}
   }
+  const recordDay=r=>r.status==='published'?
+    (r.postedDate||r.scheduledDate):(r.scheduledDate||r.postedDate);
   function calendarRender(){
     const stats=contentMetrics(workspace);
     const items=[['总内容','records'],['草稿','drafts'],['计划发布','scheduled'],
@@ -231,14 +233,44 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
       channel=v('creator-calendar-platform');
     const rows=workspace.records.filter(r=>(!filter||r.status===filter)&&
       (!channel||r.channel===channel)&&
-      (!month||!(r.scheduledDate||r.postedDate)||
-        (r.scheduledDate||r.postedDate).startsWith(month)))
-      .sort((a,b)=>(b.scheduledDate||b.postedDate||b.updatedAt)
-        .localeCompare(a.scheduledDate||a.postedDate||a.updatedAt));
+      (!month||!recordDay(r)||recordDay(r).startsWith(month)))
+      .sort((a,b)=>(recordDay(b)||b.updatedAt)
+        .localeCompare(recordDay(a)||a.updatedAt));
+    const shownMonth=/^\d{4}-\d{2}$/.test(month)?month:mytDate().slice(0,7);
+    const year=Number(shownMonth.slice(0,4)),mon=Number(shownMonth.slice(5,7));
+    const firstDay=new Date(Date.UTC(year,mon-1,1));
+    const offset=(firstDay.getUTCDay()+6)%7; // Monday first
+    const lastDay=new Date(Date.UTC(year,mon,0)).getUTCDate();
+    const days=new Map();
+    for(const r of rows){
+      const day=recordDay(r);
+      if(!day?.startsWith(shownMonth))continue;
+      if(!days.has(day))days.set(day,[]);
+      days.get(day).push(r);
+    }
+    const headings=['一','二','三','四','五','六','日']
+      .map(day=>'<span class="creator-day-title">'+day+'</span>').join('');
+    const blanks=Array.from({length:offset},()=>'<span class="creator-day creator-day-blank"></span>').join('');
+    let cells='';
+    for(let number=1;number<=lastDay;number++){
+      const day=shownMonth+'-'+String(number).padStart(2,'0');
+      const events=days.get(day)||[];
+      const isToday=day===mytDate();
+      cells+='<div class="creator-day'+(isToday?' creator-day-today':'')+'">'+
+        '<span class="creator-day-number">'+number+'</span>'+
+        events.slice(0,3).map(r=>
+          '<button type="button" class="creator-day-event creator-event-'+
+          r.status+'" data-creator-edit="'+escapeHtml(r.id)+'" title="'+
+          escapeHtml(names[r.status]+' · '+r.title)+'">'+
+          escapeHtml(r.title.slice(0,17))+'</button>').join('')+
+        (events.length>3?'<small>另有 '+(events.length-3)+' 篇</small>':'')+
+        '</div>';
+    }
+    $('creator-calendar-grid').innerHTML=headings+blanks+cells;
     $('creator-schedule').innerHTML=rows.map(r=>
       '<article class="creator-calendar-entry"><div><strong>'+escapeHtml(r.title)+
       '</strong><small>'+channels[r.channel]+' · '+names[r.status]+' · '+
-      escapeHtml(r.scheduledDate||r.postedDate||'尚未排期')+'</small>'+
+      escapeHtml(recordDay(r)||'尚未排期')+'</small>'+
       (r.postUrl?'<a href="'+escapeHtml(r.postUrl)+'" target="_blank" rel="noopener noreferrer">打开原帖 ↗</a>':'')+
       '</div><div class="creator-actions"><button type="button" class="secondary-button small" data-creator-edit="'+
       escapeHtml(r.id)+'">编辑</button><button type="button" class="secondary-button small" data-creator-delete="'+
@@ -313,6 +345,10 @@ export function createCreatorWorkspace({getOverview,loadHistory,notify,navigate}
       }
       const trend=e.target.closest('[data-creator-history]');
       if(trend)inspectHistory(Number(trend.dataset.creatorHistory));
+    });
+    $('creator-calendar-grid').addEventListener('click',e=>{
+      const action=e.target.closest('[data-creator-edit]');
+      if(action)edit(action.dataset.creatorEdit);
     });
     $('creator-schedule').addEventListener('click',e=>{
       const btn=e.target.closest('[data-creator-edit]');
