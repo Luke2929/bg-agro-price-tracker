@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {ageDays,mytDate,rankMovers,filterQuotes,quoteChange,historySeries,parseCSV,
+import {ageDays,mytDate,rankMovers,dailyStorySignals,buildMarketPostIdea,filterQuotes,quoteChange,historySeries,parseCSV,
   summarizeRows,FAMA_COLUMNS,sortQuotesByChange,groupQuotesByProduct,archiveComparisonDates,
   buildPriceDateSnapshot,shiftSurveyDate,productIdentity,canonicalDailyRows,productAreaRows,
   localLevelPrices,productScopePrices,productAreaOptions} from '../site/v3.1/engine.mjs';
@@ -358,4 +358,72 @@ test('matched date lookup never substitutes an invalid candidate with older one'
   assert.equal(change.markets,1);
   assert.equal(change.eligible,false);
   assert.equal(quoteChange(snapshot.prices.find(p=>!p.state),7),null);
+});
+
+
+test('daily content board selects actual eligible nationwide rises and falls, without state or low-market duplicates',()=>{
+  const make=(name,level,pct,{eligible=true,state='',markets=16,prev='2026-11-06'}={})=>({
+    varieti:name,product_key:name+'||F.A.Q||Kilogram',gred:'F.A.Q',unit:'Kilogram',
+    level,state,changes:{7:{percent:pct,eligible,markets,previousDate:prev,
+      currentCoverage:1,previousCoverage:1}}
+  });
+  const quotes=[
+    make('TOMATO','Runcit',11.44),
+    make('BAYAM','Borong',9.78),
+    make('KACANG PANJANG','Runcit',-6.68),
+    make('KACANG PANJANG','Borong',-6.12),
+    make('TELUR AYAM','Ladang',-90.94),
+    make('TEST IMPOSSIBLE','Runcit',99,{eligible:false,markets:1}),
+    make('STATE ONLY','Runcit',-45,{state:'PERAK'})
+  ];
+  const analysis=dailyStorySignals(quotes,7);
+  assert.equal(analysis.comparableCount,5);
+  assert.equal(analysis.rise.varieti,'TOMATO');
+  assert.equal(analysis.fall.varieti,'KACANG PANJANG');
+  assert.equal(analysis.extreme.varieti,'TELUR AYAM');
+  assert.equal(analysis.extremeCount,1);
+  assert.equal(analysis.aligned,null);
+  const post=buildMarketPostIdea(analysis.rise,7,'2026-11-13');
+  assert.match(post,/TOMATO NAIK \+11\.4%/);
+  assert.match(post,/2026-11-13 berbanding 2026-11-06/);
+  assert.match(post,/16 lokasi pasaran yang sama/);
+  assert.match(post,/bukan harga tetap atau bukti keuntungan petani/);
+  assert.equal(buildMarketPostIdea(analysis.extreme,7,'2026-11-13'),'');
+  assert.equal(buildMarketPostIdea(quotes[5],7,'2026-11-13'),'');
+  assert.equal(buildMarketPostIdea(quotes[6],7,'2026-11-13'),'');
+});
+
+test('daily content board spots all three level aligned trends using same product grade and unit',()=>{
+  const q=(name,level,pct,unit='Kilogram')=>({
+    varieti:name,gred:'F.A.Q',unit,product_key:name+'||F.A.Q||'+unit,state:'',
+    level,changes:{30:{eligible:true,percent:pct,markets:9,previousDate:'2026-10-14'}}
+  });
+  const rows=[
+    q('TIMUN HIJAU','Ladang',41),q('TIMUN HIJAU','Borong',28),q('TIMUN HIJAU','Runcit',21),
+    q('BAYAM','Ladang',3),q('BAYAM','Borong',11),q('BAYAM','Runcit',9),
+    q('CILI','Ladang',-8),q('CILI','Borong',-7),q('CILI','Runcit',-9),
+    q('CILI','Runcit',-48,'Biji')
+  ];
+  const result=dailyStorySignals(rows,30);
+  assert.equal(result.aligned.varieti,'TIMUN HIJAU');
+  assert.equal(result.aligned.direction,'up');
+  assert.deepEqual(result.aligned.levels.map(x=>x.level),['Ladang','Borong','Runcit']);
+  assert.equal(result.aligned.strength,21);
+  assert.equal(result.extremeCount,0);
+  assert.match(buildMarketPostIdea(result.fall,30,'2026-11-13'),/TURUN -9\.0%/);
+  assert.equal(dailyStorySignals(rows,1).rise,null,'no fabricated baseline for absent period');
+});
+
+test('daily editorial guards an extreme increase, mismatched levels, and non-price-zero returns',()=>{
+  const one=(pct,level='Runcit',name='SAYUR')=>({
+    product_key:name+'||F.A.Q||Kilogram',varieti:name,gred:'F.A.Q',
+    unit:'Kilogram',level,state:'',changes:{1:{percent:pct,eligible:true,markets:3,previousDate:'2026-11-12'}}
+  });
+  const analysis=dailyStorySignals([one(50),one(-2,'Borong'),one(0,'Ladang')],1);
+  assert.equal(analysis.extremeCount,1);
+  assert.equal(analysis.rise,null);
+  assert.equal(analysis.fall.level,'Borong');
+  assert.equal(analysis.aligned,null);
+  assert.equal(buildMarketPostIdea(one(0),1,'2026-11-13'),'');
+  assert.equal(buildMarketPostIdea(null,1,'2026-11-13'),'');
 });
