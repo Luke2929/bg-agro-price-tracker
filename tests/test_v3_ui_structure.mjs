@@ -89,3 +89,20 @@ test('product-group mode defaults to one label per full product, keeping level-s
   assert.match(style,/\.price-level-borong/);
   assert.match(style,/\.price-level-runcit/);
 });
+
+
+test('price explorer date selector recalculates historic matched-market comparison windows',()=>{
+  assert.match(html,/id="price-date"/);
+  assert.match(html,/id="price-date-latest"/);
+  assert.match(html,/id="price-date-status"/);
+  assert.match(code,/archiveComparisonDates\(store\.meta\.archive_dates,selected\)/);
+  assert.match(code,/buildPriceDateSnapshot\(archive,/);
+  assert.match(code,/store\.priceData=snapshot/);
+  assert.match(code,/filterQuotes\(store\.priceData\.prices,filters\(\)\)/);
+  assert.match(code,/store\.priceData\.survey_date/);
+  assert.match(code,/loadPriceDate\(\)/);
+  assert.match(code,/if\(sequence!==store\.priceDateRequest\)return/);
+  assert.match(code,/store\.priceData\?\.prices\[Number\(btn\.dataset\.watchIndex\)\]/);
+  assert.match(code,/selectOptions\(\$\('price-date'\),\[\.\.\.meta\.archive_dates\]\.reverse\(\)/);
+  assert.match(style,/\.price-date-toolbar/);
+});
