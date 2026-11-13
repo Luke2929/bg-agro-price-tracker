@@ -524,3 +524,31 @@ def test_run_rejects_bad_source_identity_without_publishing(
     assert scrape.run(["--out-dir", str(tmp_path)]) == 1
     assert "invalid source record identity" in capsys.readouterr().err
     assert not (tmp_path / "2026-07-25.csv").exists()
+
+
+def test_run_writes_audit_only_after_all_dates_verify(tmp_path, monkeypatch):
+    from scripts.daily_audit import load_audit, sha256_file
+
+    audit_path = tmp_path / "audit.json"
+    monkeypatch.setenv("FAMA_AUDIT_FILE", str(audit_path))
+
+    def fetch(client, date_str, **kwargs):
+        row = make_record(date_str, tarikh_harga=date_str)
+        return _fetch_ok([row])(client, date_str, **kwargs)
+
+    stub_run(monkeypatch, [("2026-07-25", 1), ("2026-07-26", 1)], fetch)
+    assert scrape.run(["--out-dir", str(tmp_path)]) == 0
+    audit = load_audit(audit_path)
+    assert set(audit["dates"]) == {"2026-07-25", "2026-07-26"}
+    for survey_date, info in audit["dates"].items():
+        assert info["expected"] == info["fetched"] == 1
+        assert info["csv_sha256"] == sha256_file(tmp_path / (survey_date + ".csv"))
+
+
+def test_run_mismatch_does_not_publish_audit(tmp_path, monkeypatch):
+    audit_path = tmp_path / "audit.json"
+    monkeypatch.setenv("FAMA_AUDIT_FILE", str(audit_path))
+    stub_run(monkeypatch, [("2026-07-25", 2)], _fetch_ok([make_record("1")]))
+    assert scrape.run(["--out-dir", str(tmp_path)]) == 1
+    assert not audit_path.exists()
+    assert not (tmp_path / "2026-07-25.csv").exists()
