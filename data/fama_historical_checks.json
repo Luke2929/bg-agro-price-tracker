@@ -717,6 +717,17 @@
       "status": "ok",
       "source_kind": "upstream_workflow"
     },
+    "2026-09-20": {
+      "source_repo": "ipohbot-png/fama-price-tracker",
+      "run_id": "39150661545",
+      "log_at_utc": "2026-10-18T17:41:21.9092894Z",
+      "expected": 63,
+      "fetched": 63,
+      "archive_rows_at_check": 75,
+      "chunked": false,
+      "status": "ok+archive",
+      "source_kind": "upstream_workflow"
+    },
     "2026-09-21": {
       "source_repo": "ipohbot-png/fama-price-tracker",
       "run_id": "36918175928",
