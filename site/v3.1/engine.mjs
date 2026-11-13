@@ -170,6 +170,161 @@ export function groupQuotesByProduct(quotes,{period=7,order='name'}={}) {
   return ordered;
 }
 
+
+// Generate a selected-day V3-compatible price table using only actual archive rows.
+// This deliberately mirrors scraper.aggregate_v3 + MatchedMarketComparator rather
+// than subtracting unmatched nationwide/state-level means.
+export function archiveComparisonDates(archiveDates, surveyDate) {
+  if(!Array.isArray(archiveDates)||!archiveDates.includes(surveyDate))return [];
+  const needed=new Set([surveyDate]);
+  const periods={1:6,7:4,30:7};
+  const available=new Set(archiveDates);
+  for(const [daysText,backtrack] of Object.entries(periods)){
+    const days=Number(daysText);
+    for(let step=days;step<=days+backtrack;step++){
+      const date=shiftSurveyDate(surveyDate,-step);
+      if(available.has(date))needed.add(date);
+    }
+  }
+  return [...needed].sort((a,b)=>b.localeCompare(a));
+}
+
+export function shiftSurveyDate(iso,deltaDays) {
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))throw Error('FAMA 调查日期格式无效');
+  const instant=Date.parse(iso+'T12:00:00Z');
+  if(!Number.isFinite(instant))throw Error('FAMA 调查日期无效');
+  return new Date(instant+deltaDays*86400000).toISOString().slice(0,10);
+}
+
+// Each priceid's final row within its CSV wins, and the global archive
+// revision manifest excludes superseded historic priceids. Those rules are
+// required for parity with the production Python canonicalizer.
+export function buildPriceDateSnapshot(rowsByDate,{surveyDate,archiveDates,supersededByDate={}}={}) {
+  if(!(rowsByDate instanceof Map)||!Array.isArray(archiveDates)||!archiveDates.includes(surveyDate))
+    throw Error('选中的调查日期不在已归档的 FAMA 日期中');
+  const needed=archiveComparisonDates(archiveDates,surveyDate);
+  for(const day of needed){
+    if(!rowsByDate.has(day)||!Array.isArray(rowsByDate.get(day)))
+      throw Error('缺少历史原始 CSV，无法可靠计算：'+day);
+  }
+
+  // Date -> level -> full product identity -> full market identity -> {sum,count}
+  const days=new Map(),categories=new Map(),labels=new Map();
+  const scopes=new Map();
+  let validLatestRows=0,latestRows=0;
+  const composite=(values)=>JSON.stringify(values);
+  for(const day of needed){
+    const raw=rowsByDate.get(day);
+    if(raw.some(row=>row.tarikh_harga!==day))
+      throw Error(day+' 原始 CSV 存在调查日期不匹配');
+    const canonical=canonicalDailyRows(raw,supersededByDate[day]||[]);
+    const levels=new Map();
+    days.set(day,levels);
+    for(const row of canonical){
+      if(day===surveyDate)latestRows++;
+      const price=validPrice(row.harga),level=String(row.peringkat||'').trim(),
+        variety=String(row.varieti||'').trim();
+      if(price===null||!PRICE_LEVELS.includes(level)||!variety)continue;
+      if(day===surveyDate)validLatestRows++;
+      const product=productIdentity(row);
+      const state=String(row.negeri||'').trim();
+      const market=['negeri','daerah','lokasi','sublevel']
+        .map(key=>String(row[key]??'').trim()).join('||');
+      if(!levels.has(level))levels.set(level,new Map());
+      const products=levels.get(level);
+      if(!products.has(product))products.set(product,new Map());
+      const locations=products.get(product);
+      const bucket=locations.get(market)||{sum:0,count:0};
+      bucket.sum+=price;bucket.count++;
+      locations.set(market,bucket);
+      if(day!==surveyDate)continue;
+      if(!labels.has(product))labels.set(product,{
+        product_key:product,varieti:variety,
+        gred:String(row.gred||'').trim(),unit:String(row.unit||'').trim()
+      });
+      if(!categories.has(product))categories.set(product,new Map());
+      const category=String(row.kategori||'').trim();
+      const counts=categories.get(product);
+      counts.set(category,(counts.get(category)||0)+1);
+      for(const scope of state?['',state]:['']){
+        const key=composite([product,level,scope]);
+        if(!scopes.has(key))scopes.set(key,{product,level,state:scope,rows:[]});
+        scopes.get(key).rows.push(row);
+      }
+    }
+  }
+
+  const scopedMarkets=(day,level,product,state)=>{
+    const all=days.get(day)?.get(level)?.get(product);
+    if(!all)return null;
+    if(!state)return all;
+    const prefix=state+'||';
+    const selected=new Map([...all].filter(([key])=>key.startsWith(prefix)));
+    return selected.size?selected:null;
+  };
+  const averageFor=(markets)=>{
+    const averages=[...markets.values()].map(bucket=>bucket.sum/bucket.count);
+    return averages.reduce((a,b)=>a+b,0)/averages.length;
+  };
+  const compare=(group,period)=>{
+    const current=scopedMarkets(surveyDate,group.level,group.product,group.state);
+    if(!current?.size)return null;
+    const target=shiftSurveyDate(surveyDate,-period);
+    const backtrack={1:6,7:4,30:7}[period];
+    const earliest=shiftSurveyDate(target,-backtrack);
+    for(const previousDate of needed){
+      if(previousDate>target||previousDate<earliest)continue;
+      const previous=scopedMarkets(previousDate,group.level,group.product,group.state);
+      if(!previous?.size)continue;
+      let matched=0,nowTotal=0,oldTotal=0;
+      for(const [key,now] of current){
+        const before=previous.get(key);
+        if(!before||!now.count||!before.count)continue;
+        nowTotal+=now.sum/now.count;
+        oldTotal+=before.sum/before.count;
+        matched++;
+      }
+      if(!matched)continue;
+      const nowMean=nowTotal/matched,oldMean=oldTotal/matched;
+      if(oldMean<=0)continue;
+      const rawPercent=(nowMean-oldMean)/oldMean*100;
+      return {
+        current:nowMean,previous:oldMean,rmDifference:nowMean-oldMean,
+        percent:Math.abs(rawPercent)<0.05?0:rawPercent,
+        markets:matched,currentDate:surveyDate,previousDate,
+        days:period,actualDays:Math.round((Date.parse(surveyDate)-Date.parse(previousDate))/86400000),
+        currentMarkets:current.size,previousMarkets:previous.size,
+        currentCoverage:matched/current.size,previousCoverage:matched/previous.size,
+        eligible:matched>=3&&matched/current.size>=0.5&&matched/previous.size>=0.5
+      };
+    }
+    return null;
+  };
+
+  const prices=[];
+  const states=new Set();
+  for(const group of scopes.values()){
+    const markets=scopedMarkets(surveyDate,group.level,group.product,group.state);
+    if(!markets?.size)continue;
+    const label=labels.get(group.product),countByCategory=categories.get(group.product);
+    const category=[...countByCategory].sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    if(group.state)states.add(group.state);
+    prices.push({
+      ...label,kategori:category,level:group.level,state:group.state,
+      date:surveyDate,price:averageFor(markets),
+      observations:group.rows.length,markets:markets.size,
+      changes:Object.fromEntries([1,7,30].map(period=>[String(period),compare(group,period)]))
+    });
+  }
+  prices.sort((a,b)=>a.product_key.localeCompare(b.product_key)||
+    a.level.localeCompare(b.level)||a.state.localeCompare(b.state));
+  return {
+    schema:'bg-agro/fama-overview/v3',survey_date:surveyDate,
+    latest_survey_rows:latestRows,valid_latest_rows:validLatestRows,
+    states:[...states].sort(),prices
+  };
+}
+
 export function productLabel(item) {
   return [item?.varieti,item?.gred,item?.unit].filter(Boolean).join(' · ');
 }
