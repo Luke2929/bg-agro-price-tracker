@@ -151,6 +151,9 @@ jobs:
             python -m scripts.health_v3
           fi
 
+      - name: Refresh newest-first daily CSV archive index
+        run: python -m scripts.build_daily_index
+
       # A successful scrape is not necessarily a new daily price publication.
       # Show a warning and a separate GitHub summary when FAMA's data is old,
       # without discarding valid archive rows or preventing Pages deployment.
@@ -163,7 +166,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add data site/data
+          git add data site/data DAILY_PRICE_INDEX.md
 
           # Ignore commits containing only the generated timestamp
           if git diff --cached --quiet -- ':!site/data/meta.json'; then
