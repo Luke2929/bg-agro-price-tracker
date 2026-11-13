@@ -103,7 +103,7 @@ export function findContentSignals(prices,{period=7,region='',category='',query=
       previousDate:change.previousDate||'',
       currentMean:change.current,previousMean:change.previous,
       aligned,divergent,flagged:risk,
-      publishable:!riskOnly&&Math.abs(change.percent)<50,
+      publishable:!risk&&!riskOnly&&Math.abs(change.percent)<50,
       score:score?.total||0,components:score?.components||null,
       levels:valid.map(q=>({
         level:q.level,percent:quoteChange(q,p).percent,
