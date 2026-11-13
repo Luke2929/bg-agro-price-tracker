@@ -106,6 +106,7 @@ jobs:
 
       - name: Scrape rolling FAMA price window
         env:
+          FAMA_AUDIT_FILE: data/fama_fetch_audit.json
           TRIGGER_CRON: ${{ github.event.schedule }}
           SCRAPE_SCOPE: ${{ inputs.scrape_scope }}
         run: |
