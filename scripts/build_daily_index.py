@@ -37,7 +37,7 @@ def build_index(filenames: list[str]) -> str:
         "# FAMA Daily CSV Index — Newest First",
         "",
         "Automatically generated from the CSV files actually present in "
-        "[\`data/daily/\`](data/daily/). The most recent archived survey date appears first.",
+        "[`data/daily/`](data/daily/). The most recent archived survey date appears first.",
         "",
         f"**Archived CSV files:** {len(filenames)}",
         "",
