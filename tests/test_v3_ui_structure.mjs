@@ -126,3 +126,35 @@ test('overview replaces giant promotional hero with FAMA daily story board and c
   assert.match(style,/\.insight-board/);
   assert.match(style,/\.insight-aux-grid/);
 });
+
+
+test('V3.4 creator routes and workflows are wired to the original dashboard',()=>{
+  const creator=readFileSync(new URL('../site/v3.1/creator-app.mjs',import.meta.url),'utf8');
+  const core=readFileSync(new URL('../site/v3.1/creator-core.mjs',import.meta.url),'utf8');
+  for(const page of ['signals','studio','calendar']){
+    assert.match(html,new RegExp('data-screen="'+page+'"'));
+    assert.match(html,new RegExp('data-page="'+page+'"'));
+  }
+  assert.match(html,/MALAYSIA PRICE MONITOR · V3\.4/);
+  assert.match(code,/import \{createCreatorWorkspace\} from '\.\/creator-app\.mjs'/);
+  assert.match(code,/creator\.bind\(\)/);
+  assert.match(code,/creator\.refresh\(\)/);
+  assert.match(code,/creator\.render\(page\)/);
+  assert.match(html,/id="creator-signal-list"/);
+  assert.match(html,/id="creator-kpis"/);
+  assert.match(html,/id="creator-body"/);
+  assert.match(html,/id="creator-calendar-month"/);
+  assert.match(html,/id="creator-import-json"/);
+  assert.match(creator,/navigator\.clipboard\.writeText/);
+  assert.match(creator,/canvas\.toBlob/);
+  assert.match(creator,/localStorage\.setItem/);
+  assert.match(creator,/confirm\(/);
+  assert.match(creator,/JSON\.stringify\(workspace,null,2\)/);
+  assert.match(core,/FAMA AMI/);
+  assert.match(core,/currentCoverage/);
+  assert.match(core,/observedStreak/);
+  assert.match(core,/toCSV/);
+  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
+  const referenced=[...creator.matchAll(/\$\('([^']+)'\)/g)].map(m=>m[1]);
+  for(const id of referenced)assert.ok(ids.includes(id),'Missing creator DOM id: '+id);
+});
