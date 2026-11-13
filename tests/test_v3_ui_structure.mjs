@@ -62,3 +62,15 @@ test('root and legacy URLs redirect to V3.1; V3.1 has no old-version navigation'
   }
   assert.ok(statSync(new URL('../site/assets/agro-logo.png',import.meta.url)).size>1000);
 });
+
+test('price table has explicit 1/7/30-day ranking and clickable accessible change headers',()=>{
+  for(const id of ['price-change-period','price-change-order'])
+    assert.match(html,new RegExp('id="'+id+'"'));
+  for(const period of [1,7,30])
+    assert.match(html,new RegExp('data-price-period="'+period+'"'));
+  for(const order of ['name','rise','fall','swing'])
+    assert.match(html,new RegExp('<option value="'+order+'">'));
+  assert.match(code,/sortQuotesByChange\(filterQuotes\(store\.overview\.prices,filters\(\)\),\{period,order\}\)/);
+  assert.match(code,/btn\.closest\('th'\)\.setAttribute\('aria-sort'/);
+  assert.match(style,/\.price-sort-toolbar/);
+});
