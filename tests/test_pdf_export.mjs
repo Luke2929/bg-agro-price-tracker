@@ -99,7 +99,7 @@ test('V3.1 has working PDF buttons, neutral branding, and shared theme',()=>{
   const html=readFileSync(new URL('../site/v3.1/index.html',import.meta.url),'utf8');
   const code=readFileSync(new URL('../site/v3.1/app.mjs',import.meta.url),'utf8');
   assert.doesNotMatch(html,/BG Agro|Luke Ng/i);
-  assert.match(html,/assets\/official-theme\.css/);
+  assert.match(html,/assets\/editorial-theme\.css/);
   for(const id of ['export-pdf-quick','export-pdf-full']){
     assert.match(html,new RegExp(`id="${id}"`));
     assert.match(code,new RegExp(`\\$\\('${id}'\\)\\.addEventListener`));

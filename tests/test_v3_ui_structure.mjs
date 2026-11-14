@@ -155,14 +155,14 @@ test('Pages loads the same cache revision for the dashboard and its price eviden
 });
 
 
-test('V3.4 creator routes and workflows are wired to the original dashboard',()=>{
+test('V3.5 retains creator routes and workflows from the original dashboard',()=>{
   const creator=readFileSync(new URL('../site/v3.1/creator-app.mjs',import.meta.url),'utf8');
   const core=readFileSync(new URL('../site/v3.1/creator-core.mjs',import.meta.url),'utf8');
   for(const page of ['signals','studio','calendar']){
     assert.match(html,new RegExp('data-screen="'+page+'"'));
     assert.match(html,new RegExp('data-page="'+page+'"'));
   }
-  assert.match(html,/MALAYSIA PRICE MONITOR · V3\.4/);
+  assert.match(html,/MALAYSIA PRICE MONITOR · V3\.5/);
   assert.match(code,/import \{createCreatorWorkspace\} from '\.\/creator-app\.mjs\?rev=[^']+'/);
   assert.match(code,/creator\.bind\(\)/);
   assert.match(code,/creator\.refresh\(\)/);
