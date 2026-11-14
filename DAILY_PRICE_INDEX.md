@@ -2,16 +2,17 @@
 
 Automatically generated from the CSV files actually present in [data/daily/](data/daily/). Most recent **survey dates** appear first.
 
-**Archived CSV files:** 138
+**Archived CSV files:** 139
 
-**Latest archived survey date:** 2026-11-13
+**Latest archived survey date:** 2026-11-14
 
 | Name (newest survey date first) | Last commit message | Last commit date (MYT) | Data status (FAMA snapshot) |
 | --- | --- | --- | --- |
-| [2026-11-13.csv](data/daily/2026-11-13.csv) **(Latest)** | [data: scrape 2026-11-13 09:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/6cbf0f9394f585f16cc7698b5c3d4d29cceb8065) | 2026-11-13 17:17 MYT | ✅ Snapshot matched; [FAMA 1,468/1,468](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43400027040); archive 1,470 · 2026-11-13 17:17 MYT |
-| [2026-11-12.csv](data/daily/2026-11-12.csv) | [data: scrape 2026-11-13 09:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/6cbf0f9394f585f16cc7698b5c3d4d29cceb8065) | 2026-11-13 17:17 MYT | ✅ Snapshot matched; [FAMA 5,691/5,691](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43400027040); archive 5,692 · 2026-11-13 17:17 MYT |
-| [2026-11-11.csv](data/daily/2026-11-11.csv) | [data: scrape 2026-11-13 09:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/6cbf0f9394f585f16cc7698b5c3d4d29cceb8065) | 2026-11-13 17:17 MYT | ✅ Snapshot matched; [FAMA 3,765/3,765](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43400027040); archive 3,769 · 2026-11-13 17:17 MYT |
-| [2026-11-10.csv](data/daily/2026-11-10.csv) | [data: scrape 2026-11-13 09:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/6cbf0f9394f585f16cc7698b5c3d4d29cceb8065) | 2026-11-13 17:17 MYT | ✅ Snapshot matched; [FAMA 5,357/5,357](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43400027040); archive 5,373 · 2026-11-13 17:17 MYT |
+| [2026-11-14.csv](data/daily/2026-11-14.csv) **(Latest)** | [data: scrape 2026-11-14 03:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/560e5ca1e3b977174b53dfe65dd9230348f1a9cf) | 2026-11-14 11:17 MYT | ✅ Snapshot matched; [FAMA 1,906/1,906](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43550827479) · 2026-11-14 11:17 MYT |
+| [2026-11-13.csv](data/daily/2026-11-13.csv) | [data: scrape 2026-11-14 03:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/560e5ca1e3b977174b53dfe65dd9230348f1a9cf) | 2026-11-14 11:17 MYT | ✅ Snapshot matched; [FAMA 1,510/1,510](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43550827479); archive 1,512 · 2026-11-14 11:17 MYT |
+| [2026-11-12.csv](data/daily/2026-11-12.csv) | [data: scrape 2026-11-14 03:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/560e5ca1e3b977174b53dfe65dd9230348f1a9cf) | 2026-11-14 11:17 MYT | ✅ Snapshot matched; [FAMA 5,691/5,691](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43550827479); archive 5,692 · 2026-11-14 11:17 MYT |
+| [2026-11-11.csv](data/daily/2026-11-11.csv) | [data: scrape 2026-11-14 03:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/560e5ca1e3b977174b53dfe65dd9230348f1a9cf) | 2026-11-14 11:17 MYT | ✅ Snapshot matched; [FAMA 3,801/3,801](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43550827479); archive 3,805 · 2026-11-14 11:17 MYT |
+| [2026-11-10.csv](data/daily/2026-11-10.csv) | [data: scrape 2026-11-14 03:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/560e5ca1e3b977174b53dfe65dd9230348f1a9cf) | 2026-11-14 11:17 MYT | ✅ Snapshot matched; [FAMA 5,357/5,357](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43550827479); archive 5,373 · 2026-11-14 11:17 MYT |
 | [2026-11-09.csv](data/daily/2026-11-09.csv) | [data: scrape 2026-11-13 09:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/6cbf0f9394f585f16cc7698b5c3d4d29cceb8065) | 2026-11-13 17:17 MYT | ✅ Snapshot matched; [FAMA 2,376/2,376](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43400027040) · 2026-11-13 17:17 MYT |
 | [2026-11-08.csv](data/daily/2026-11-08.csv) | [data: scrape 2026-11-10 01:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/458b876872ea136aec4f8cbae3d192b4b8622fd7) | 2026-11-10 09:17 MYT | ✅ Snapshot matched; [FAMA 65/65](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43363805005) · 2026-11-13 12:11 MYT |
 | [2026-11-07.csv](data/daily/2026-11-07.csv) | [data: scrape 2026-11-11 05:17 UTC](https://github.com/Luke2929/bg-agro-price-tracker/commit/8b3e1d8dece482c4c2cd318e2db6eee93572dedc) | 2026-11-11 13:17 MYT | ✅ Snapshot matched; [FAMA 2,894/2,894](https://github.com/Luke2929/bg-agro-price-tracker/actions/runs/43363805005); archive 2,899 · 2026-11-13 12:11 MYT |
