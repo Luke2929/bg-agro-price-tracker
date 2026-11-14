@@ -8,6 +8,7 @@ import {buildXlsx,downloadXlsx} from './excel.mjs';
 import {createCreatorWorkspace} from './creator-app.mjs?rev=price-evidence-1';
 import {buildMarketPostIdea,evidenceForQuote,formatPercent,formatPrice} from './creator-core.mjs?rev=price-evidence-1';
 import {buildFamaPdf,downloadPdf} from '../pdf.mjs';
+import {createCompletenessMonitor} from './completeness.mjs?rev=v3-5-completeness-1';
 
 const $=id=>document.getElementById(id);
 const BASE='../data/v3/';
@@ -23,6 +24,7 @@ let historyRequestSequence=0;
 const creator=createCreatorWorkspace({getOverview:()=>store.overview,
   getArchiveDates:()=>store.meta.archive_dates,loadSnapshot,loadEvidenceRows,
   loadHistory,loadStreaks,showComparison,notify:alertUser,navigate});
+const completeness=createCompletenessMonitor({loadDaily});
 const LEVEL_MEANINGS={Ladang:'农场端 · Farm-gate price',Borong:'批发端 · Wholesale price',
   Runcit:'零售端 · Consumer retail price'};
 const verifiedInsightButtons=new WeakSet();
@@ -983,7 +985,7 @@ async function load(refresh=false){
     const list=index.products.filter(p=>overview.prices.some(q=>q.product_key===p.product_key));
     selectOptions($('history-product'),list.map(p=>({value:p.product_key,label:productLabel(p)})),{
       defaultValue:list[0]?.product_key||''});
-    renderSummary();loadInsightDate();renderWatchlist();renderExportDates();renderHealth();
+    renderSummary();completeness.refresh(meta);loadInsightDate();renderWatchlist();renderExportDates();renderHealth();
     creator.refresh();
     loadPriceDate();
     if(store.page==='history')await renderHistory();
