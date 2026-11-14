@@ -155,7 +155,7 @@ test('Pages loads the same cache revision for the dashboard and its price eviden
 });
 
 
-test('V3.4 creator routes and workflows are wired to the original dashboard',()=>{
+test('V3.5 retains creator routes and workflows from the original dashboard',()=>{
   const creator=readFileSync(new URL('../site/v3.1/creator-app.mjs',import.meta.url),'utf8');
   const core=readFileSync(new URL('../site/v3.1/creator-core.mjs',import.meta.url),'utf8');
   for(const page of ['signals','studio','calendar']){
