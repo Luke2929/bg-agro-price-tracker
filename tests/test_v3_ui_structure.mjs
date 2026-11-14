@@ -162,7 +162,7 @@ test('V3.5 retains creator routes and workflows from the original dashboard',()=
     assert.match(html,new RegExp('data-screen="'+page+'"'));
     assert.match(html,new RegExp('data-page="'+page+'"'));
   }
-  assert.match(html,/MALAYSIA PRICE MONITOR · V3\.4/);
+  assert.match(html,/MALAYSIA PRICE MONITOR · V3\.5/);
   assert.match(code,/import \{createCreatorWorkspace\} from '\.\/creator-app\.mjs\?rev=[^']+'/);
   assert.match(code,/creator\.bind\(\)/);
   assert.match(code,/creator\.refresh\(\)/);
