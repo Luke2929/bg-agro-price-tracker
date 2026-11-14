@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1E2E24">
   <meta name="description" content="马来西亚农产品价格资讯平台 — FAMA 农产品详情、真实历史趋势、州别比较与市场原始记录。">
-  <title>马来西亚农产品价格资讯平台 · Creator V3.4</title>
+  <title>马来西亚农产品价格资讯平台 · Creator V3.5</title>
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
   <link rel="stylesheet" href="./styles.css?rev=editorial-20261113">
-  <link rel="stylesheet" href="../assets/editorial-theme.css?rev=20261113">
-  <script type="module" src="./app.mjs?rev=price-evidence-1"></script>
+  <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
+  <script type="module" src="./app.mjs?rev=v3-5-completeness-1"></script>
 </head>
 <body>
 <div class="shell">
   <aside class="sidebar" aria-label="主导航">
-    <div class="brand"><img class="brand-logo" src="../assets/agro-logo.png" alt="农业数据标志"><div><strong>农业价格资讯</strong><small>MALAYSIA PRICE MONITOR · V3.4</small></div></div>
+    <div class="brand"><img class="brand-logo" src="../assets/agro-logo.png" alt="农业数据标志"><div><strong>农业价格资讯</strong><small>MALAYSIA PRICE MONITOR · V3.5</small></div></div>
     <p class="nav-label">WORKSPACE</p>
     <nav class="navigation" aria-label="功能页面">
       <button type="button" class="nav-item selected" data-page="overview"><span>◫</span> 农价总览</button>
@@ -77,6 +77,44 @@
           <article class="stat"><span>有报价的州／直辖区</span><strong id="stat-states">—</strong><small>按当日实际覆盖统计</small></article>
           <article class="stat"><span>当前价格组合</span><strong id="stat-quotes">—</strong><small>商品 × 等级 × 层级 × 地区</small></article>
         </div>
+
+
+        <section class="completeness-panel" aria-labelledby="completeness-title" id="completeness-monitor">
+          <header class="completeness-heading">
+            <div><span class="eyebrow green">DATA QUALITY · V3.5</span>
+              <h2 id="completeness-title">每日 FAMA 数据完整性监控</h2>
+              <p>识别未报价州、消失的 Daerah / Lokasi / Item，并区分来源快照核验与市场覆盖差异。</p>
+            </div>
+            <span class="completeness-baseline">比较基准：上一个有记录的调查日</span>
+          </header>
+          <div class="completeness-controls" role="group" aria-label="日期范围和调查基准">
+            <label>开始日期<input id="completeness-start" type="date" aria-label="数据完整性分析开始日期"></label>
+            <label>结束日期<input id="completeness-end" type="date" aria-label="数据完整性分析结束日期"></label>
+            <label>参考基准<select disabled aria-label="比较基准"><option>上一个有记录的调查日</option></select></label>
+            <button type="button" class="primary-button" id="completeness-analyze">分析日期范围</button>
+            <button type="button" class="secondary-button" id="completeness-export">导出缺失 CSV</button>
+          </div>
+          <p class="completeness-status" id="completeness-status" role="status" aria-live="polite">正在准备调查日期…</p>
+          <div id="completeness-results" hidden>
+            <div class="completeness-kpis" id="completeness-kpis"></div>
+            <p class="completeness-provenance" id="completeness-provenance"></p>
+            <div class="completeness-body">
+              <div class="completeness-timeline" id="completeness-timeline"></div>
+              <div class="completeness-detail">
+                <div class="completeness-detail-head"><h3>覆盖缺口诊断</h3><label>筛选州<select id="completeness-state"><option value="">全马</option></select></label></div>
+                <div class="completeness-tabs" role="group" aria-label="缺失类型">
+                  <button type="button" class="active" data-completeness-tab="states">州／直辖区</button>
+                  <button type="button" data-completeness-tab="districts">Daerah</button>
+                  <button type="button" data-completeness-tab="locations">Lokasi</button>
+                  <button type="button" data-completeness-tab="items">Item / L-B-R</button>
+                </div>
+                <p class="completeness-count" id="completeness-detail-count"></p>
+                <div id="completeness-detail-list"></div>
+              </div>
+            </div>
+          </div>
+          <p class="completeness-disclaimer">“缺少”指该日无有效价格或相比前一调查日消失，不证明 FAMA 漏报或爬虫失败。特殊休市、轮换调查及补录均可能造成变化；仅显示原始 CSV 的真实记录。</p>
+        </section>
 
         <section class="panel movers-panel"><div class="panel-heading"><div><span class="eyebrow green">MARKET MOVERS</span><h2>价格涨跌榜</h2><p>同一批调查市场对比；只显示符合样本覆盖门槛的数据。</p></div><div class="segmented" role="group" aria-label="涨跌观察窗口"><button type="button" data-period="1" class="active">昨日对比</button><button type="button" data-period="7">7 天</button><button type="button" data-period="30">30 天</button></div></div><div class="movers-grid"><div><h3>上升幅度 <span class="up">↑</span></h3><div id="movers-up" class="mover-list"><p class="empty">载入中…</p></div></div><div><h3>下降幅度 <span class="down">↓</span></h3><div id="movers-down" class="mover-list"><p class="empty">载入中…</p></div></div></div><p class="method-note">仅显示全国范围、匹配市场数 ≥ 3 且前后市场覆盖率均 ≥ 50% 的可比数据；价格上涨不等于所有市场都涨价。</p></section>
 
@@ -254,7 +292,7 @@
 
       <section data-screen="system" class="screen" aria-labelledby="system-title"><div class="page-intro"><span class="eyebrow green">SYSTEM HEALTH</span><h1 id="system-title">运行状态与数据质量</h1><p>区分“GitHub 执行成功”和“FAMA 已发布新价格”；两者不是同一件事。</p></div><div class="health-grid"><article class="panel"><h2>数据完整性</h2><dl id="archive-health"></dl></article><article class="panel"><h2>自动化监控</h2><dl id="job-health"><div><dt>运行状态</dt><dd>等待检测…</dd></div></dl></article></div><section class="panel"><h2>数据处理规则</h2><ul class="explanation"><li>原始 <code>data/daily/*.csv</code> 是审计档案，不会因 V3 迁移而删除或覆盖。</li><li>同一天同产品先按市场计算平均；各市场在州或全国平均中等权。</li><li>涨跌比较只匹配相同产品、等级、单位、价格层级与市场。</li><li>最新调查日期和程序运行时间分别显示；缺失数据不会被估算。</li><li>GitHub Actions 预约执行不是强保证。备用调度与外部告警需要另行授权配置。</li></ul></section></section>
     </main>
-    <footer class="footer">马来西亚农产品价格资讯平台 · Creator V3.4 <span>来源：FAMA AMI · 独立资讯整理，非 FAMA 官方网站或交易报价</span></footer>
+    <footer class="footer">马来西亚农产品价格资讯平台 · Creator V3.5 <span>来源：FAMA AMI · 独立资讯整理，非 FAMA 官方网站或交易报价</span></footer>
   </div>
 </div>
 <dialog id="comparison-dialog" class="comparison-dialog" aria-labelledby="comparison-title">
