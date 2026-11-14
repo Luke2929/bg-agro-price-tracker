@@ -41,7 +41,8 @@ jobs:
           node --check site/v3.1/creator-app.mjs
           node --check site/v3.1/creator-core.mjs
           node --check site/v3.1/app.mjs
-          node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs tests/test_v34_creator.mjs
+          node --check site/v3.1/completeness.mjs
+          node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs tests/test_v34_creator.mjs tests/test_v35_completeness.mjs
 
       - name: Build complete V3 contracts from real, unchanged archive
         run: |
