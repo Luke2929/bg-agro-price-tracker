@@ -39,6 +39,7 @@ const WIDTH = 1080, HEIGHT = 1350;
 let meta = null;
 let busy = false;
 let previewData = null;
+let previewIndex = 0;
 
 function stateName(key,lang) {
   const found=STATES.find(s=>s[0]===key);
@@ -133,6 +134,7 @@ function setBusy(flag) {
   for(const id of ['fb-post-preview','fb-post-single','fb-post-zip','fb-post-copy',
     'fb-post-date','fb-post-state','fb-post-level','fb-post-language','fb-post-mode'])
     $(id).disabled=flag;
+  updateGalleryControls();
 }
 function roundRect(ctx,x,y,w,h,r,color) {
   ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();
@@ -291,21 +293,79 @@ async function dataForForm() {
   const groups=buildGroups(rows,v.date,v.level);
   return {v,groups};
 }
+// Build only descriptors, not dozens of expensive canvases. Every page is rendered on demand.
+function buildPreviewGallery(v,groups) {
+  const states=v.state==='ALL'?STATES.map(s=>s[0]):[v.state];
+  const languages=v.language==='both'?['bm','zh']:[v.language];
+  const gallery=[];
+  for(const state of states) {
+    const allItems=pickProducts(groups,state,v.mode),pages=paginate(allItems);
+    for(const lang of languages)for(let page=0;page<pages.length;page++)
+      gallery.push({date:v.date,state,level:v.level,lang,items:pages[page],allItems,
+        page,pages:pages.length,mode:v.mode});
+  }
+  return gallery;
+}
+function selectedSpec() {
+  return previewData?.gallery?.[previewIndex]||null;
+}
+function galleryLabel(spec) {
+  if(!spec)return '等待预览…';
+  return stateName(spec.state,'zh')+' · '+(spec.lang==='bm'?'BM':'中文')+
+    ' · 第 '+(spec.page+1)+' / '+spec.pages+' 页';
+}
+function updateGalleryControls() {
+  const count=previewData?.gallery?.length||0,canUse=!busy&&count>0;
+  $('fb-post-expand').disabled=!canUse;
+  for(const id of ['fb-post-prev','fb-lightbox-prev'])$(id).disabled=!canUse||previewIndex<=0;
+  for(const id of ['fb-post-next','fb-lightbox-next'])$(id).disabled=!canUse||previewIndex>=count-1;
+}
+function renderPreviewSelection() {
+  const spec=selectedSpec();
+  if(!spec)return;
+  drawPoster($('fb-post-canvas'),spec);
+  if($('fb-preview-dialog').open)drawPoster($('fb-lightbox-canvas'),spec);
+  previewData.state=spec.state;
+  previewData.items=spec.allItems;
+  $('fb-post-page-label').textContent=(previewIndex+1)+' / '+previewData.gallery.length;
+  $('fb-lightbox-count').textContent=(previewIndex+1)+' / '+previewData.gallery.length;
+  $('fb-lightbox-subtitle').textContent=galleryLabel(spec);
+  updateGalleryControls();
+}
+function changePreview(step) {
+  if(busy||!previewData)return;
+  const next=previewIndex+step;
+  if(next<0||next>=previewData.gallery.length)return;
+  previewIndex=next;
+  renderPreviewSelection();
+}
+function openPreviewDialog() {
+  if(busy||!selectedSpec())return;
+  const dialog=$('fb-preview-dialog');
+  if(!dialog.open)dialog.showModal();
+  drawPoster($('fb-lightbox-canvas'),selectedSpec());
+  $('fb-lightbox-close').focus();
+}
 async function preview() {
   if(busy)return;
   setBusy(true);
   try {
     setStatus('正在读取并验证所选日期 FAMA CSV…');
     const {v,groups}=await dataForForm();
-    let state=v.state==='ALL'?'PERAK':v.state;
-    if(v.state==='ALL'&&!groups.get(state)?.size)state=STATES.find(s=>groups.get(s[0])?.size)?.[0]||'PERAK';
-    const items=pickProducts(groups,state,v.mode),pages=paginate(items);
-    const lang=v.language==='zh'?'zh':'bm';
-    drawPoster($('fb-post-canvas'),{date:v.date,state,level:v.level,lang,items:pages[0],page:0,pages:pages.length,mode:v.mode});
-    previewData={v,state,items};
-    const total=items.length;
-    setStatus('预览：'+stateName(state,'zh')+' · '+total+' 种/等级/单位组合 · '+pages.length+' 页。全部州 ZIP 会按选择生成所有对应地区，缺失地区明确标示。');
-  } catch(error){previewData=null;setStatus('预览失败：'+error.message,true);}
+    const gallery=buildPreviewGallery(v,groups);
+    if(!gallery.length)throw Error('没有可预览的州属或语言');
+    previewData={v,gallery,state:null,items:null};
+    previewIndex=v.state==='ALL'?Math.max(0,gallery.findIndex(x=>x.state==='PERAK'&&x.lang===(v.language==='zh'?'zh':'bm'))):0;
+    renderPreviewSelection();
+    setStatus('已载入 '+gallery.length+' 张预览 · 当前 '+galleryLabel(selectedSpec())+
+      '。点击图片放大，使用左右箭头切换地区、语言及分页；所有报价来自当天 CSV。');
+  }catch(error){
+    previewData=null;previewIndex=0;
+    $('fb-post-page-label').textContent='预览不可用';
+    $('fb-lightbox-count').textContent='0 / 0';
+    if($('fb-preview-dialog').open)$('fb-preview-dialog').close();
+    setStatus('预览失败：'+error.message,true);
+  }
   finally{setBusy(false);}
 }
 async function generate(single) {
@@ -361,7 +421,23 @@ async function init() {
     for(const date of [...m.archive_dates].reverse())select.add(new Option(date,date));
     select.value=m.window?.max&&m.archive_dates.includes(m.window.max)?m.window.max:m.archive_dates.at(-1);
     for(const id of ['fb-post-date','fb-post-state','fb-post-level','fb-post-language','fb-post-mode'])
-      $(id).addEventListener('change',()=>{previewData=null;preview();});
+      $(id).addEventListener('change',()=>{previewData=null;previewIndex=0;preview();});
+    $('fb-post-expand').addEventListener('click',openPreviewDialog);
+    $('fb-post-prev').addEventListener('click',()=>changePreview(-1));
+    $('fb-post-next').addEventListener('click',()=>changePreview(1));
+    $('fb-lightbox-prev').addEventListener('click',()=>changePreview(-1));
+    $('fb-lightbox-next').addEventListener('click',()=>changePreview(1));
+    $('fb-lightbox-close').addEventListener('click',()=>$('fb-preview-dialog').close());
+    $('fb-preview-dialog').addEventListener('click',event=>{
+      if(event.target===$('fb-preview-dialog'))$('fb-preview-dialog').close();
+    });
+    document.addEventListener('keydown',event=>{
+      if(!$('fb-preview-dialog').open)return;
+      if(event.key==='ArrowLeft'||event.key==='ArrowRight'){
+        event.preventDefault();
+        changePreview(event.key==='ArrowLeft'?-1:1);
+      }
+    });
     $('fb-post-preview').addEventListener('click',preview);
     $('fb-post-single').addEventListener('click',()=>generate(true));
     $('fb-post-zip').addEventListener('click',()=>generate(false));
