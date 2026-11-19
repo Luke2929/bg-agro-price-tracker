@@ -324,8 +324,6 @@ async function generate(single) {
           (pages.length>1?'_P'+(page+1):'')+'.png';
         files.push({name:filename,data:await posterBytes({date:v.date,state,level:v.level,lang,items:pages[page],page,pages:pages.length,mode:v.mode})});
       }
-      for(const lang of langs)files.push({name:state.replaceAll(/[^a-zA-Z0-9]+/g,'_')+'_'+lang.toUpperCase()+'.txt',
-        data:new TextEncoder().encode(createCaption({date:v.date,state,level:v.level,lang,items}))});
       setStatus('正在生成图片：'+(i+1)+' / '+states.length+' 地区，已完成 '+files.filter(f=>f.name.endsWith('.png')).length+' 张…');
       await new Promise(resolve=>setTimeout(resolve,0));
     }
