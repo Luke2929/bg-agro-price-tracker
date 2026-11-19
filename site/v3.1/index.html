@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="./styles.css?rev=v3-5-completeness-1">
   <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
   <script type="module" src="./app.mjs?rev=v3-5-completeness-1"></script>
+  <link rel="stylesheet" href="./fb-export.css?rev=2026-11-19-1">
+  <script type="module" src="./fb-export.mjs?rev=2026-11-19-1"></script>
 </head>
 <body>
 <div class="shell">
@@ -25,7 +27,7 @@
       <button type="button" class="nav-item" data-page="signals"><span>◇</span> 选题情报</button>
       <button type="button" class="nav-item" data-page="studio"><span>✎</span> 内容工作室</button>
       <button type="button" class="nav-item" data-page="calendar"><span>▦</span> 内容日历与成效</button>
-      <button type="button" class="nav-item" data-page="export"><span>⇩</span> Excel / PDF 导出</button>
+      <button type="button" class="nav-item" data-page="export"><span>⇩</span> Excel / PDF / FB 导出</button>
       <button type="button" class="nav-item" data-page="system"><span>◉</span> 运行状态</button>
     </nav>
     <div class="sidebar-foot"><div class="live-dot"></div><span>数据：FAMA AMI 原始档案</span><small>Malaysia · Agricultural Price Data</small></div>
@@ -276,7 +278,7 @@
       </section>
 
       <section data-screen="export" class="screen" aria-labelledby="export-title">
-        <div class="page-intro"><span class="eyebrow green">DATA EXPORTS</span><h1 id="export-title">Excel / PDF 数据导出</h1><p>选好日期范围、州属和价格层级，再下载适合分析或 WhatsApp 分享的文件。</p></div>
+        <div class="page-intro"><span class="eyebrow green">DATA EXPORTS</span><h1 id="export-title">Excel / PDF / Facebook 导出</h1><p>原始 FAMA 报价可导出 Excel、PDF，也可直接生成 SKY AGRO 各州马来文／中文版 FB 价格图片。</p></div>
         <section class="panel">
           <div class="filters four"><label>起始日期<input id="export-from" type="date"></label><label>结束日期<input id="export-to" type="date"></label><label>州／直辖区<select id="export-state"><option value="">全马</option></select></label><label>价格层级<select id="export-level"><option value="">全部层级</option><option>Ladang</option><option>Borong</option><option>Runcit</option></select></label></div>
           <div class="export-options">
@@ -287,6 +289,31 @@
           </div>
           <p id="export-progress" class="progress" aria-live="polite">Excel 和 PDF 共用以上日期与地区筛选；单次最多 45 个有存档的调查日。</p>
           <p class="method-note">只读取 GitHub 保存的真实 FAMA CSV；缺失价格不当 RM0，日期缺档不补值。Full Mobile PDF 每个实际调查日独立分组，避免将不同日期混成同一天报价。无法完整读取档案时，整次导出停止。</p>
+        </section>
+        <section class="panel sky-fb-panel" id="sky-fb-post-export" aria-labelledby="fb-post-title">
+          <div class="sky-fb-head"><div><span class="sky-fb-tag">SOCIAL EXPORTS · SKY AGRO</span><h2 id="fb-post-title">Facebook 价格图生成器｜马来文 + 中文</h2><p>按单个真实 FAMA 调查日生成 1080 × 1350 PNG。可选择 13 州和 3 个联邦直辖区，一键批量导出双语 ZIP；完整品种自动分页，缺报地区不会填假价。</p></div><span class="sky-fb-pill">NEW · FB POST</span></div>
+          <div class="sky-fb-fields">
+            <label>FAMA 调查日期<select id="fb-post-date" aria-label="Facebook export survey date"></select></label>
+            <label>州／直辖区<select id="fb-post-state"><option value="ALL">全部 16 地区</option></select></label>
+            <label>价格层级<select id="fb-post-level"><option value="Ladang">L · 农场价</option><option value="Borong">B · 批发价</option><option value="Runcit">R · 零售价</option></select></label>
+            <label>图片语言<select id="fb-post-language"><option value="both">马来文 + 中文</option><option value="bm">Bahasa Melayu</option><option value="zh">简体中文</option></select></label>
+            <label>海报范围<select id="fb-post-mode"><option value="all">全部蔬菜品种（自动分页）</option><option value="popular">热门精选 12 种</option></select></label>
+          </div>
+          <div class="sky-fb-layout">
+            <div class="sky-fb-preview-wrap"><canvas id="fb-post-canvas" width="1080" height="1350" aria-label="SKY AGRO poster preview"></canvas><p class="sky-fb-preview-caption">左侧预览为首张 BM 海报。切换为中文版后可直接预览中文；双语档案会分别生成两种语言。预览仅展示第一页。</p></div>
+            <div class="sky-fb-tools">
+              <h3>从 CSV 直接生成 Facebook 图片</h3>
+              <p>海报显示同一产品、等级与单位在所选州的真实最低—最高记录价，不是全州统一成交价。完整版超过每页 18 行时会继续生成第 2、3 页。</p>
+              <div class="sky-fb-actions">
+                <button type="button" class="secondary-button" id="fb-post-preview">刷新图片预览</button>
+                <button type="button" class="secondary-button" id="fb-post-single">下载预览州 PNG / ZIP</button>
+                <button type="button" class="primary-button" id="fb-post-zip">下载所选州／全国 ZIP</button>
+                <button type="button" class="secondary-button" id="fb-post-copy">复制 FB 文案</button>
+              </div>
+              <div id="fb-post-status" class="sky-fb-status" role="status" aria-live="polite">正在初始化真实 FAMA 存档…</div>
+              <div class="sky-fb-rules">核对原则：仅使用 GitHub 上的真实 FAMA 日期 CSV；先去除已更新的旧 priceid；空白及零价格不列为有效报价；按价格层级及单位分开；没有记录显示「无数据」。不自动生成未经匹配验证的涨跌百分比。配套 TXT 包含可复制的马来文或中文 FB 文案。</div>
+            </div>
+          </div>
         </section>
       </section>
 
