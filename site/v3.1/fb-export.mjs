@@ -130,7 +130,8 @@ function values() {
 }
 function setBusy(flag) {
   busy=flag;
-  for(const id of ['fb-post-preview','fb-post-single','fb-post-zip','fb-post-copy'])
+  for(const id of ['fb-post-preview','fb-post-single','fb-post-zip','fb-post-copy',
+    'fb-post-date','fb-post-state','fb-post-level','fb-post-language','fb-post-mode'])
     $(id).disabled=flag;
 }
 function roundRect(ctx,x,y,w,h,r,color) {
@@ -224,6 +225,18 @@ function drawPoster(canvas,{date,state,level,lang,items,page,pages,mode}) {
   c.textAlign='right';c.fillText(String(page+1)+' / '+String(pages),1014,1280);
   c.textAlign='left';
 }
+function auditCSV(groups,states,options) {
+  const esc=value=>{
+    let t=String(value??'');
+    if(/^[=+@-]/.test(t))t="'"+t;
+    return '"'+t.replaceAll('"','""')+'"';
+  };
+  const rows=[['Survey date','State','Price level','Variety (FAMA)','Grade','Unit','Min (RM)','Max (RM)','Observations','Distinct source markets']];
+  for(const state of states)for(const item of pickProducts(groups,state,options.mode))
+    rows.push([options.date,state,options.level,item.varieti,item.gred,item.unit,
+      money(item.min),money(item.max),item.count,item.markets.size]);
+  return new TextEncoder().encode('\uFEFF'+rows.map(r=>r.map(esc).join(',')).join('\r\n')+'\r\n');
+}
 function createCaption({date,state,level,lang,items}) {
   const loc=stateName(state,lang),dateDisplay=date.split('-').reverse().join('/');
   if(lang==='zh')return '🌱 SKY AGRO｜'+loc+'蔬菜价格\n📅 '+dateDisplay+' · '+LEVEL_LABELS[level][1]+
@@ -301,7 +314,7 @@ async function generate(single) {
   try{
     setStatus('正在验证全部原始 CSV 报价…');
     const {v,groups}=await dataForForm();
-    const states=single?[v.state==='ALL'?'PERAK':v.state]:(v.state==='ALL'?STATES.map(s=>s[0]):[v.state]);
+    const states=single?[v.state==='ALL'?(previewData?.state||'PERAK'):v.state]:(v.state==='ALL'?STATES.map(s=>s[0]):[v.state]);
     const langs=v.language==='both'?['bm','zh']:[v.language];
     const files=[];
     for(let i=0;i<states.length;i++){
@@ -316,6 +329,7 @@ async function generate(single) {
       setStatus('正在生成图片：'+(i+1)+' / '+states.length+' 地区，已完成 '+files.filter(f=>f.name.endsWith('.png')).length+' 张…');
       await new Promise(resolve=>setTimeout(resolve,0));
     }
+    files.push({name:'FAMA_PRICE_AUDIT_'+v.date+'.csv',data:auditCSV(groups,states,v)});
     if(single && files.filter(f=>f.name.endsWith('.png')).length===1){
       const picture=files.find(f=>f.name.endsWith('.png'));
       saveBlob(new Blob([picture.data],{type:'image/png'}),'SKY_AGRO_'+v.date+'_'+picture.name);
@@ -334,10 +348,10 @@ async function copyCaption() {
       await preview();d=previewData;
     }
     if(!d)throw Error('请先生成有效预览');
-    const lang=values().language==='zh'?'zh':'bm';
-    const result=createCaption({date:d.v.date,state:d.state,level:d.v.level,lang,items:d.items});
+    const languages=values().language==='both'?['bm','zh']:[values().language];
+    const result=languages.map(lang=>createCaption({date:d.v.date,state:d.state,level:d.v.level,lang,items:d.items})).join('\n\n--------------------\n\n');
     await navigator.clipboard.writeText(result);
-    setStatus('已复制'+(lang==='zh'?'中文':'马来文')+' Facebook 文案。');
+    setStatus('已复制'+(languages.length===2?'马来文及中文':languages[0]==='zh'?'中文':'马来文')+' Facebook 文案。');
   }catch(error){setStatus('复制失败：'+error.message,true);}
 }
 async function init() {
