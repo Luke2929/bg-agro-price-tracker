@@ -24,3 +24,41 @@
 @media(max-width:1100px){.sky-fb-fields{grid-template-columns:repeat(3,minmax(0,1fr))}.sky-fb-layout{grid-template-columns:minmax(200px,310px) minmax(0,1fr)}}
 @media(max-width:790px){.sky-fb-layout{grid-template-columns:1fr}.sky-fb-preview-wrap{max-width:390px}.sky-fb-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.sky-fb-head{flex-direction:column;gap:9px}}
 @media(max-width:460px){.sky-fb-fields{grid-template-columns:1fr}.sky-fb-panel{padding:18px 13px}.sky-fb-actions button{width:100%}}
+
+/* Enlarged gallery: same source canvas render, no image resampling or data mutation. */
+.sky-fb-expand{position:relative;display:block;width:100%;padding:0;margin:0;border:0;border-radius:5px;background:transparent;cursor:zoom-in;text-align:left;overflow:hidden}
+.sky-fb-expand canvas{pointer-events:none}
+.sky-fb-expand:focus-visible{outline:3px solid #b38734;outline-offset:4px}
+.sky-fb-expand:disabled{opacity:.75;cursor:wait}
+.sky-fb-expand-hint{position:absolute;right:11px;bottom:11px;display:block;padding:9px 12px;background:#103f2de8;color:white;border-radius:8px;font-size:12px;font-weight:750;box-shadow:0 3px 12px #0005}
+.sky-fb-expand:hover .sky-fb-expand-hint,.sky-fb-expand:focus-visible .sky-fb-expand-hint{background:#215c41}
+.sky-fb-pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}
+.sky-fb-pagination>span{font-size:12px;color:#204e38;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sky-fb-arrow{border:1px solid #bdcdbd;background:#fff;color:#264c35;border-radius:9px;padding:9px 10px;font-size:11px;font-weight:750;cursor:pointer;white-space:nowrap}
+.sky-fb-arrow:hover:not(:disabled){background:#eef6eb}
+.sky-fb-arrow:disabled{opacity:.35;cursor:not-allowed}
+.sky-fb-lightbox{position:fixed;inset:0;margin:auto;border:1px solid #d4e4d5;border-radius:15px;padding:0;width:min(94vw,880px);max-width:94vw;max-height:96dvh;background:#f7f8f1;color:#153d2b;overflow:auto;box-shadow:0 18px 100px #071c16a8}
+.sky-fb-lightbox::backdrop{background:#071913d9;backdrop-filter:blur(4px)}
+.sky-fb-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:13px 18px;background:#103f2d;color:#fff}
+.sky-fb-modal-head strong{font-size:16px}
+.sky-fb-modal-sub{color:#d1e3d1;font-size:12px;margin-top:5px}
+.sky-fb-modal-close{background:#ffffff22;color:white;border:1px solid #ffffff66;border-radius:8px;width:35px;height:35px;cursor:pointer;font-size:20px}
+.sky-fb-modal-close:hover{background:#ffffff42}
+.sky-fb-modal-stage{position:relative;display:flex;justify-content:center;align-items:center;padding:12px 48px 0;min-height:0}
+.sky-fb-modal-stage canvas{display:block;width:auto;height:auto;max-width:100%;max-height:calc(96dvh - 167px);aspect-ratio:4/5;object-fit:contain;background:#f7f6ef;box-shadow:0 5px 24px #081e1828}
+.sky-fb-modal-prev,.sky-fb-modal-next{position:absolute;top:50%;transform:translateY(-50%);border:1px solid #d5e4d6;border-radius:50%;width:40px;height:52px;background:#fff;color:#16462e;font-size:32px;line-height:1;cursor:pointer;box-shadow:0 4px 18px #132f2840}
+.sky-fb-modal-prev{left:5px}.sky-fb-modal-next{right:5px}
+.sky-fb-modal-prev:hover:not(:disabled),.sky-fb-modal-next:hover:not(:disabled){background:#e2efdf}
+.sky-fb-modal-prev:disabled,.sky-fb-modal-next:disabled{opacity:.25;cursor:not-allowed}
+.sky-fb-modal-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 18px 15px;font-size:12px;font-weight:750}
+.sky-fb-modal-foot>span:first-child{font-variant-numeric:tabular-nums}
+.sky-fb-modal-help{color:#68806c;font-weight:500}
+@media(max-width:600px){
+.sky-fb-lightbox{width:98vw;max-width:98vw;max-height:97dvh;border-radius:10px}
+.sky-fb-modal-stage{padding:8px 29px 0}
+.sky-fb-modal-stage canvas{max-height:calc(97dvh - 146px)}
+.sky-fb-modal-prev,.sky-fb-modal-next{width:30px;height:44px;font-size:26px}
+.sky-fb-modal-prev{left:0}.sky-fb-modal-next{right:0}
+.sky-fb-modal-head{padding:11px 13px}.sky-fb-modal-head strong{font-size:13px}
+.sky-fb-modal-help{font-size:10px}
+}
