@@ -14,7 +14,7 @@ const $=id=>document.getElementById(id);
 const BASE='../data/v3/';
 const RAW_BASE='https://raw.githubusercontent.com/Luke2929/bg-agro-price-tracker/master/data/daily/';
 const ARCHIVE_API='https://api.github.com/repos/Luke2929/bg-agro-price-tracker/contents/data/daily/';
-const PAGE_NAMES={overview:'农价总览',prices:'价格明细',history:'历史与州别',watchlist:'我的关注',signals:'选题情报',studio:'内容工作室',calendar:'内容日历与成效',export:'Excel / PDF 导出',system:'运行状态',product:'农产品详情'};
+const PAGE_NAMES={overview:'农价总览',prices:'价格明细',history:'历史与州别',watchlist:'我的关注',signals:'选题情报',studio:'内容工作室',calendar:'内容日历与成效',export:'Excel / PDF / FB 导出',system:'运行状态',product:'农产品详情'};
 const store={overview:null,index:null,meta:null,health:null,history:new Map(),page:'overview',
   period:1,visible:40,watch:[],fetching:false,rawCache:new Map(),dailyPending:new Map(),
   insightData:null,insightRequest:0,snapshots:new Map(),streaks:new Map(),comparison:null,comparisonRequest:0,
