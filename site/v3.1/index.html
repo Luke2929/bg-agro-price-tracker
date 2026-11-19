@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="./styles.css?rev=v3-5-completeness-1">
   <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
   <script type="module" src="./app.mjs?rev=v3-5-completeness-1"></script>
-  <link rel="stylesheet" href="./fb-export.css?rev=2026-11-19-1">
-  <script type="module" src="./fb-export.mjs?rev=2026-11-19-2-no-txt"></script>
+  <link rel="stylesheet" href="./fb-export.css?rev=2026-11-19-gallery-v1">
+  <script type="module" src="./fb-export.mjs?rev=2026-11-19-gallery-v1"></script>
 </head>
 <body>
 <div class="shell">
@@ -300,7 +300,18 @@
             <label>海报范围<select id="fb-post-mode"><option value="all">全部蔬菜品种（自动分页）</option><option value="popular">热门精选 12 种</option></select></label>
           </div>
           <div class="sky-fb-layout">
-            <div class="sky-fb-preview-wrap"><canvas id="fb-post-canvas" width="1080" height="1350" aria-label="SKY AGRO poster preview"></canvas><p class="sky-fb-preview-caption">左侧预览为首张 BM 海报。切换为中文版后可直接预览中文；双语档案会分别生成两种语言。预览仅展示第一页。</p></div>
+            <div class="sky-fb-preview-wrap">
+              <button type="button" class="sky-fb-expand" id="fb-post-expand" aria-haspopup="dialog" aria-controls="fb-preview-dialog" aria-label="点击放大查看当前 SKY AGRO 图片">
+                <canvas id="fb-post-canvas" width="1080" height="1350" aria-label="SKY AGRO poster preview"></canvas>
+                <span class="sky-fb-expand-hint">⤢ 点击放大查看</span>
+              </button>
+              <div class="sky-fb-pagination" aria-label="图片预览翻页">
+                <button type="button" class="sky-fb-arrow" id="fb-post-prev" aria-label="上一张" disabled>← 上一张</button>
+                <span id="fb-post-page-label" aria-live="polite">等待预览…</span>
+                <button type="button" class="sky-fb-arrow" id="fb-post-next" aria-label="下一张" disabled>下一张 →</button>
+              </div>
+              <p class="sky-fb-preview-caption">点击图片可放大；上一张／下一张可浏览所选州的全部分页和 BM／中文版本。选择全国时可连续查看 16 个地区。</p>
+            </div>
             <div class="sky-fb-tools">
               <h3>从 CSV 直接生成 Facebook 图片</h3>
               <p>海报显示同一产品、等级与单位在所选州的真实最低—最高记录价，不是全州统一成交价。完整版超过每页 18 行时会继续生成第 2、3 页。</p>
@@ -315,6 +326,22 @@
             </div>
           </div>
         </section>
+        <dialog id="fb-preview-dialog" class="sky-fb-lightbox" aria-labelledby="fb-lightbox-title">
+          <div class="sky-fb-modal-head">
+            <div><strong id="fb-lightbox-title">SKY AGRO · 图片放大预览</strong>
+            <div class="sky-fb-modal-sub" id="fb-lightbox-subtitle">真实 FAMA 价格海报</div></div>
+            <button type="button" class="sky-fb-modal-close" id="fb-lightbox-close" aria-label="关闭放大预览">✕</button>
+          </div>
+          <div class="sky-fb-modal-stage">
+            <canvas id="fb-lightbox-canvas" width="1080" height="1350" aria-label="放大后的 SKY AGRO Facebook 价格海报"></canvas>
+            <button type="button" class="sky-fb-modal-prev" id="fb-lightbox-prev" aria-label="上一张图片" disabled>‹</button>
+            <button type="button" class="sky-fb-modal-next" id="fb-lightbox-next" aria-label="下一张图片" disabled>›</button>
+          </div>
+          <div class="sky-fb-modal-foot">
+            <span id="fb-lightbox-count" aria-live="polite">0 / 0</span>
+            <span class="sky-fb-modal-help">键盘 ← → 翻页 · Esc 关闭</span>
+          </div>
+        </dialog>
       </section>
 
       <section data-screen="system" class="screen" aria-labelledby="system-title"><div class="page-intro"><span class="eyebrow green">SYSTEM HEALTH</span><h1 id="system-title">运行状态与数据质量</h1><p>区分“GitHub 执行成功”和“FAMA 已发布新价格”；两者不是同一件事。</p></div><div class="health-grid"><article class="panel"><h2>数据完整性</h2><dl id="archive-health"></dl></article><article class="panel"><h2>自动化监控</h2><dl id="job-health"><div><dt>运行状态</dt><dd>等待检测…</dd></div></dl></article></div><section class="panel"><h2>数据处理规则</h2><ul class="explanation"><li>原始 <code>data/daily/*.csv</code> 是审计档案，不会因 V3 迁移而删除或覆盖。</li><li>同一天同产品先按市场计算平均；各市场在州或全国平均中等权。</li><li>涨跌比较只匹配相同产品、等级、单位、价格层级与市场。</li><li>最新调查日期和程序运行时间分别显示；缺失数据不会被估算。</li><li>GitHub Actions 预约执行不是强保证。备用调度与外部告警需要另行授权配置。</li></ul></section></section>
