@@ -1,4 +1,5 @@
 import {parseCSV,canonicalDailyRows,validPrice} from './engine.mjs?rev=v3-5-completeness-1';
+import {translateVegetableZH,untranslatedVegetables} from './fb-zh-names.mjs?rev=2026-11-19-full-zh-audit-v1';
 
 const RAW = 'https://raw.githubusercontent.com/Luke2929/bg-agro-price-tracker/master/data/daily/';
 const $ = id => document.getElementById(id);
@@ -11,18 +12,6 @@ const STATES = [
   ['SELANGOR','Selangor','雪兰莪'],['TERENGGANU','Terengganu','登嘉楼'],
   ['W.P. KUALA LUMPUR','Kuala Lumpur','吉隆坡'],
   ['W.P. PUTRAJAYA','Putrajaya','布城'],['W.P. LABUAN','Labuan','纳闽']
-];
-const NAMES = [
-  ['CILI MERAH KULAI','红辣椒（Kulai）'],['CILI MERAH MINYAK','红辣椒（Minyak）'],
-  ['CILI HIJAU','青辣椒'],['CILI / LADA SOLOK','Solok 辣椒'],
-  ['TIMUN HIJAU','青瓜'],['KACANG PANJANG HIJAU','长豆'],
-  ['KACANG BENDI','羊角豆'],['KACANG BUNCIS','四季豆'],
-  ['TERUNG PANJANG','长茄子'],['SAWI HIJAU TANAH TINGGI','高地芥菜'],
-  ['SAWI HIJAU','芥菜'],['BAYAM','苋菜'],['KANGKUNG','空心菜'],
-  ['KUBIS BULAT','包菜'],['KOBIS BULAT','包菜'],['KOBIS BUNGA','花椰菜'],
-  ['TOMATO PLUM','李子型番茄'],['TOMATO','番茄'],
-  ['LABU MANIS','南瓜'],['DAUN BAWANG','葱叶'],['DAUN SUP','芹菜叶'],
-  ['SALAD','生菜'],['KUBIS','包菜']
 ];
 const FEATURED = [
   'CILI MERAH','TIMUN','SAWI','KACANG PANJANG','BAYAM','KANGKUNG',
@@ -44,11 +33,6 @@ let previewIndex = 0;
 function stateName(key,lang) {
   const found=STATES.find(s=>s[0]===key);
   return found ? found[lang==='zh'?2:1] : key;
-}
-function translateProduct(v) {
-  const source=String(v||'').trim().toUpperCase();
-  const found=NAMES.find(([prefix])=>source.startsWith(prefix));
-  return found ? found[1] : source;
 }
 function unitLabel(v,lang) {
   const key=String(v||'').trim().toLowerCase();
@@ -95,6 +79,14 @@ function paginate(items) {
   const pages=[];
   for(let i=0;i<items.length;i+=PER_PAGE)pages.push(items.slice(i,i+PER_PAGE));
   return pages;
+}
+// Never silently print raw Malay names on Chinese posters.
+function requireChineseTranslations(groups,states,mode,languages) {
+  if(!languages.includes('zh'))return;
+  const visible=states.flatMap(state=>pickProducts(groups,state,mode).map(item=>item.varieti));
+  const missing=untranslatedVegetables(visible);
+  if(missing.length)throw Error('发现 '+missing.length+' 个尚未审核的蔬菜中文名称，请先更新 fb-zh-names.mjs：'+
+    missing.slice(0,6).join('、')+(missing.length>6?' 等':'')+'。已停止中文海报生成，防止误将马来文当作中文。');
 }
 async function getArchive() {
   if(meta)return meta;
@@ -178,7 +170,7 @@ function drawPoster(canvas,{date,state,level,lang,items,page,pages,mode}) {
   c.textAlign='left';
   c.fillStyle='#ffffff';textFit(c,'SKY AGRO · 天順農業',48,66,850,43,32);
   c.fillStyle='#d8eacd';c.font='600 21px Arial, "Microsoft YaHei", sans-serif';
-  c.fillText('PERTANIAN  ·  BAJA  ·  BENIH',51,99);
+  c.fillText(lang==='zh'?'农业用品 · 肥料 · 种子':'PERTANIAN  ·  BAJA  ·  BENIH',51,99);
   c.fillStyle='#fff8dc';
   textFit(c,lang==='zh'?'蔬菜市场价格':'HARGA PASARAN SAYUR',50,160,960,57,39);
   c.fillStyle='#f6dc73';textFit(c,stateName(state,lang).toUpperCase(),50,229,965,49,36);
@@ -206,7 +198,8 @@ function drawPoster(canvas,{date,state,level,lang,items,page,pages,mode}) {
     roundRect(c,x,y,cardWidth,70,12,row%2?'#eef3e7':'#ffffff');
     roundRect(c,x+10,y+12,5,47,2,'#5c9470');
     c.textAlign='left';c.fillStyle='#163e2e';
-    const title=lang==='zh'?translateProduct(item.varieti):item.varieti;
+    const title=lang==='zh'?translateVegetableZH(item.varieti):item.varieti;
+    if(!title)throw Error('找不到蔬菜中文名称：'+item.varieti+'。请先审核翻译词库。');
     textFit(c,title,x+27,y+30,435,25,17);
     c.fillStyle='#506d5a';c.font='18px Arial, "Microsoft YaHei", sans-serif';
     const grade=(item.gred && item.gred!=='F.A.Q') ? item.gred+' · ':'';
@@ -297,6 +290,7 @@ async function dataForForm() {
 function buildPreviewGallery(v,groups) {
   const states=v.state==='ALL'?STATES.map(s=>s[0]):[v.state];
   const languages=v.language==='both'?['bm','zh']:[v.language];
+  requireChineseTranslations(groups,states,v.mode,languages);
   const gallery=[];
   for(const state of states) {
     const allItems=pickProducts(groups,state,v.mode),pages=paginate(allItems);
@@ -376,6 +370,7 @@ async function generate(single) {
     const {v,groups}=await dataForForm();
     const states=single?[v.state==='ALL'?(previewData?.state||'PERAK'):v.state]:(v.state==='ALL'?STATES.map(s=>s[0]):[v.state]);
     const langs=v.language==='both'?['bm','zh']:[v.language];
+    requireChineseTranslations(groups,states,v.mode,langs);
     const files=[];
     for(let i=0;i<states.length;i++){
       const state=states[i],items=pickProducts(groups,state,v.mode),pages=paginate(items);
