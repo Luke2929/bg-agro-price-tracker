@@ -118,14 +118,15 @@ function setStatus(message,isError=false) {
 }
 function values() {
   return {date:$('fb-post-date').value,state:$('fb-post-state').value,
-    level:$('fb-post-level').value,language:$('fb-post-language').value,
-    mode:$('fb-post-mode').value};
+    levels:[...document.querySelectorAll('.fb-post-level-check:checked')].map(el=>el.value),
+    language:$('fb-post-language').value,mode:$('fb-post-mode').value};
 }
 function setBusy(flag) {
   busy=flag;
   for(const id of ['fb-post-preview','fb-post-single','fb-post-zip','fb-post-copy',
-    'fb-post-date','fb-post-state','fb-post-level','fb-post-language','fb-post-mode'])
+    'fb-post-date','fb-post-state','fb-post-language','fb-post-mode'])
     $(id).disabled=flag;
+  for(const checkbox of document.querySelectorAll('.fb-post-level-check'))checkbox.disabled=flag;
   updateGalleryControls();
 }
 function roundRect(ctx,x,y,w,h,r,color) {
@@ -220,16 +221,19 @@ function drawPoster(canvas,{date,state,level,lang,items,page,pages,mode}) {
   c.textAlign='right';c.fillText(String(page+1)+' / '+String(pages),1014,1280);
   c.textAlign='left';
 }
-function auditCSV(groups,states,options) {
+function auditCSV(groupsByLevel,states,options) {
   const esc=value=>{
     let t=String(value??'');
     if(/^[=+@-]/.test(t))t="'"+t;
     return '"'+t.replaceAll('"','""')+'"';
   };
   const rows=[['Survey date','State','Price level','Variety (FAMA)','Grade','Unit','Min (RM)','Max (RM)','Observations','Distinct source markets']];
-  for(const state of states)for(const item of pickProducts(groups,state,options.mode))
-    rows.push([options.date,state,options.level,item.varieti,item.gred,item.unit,
-      money(item.min),money(item.max),item.count,item.markets.size]);
+  for(const level of options.levels) {
+    const groups=groupsByLevel.get(level);
+    for(const state of states)for(const item of pickProducts(groups,state,options.mode))
+      rows.push([options.date,state,level,item.varieti,item.gred,item.unit,
+        money(item.min),money(item.max),item.count,item.markets.size]);
+  }
   return new TextEncoder().encode('\uFEFF'+rows.map(r=>r.map(esc).join(',')).join('\r\n')+'\r\n');
 }
 function createCaption({date,state,level,lang,items}) {
@@ -281,22 +285,27 @@ function zip(files) {
   return new Blob([...localParts,...centralParts,tail],{type:'application/zip'});
 }
 async function dataForForm() {
-  const v=values(); await getArchive();
+  const v=values();
+  if(!v.levels.length)throw Error('请至少勾选一个价格层级（L / B / R）');
+  await getArchive();
   const rows=await getDate(v.date);
-  const groups=buildGroups(rows,v.date,v.level);
-  return {v,groups};
+  const groupsByLevel=new Map(v.levels.map(level=>[level,buildGroups(rows,v.date,level)]));
+  return {v,groupsByLevel};
 }
-// Build only descriptors, not dozens of expensive canvases. Every page is rendered on demand.
-function buildPreviewGallery(v,groups) {
+// Gallery descriptors only: draw canvases on demand to keep multi-level preview responsive.
+function buildPreviewGallery(v,groupsByLevel) {
   const states=v.state==='ALL'?STATES.map(s=>s[0]):[v.state];
   const languages=v.language==='both'?['bm','zh']:[v.language];
-  requireChineseTranslations(groups,states,v.mode,languages);
   const gallery=[];
-  for(const state of states) {
-    const allItems=pickProducts(groups,state,v.mode),pages=paginate(allItems);
-    for(const lang of languages)for(let page=0;page<pages.length;page++)
-      gallery.push({date:v.date,state,level:v.level,lang,items:pages[page],allItems,
-        page,pages:pages.length,mode:v.mode});
+  for(const level of v.levels) {
+    const groups=groupsByLevel.get(level);
+    requireChineseTranslations(groups,states,v.mode,languages);
+    for(const state of states) {
+      const allItems=pickProducts(groups,state,v.mode),pages=paginate(allItems);
+      for(const lang of languages)for(let page=0;page<pages.length;page++)
+        gallery.push({date:v.date,state,level,lang,items:pages[page],allItems,
+          page,pages:pages.length,mode:v.mode});
+    }
   }
   return gallery;
 }
@@ -305,7 +314,8 @@ function selectedSpec() {
 }
 function galleryLabel(spec) {
   if(!spec)return '等待预览…';
-  return stateName(spec.state,'zh')+' · '+(spec.lang==='bm'?'BM':'中文')+
+  return stateName(spec.state,'zh')+' · '+LEVEL_LABELS[spec.level][1]+
+    ' · '+(spec.lang==='bm'?'BM':'中文')+
     ' · 第 '+(spec.page+1)+' / '+spec.pages+' 页';
 }
 function updateGalleryControls() {
@@ -345,8 +355,8 @@ async function preview() {
   setBusy(true);
   try {
     setStatus('正在读取并验证所选日期 FAMA CSV…');
-    const {v,groups}=await dataForForm();
-    const gallery=buildPreviewGallery(v,groups);
+    const {v,groupsByLevel}=await dataForForm();
+    const gallery=buildPreviewGallery(v,groupsByLevel);
     if(!gallery.length)throw Error('没有可预览的州属或语言');
     previewData={v,gallery,state:null,items:null};
     previewIndex=v.state==='ALL'?Math.max(0,gallery.findIndex(x=>x.state==='PERAK'&&x.lang===(v.language==='zh'?'zh':'bm'))):0;
@@ -366,30 +376,46 @@ async function generate(single) {
   if(busy)return;
   setBusy(true);
   try{
-    setStatus('正在验证全部原始 CSV 报价…');
-    const {v,groups}=await dataForForm();
-    const states=single?[v.state==='ALL'?(previewData?.state||'PERAK'):v.state]:(v.state==='ALL'?STATES.map(s=>s[0]):[v.state]);
+    setStatus('正在验证全部原始 CSV 报价与所选价格层级…');
+    const {v,groupsByLevel}=await dataForForm();
+    const states=single
+      ? [v.state==='ALL'?(previewData?.state||'PERAK'):v.state]
+      : (v.state==='ALL'?STATES.map(s=>s[0]):[v.state]);
     const langs=v.language==='both'?['bm','zh']:[v.language];
-    requireChineseTranslations(groups,states,v.mode,langs);
+    // Check all requested translations before saving any files.
+    for(const level of v.levels)requireChineseTranslations(groupsByLevel.get(level),states,v.mode,langs);
     const files=[];
-    for(let i=0;i<states.length;i++){
-      const state=states[i],items=pickProducts(groups,state,v.mode),pages=paginate(items);
-      for(const lang of langs)for(let page=0;page<pages.length;page++){
-        const filename=state.replaceAll(/[^a-zA-Z0-9]+/g,'_')+'_'+lang.toUpperCase()+
-          (pages.length>1?'_P'+(page+1):'')+'.png';
-        files.push({name:filename,data:await posterBytes({date:v.date,state,level:v.level,lang,items:pages[page],page,pages:pages.length,mode:v.mode})});
+    let completed=0;
+    const total=states.length*v.levels.length;
+    for(const level of v.levels) {
+      const groups=groupsByLevel.get(level);
+      const levelDir=({Ladang:'L_Ladang',Borong:'B_Borong',Runcit:'R_Runcit'})[level];
+      for(const state of states) {
+        const items=pickProducts(groups,state,v.mode),pages=paginate(items);
+        for(const lang of langs)for(let page=0;page<pages.length;page++){
+          const basename=state.replaceAll(/[^a-zA-Z0-9]+/g,'_')+'_'+lang.toUpperCase()+
+            (pages.length>1?'_P'+(page+1):'')+'.png';
+          files.push({name:levelDir+'/'+basename,
+            data:await posterBytes({date:v.date,state,level,lang,items:pages[page],
+              page,pages:pages.length,mode:v.mode})});
+        }
+        completed++;
+        setStatus('正在批量生成：'+completed+' / '+total+' 组；已完成 '+files.length+' 张 PNG…');
+        await new Promise(resolve=>setTimeout(resolve,0));
       }
-      setStatus('正在生成图片：'+(i+1)+' / '+states.length+' 地区，已完成 '+files.filter(f=>f.name.endsWith('.png')).length+' 张…');
-      await new Promise(resolve=>setTimeout(resolve,0));
     }
-    files.push({name:'FAMA_PRICE_AUDIT_'+v.date+'.csv',data:auditCSV(groups,states,v)});
-    if(single && files.filter(f=>f.name.endsWith('.png')).length===1){
-      const picture=files.find(f=>f.name.endsWith('.png'));
-      saveBlob(new Blob([picture.data],{type:'image/png'}),'SKY_AGRO_'+v.date+'_'+picture.name);
+    files.push({name:'FAMA_PRICE_AUDIT_'+v.date+'.csv',data:auditCSV(groupsByLevel,states,v)});
+    const pictures=files.filter(f=>f.name.endsWith('.png'));
+    const levelCode=v.levels.map(level=>level[0].toUpperCase()).join('');
+    if(single && pictures.length===1){
+      const picture=pictures[0],baseName=picture.name.split('/').at(-1);
+      saveBlob(new Blob([picture.data],{type:'image/png'}),
+        'SKY_AGRO_'+v.date+'_'+levelCode+'_'+baseName);
     }else{
-      saveBlob(zip(files),'SKY_AGRO_FAMA_FB_'+v.date+'_'+v.level+'_'+v.language+'.zip');
+      saveBlob(zip(files),'SKY_AGRO_FAMA_FB_'+v.date+'_'+levelCode+'_'+v.language+'.zip');
     }
-    setStatus('已生成 '+files.filter(f=>f.name.endsWith('.png')).length+' 张图片，包含 '+states.length+' 个地区；请检查浏览器下载。');
+    setStatus('已完成 '+pictures.length+' 张图片（'+states.length+' 个地区 × '+v.levels.length+
+      ' 个价格层级）；'+(single&&pictures.length===1?'已下载 PNG':'已打包一个 ZIP')+'。请检查浏览器下载。');
   }catch(error){setStatus('导出失败：'+error.message,true);}
   finally{setBusy(false);}
 }
@@ -397,14 +423,20 @@ async function copyCaption() {
   if(busy)return;
   try{
     let d=previewData;
-    if(!d || d.v.date!==values().date || d.v.level!==values().level || d.v.mode!==values().mode) {
+    const v=values();
+    if(!d || JSON.stringify(d.v)!==JSON.stringify(v)) {
       await preview();d=previewData;
     }
     if(!d)throw Error('请先生成有效预览');
-    const languages=values().language==='both'?['bm','zh']:[values().language];
-    const result=languages.map(lang=>createCaption({date:d.v.date,state:d.state,level:d.v.level,lang,items:d.items})).join('\n\n--------------------\n\n');
+    const spec=selectedSpec();
+    if(!spec)throw Error('没有选中的海报');
+    const languages=v.language==='both'?['bm','zh']:[v.language];
+    const result=languages.map(lang=>createCaption({
+      date:spec.date,state:spec.state,level:spec.level,lang,items:spec.allItems
+    })).join('\n\n--------------------\n\n');
     await navigator.clipboard.writeText(result);
-    setStatus('已复制'+(languages.length===2?'马来文及中文':languages[0]==='zh'?'中文':'马来文')+' Facebook 文案。');
+    setStatus('已复制当前预览 '+LEVEL_LABELS[spec.level][1]+' 的'+
+      (languages.length===2?'马来文及中文':languages[0]==='zh'?'中文':'马来文')+' Facebook 文案。');
   }catch(error){setStatus('复制失败：'+error.message,true);}
 }
 async function init() {
@@ -415,8 +447,11 @@ async function init() {
     const m=await getArchive(), select=$('fb-post-date');
     for(const date of [...m.archive_dates].reverse())select.add(new Option(date,date));
     select.value=m.window?.max&&m.archive_dates.includes(m.window.max)?m.window.max:m.archive_dates.at(-1);
-    for(const id of ['fb-post-date','fb-post-state','fb-post-level','fb-post-language','fb-post-mode'])
-      $(id).addEventListener('change',()=>{previewData=null;previewIndex=0;preview();});
+    const refresh=()=>{previewData=null;previewIndex=0;preview();};
+    for(const id of ['fb-post-date','fb-post-state','fb-post-language','fb-post-mode'])
+      $(id).addEventListener('change',refresh);
+    for(const checkbox of document.querySelectorAll('.fb-post-level-check'))
+      checkbox.addEventListener('change',refresh);
     $('fb-post-expand').addEventListener('click',openPreviewDialog);
     $('fb-post-prev').addEventListener('click',()=>changePreview(-1));
     $('fb-post-next').addEventListener('click',()=>changePreview(1));
