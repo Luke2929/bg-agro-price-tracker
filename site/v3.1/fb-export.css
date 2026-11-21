@@ -8,6 +8,14 @@
 .sky-fb-fields{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .sky-fb-fields label{font-size:11px;color:#506f5e;font-weight:770;display:grid;gap:8px;min-width:0}
 .sky-fb-fields select{height:43px;width:100%;min-width:0;background:#fff;border:1px solid #cddfd1;border-radius:9px;padding:0 10px;color:#224a37;font-size:12px}
+.sky-fb-level-field{display:grid;gap:8px;min-width:0}
+.sky-fb-level-field>span{font-size:11px;color:#506f5e;font-weight:770}
+.sky-fb-level-field>span small{color:#718d77;font-weight:500}
+.sky-fb-level-options{display:flex;align-items:center;justify-content:space-around;gap:2px;min-height:43px;padding:3px 5px;border:1px solid #cddfd1;border-radius:9px;background:#fff}
+.sky-fb-fields .sky-fb-level-options label{display:inline-flex;align-items:center;justify-content:center;gap:3px;min-width:0;padding:5px 2px;font-size:11px;font-weight:750;white-space:nowrap;cursor:pointer}
+.sky-fb-level-options input{width:14px;height:14px;margin:0;accent-color:#1e6544;cursor:pointer}
+.sky-fb-level-options label:has(input:checked){color:#12623f}
+.sky-fb-level-options label:has(input:focus-visible){outline:2px solid #c7a958;outline-offset:1px;border-radius:5px}
 .sky-fb-layout{display:grid;grid-template-columns:minmax(230px,350px) minmax(0,1fr);gap:23px;align-items:start}
 .sky-fb-preview-wrap{padding:12px;background:#e5eadd;border:1px solid #d1dccb;border-radius:14px;min-width:0}
 .sky-fb-preview-wrap canvas{display:block;width:100%;height:auto;aspect-ratio:4/5;background:#f8f6ee;box-shadow:0 7px 25px #113d2329}
