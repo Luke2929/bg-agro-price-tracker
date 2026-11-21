@@ -1,0 +1,49 @@
+name: Deploy Dashboard UI (Independent)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'site/v3.1/**'
+      - '.github/workflows/deploy-dashboard-ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: bg-agro-ui-pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-ui:
+    name: Validate and deploy UI
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout dashboard
+        uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check dashboard JavaScript
+        run: |
+          node --check site/v3.1/fb-export.mjs
+          node --check site/v3.1/app.mjs
+          node --check site/v3.1/creator-app.mjs
+      - name: Run dashboard UI regression tests
+        run: node --test tests/test_v3_ui_structure.mjs tests/test_fb_zh_names.mjs tests/test_fb_multilevel.mjs
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - name: Publish dashboard
+        id: deployment
+        uses: actions/deploy-pages@v4
