@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="./styles.css?rev=v3-5-completeness-1">
   <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
   <script type="module" src="./app.mjs?rev=v3-5-completeness-1"></script>
-  <link rel="stylesheet" href="./fb-export.css?rev=2026-11-19-gallery-v1">
-  <script type="module" src="./fb-export.mjs?rev=2026-11-19-zh-audit-v1"></script>
+  <link rel="stylesheet" href="./fb-export.css?rev=2026-11-21-multilevel-v1">
+  <script type="module" src="./fb-export.mjs?rev=2026-11-21-multilevel-v1"></script>
 </head>
 <body>
 <div class="shell">
@@ -291,11 +291,18 @@
           <p class="method-note">只读取 GitHub 保存的真实 FAMA CSV；缺失价格不当 RM0，日期缺档不补值。Full Mobile PDF 每个实际调查日独立分组，避免将不同日期混成同一天报价。无法完整读取档案时，整次导出停止。</p>
         </section>
         <section class="panel sky-fb-panel" id="sky-fb-post-export" aria-labelledby="fb-post-title">
-          <div class="sky-fb-head"><div><span class="sky-fb-tag">SOCIAL EXPORTS · SKY AGRO</span><h2 id="fb-post-title">Facebook 价格图生成器｜马来文 + 中文</h2><p>按单个真实 FAMA 调查日生成 1080 × 1350 PNG。可选择 13 州和 3 个联邦直辖区，一键批量导出双语 ZIP；完整品种自动分页，缺报地区不会填假价。</p></div><span class="sky-fb-pill">NEW · FB POST</span></div>
+          <div class="sky-fb-head"><div><span class="sky-fb-tag">SOCIAL EXPORTS · SKY AGRO</span><h2 id="fb-post-title">Facebook 价格图生成器｜马来文 + 中文</h2><p>按真实 FAMA 调查日生成 1080 × 1350 PNG。价格层级 L／B／R 可多选；支持全部 16 地区及双语，一次下载 ZIP（按层级分类）；完整品种自动分页，缺报地区不会填假价。</p></div><span class="sky-fb-pill">NEW · FB POST</span></div>
           <div class="sky-fb-fields">
             <label>FAMA 调查日期<select id="fb-post-date" aria-label="Facebook export survey date"></select></label>
             <label>州／直辖区<select id="fb-post-state"><option value="ALL">全部 16 地区</option></select></label>
-            <label>价格层级<select id="fb-post-level"><option value="Ladang">L · 农场价</option><option value="Borong">B · 批发价</option><option value="Runcit">R · 零售价</option></select></label>
+            <div class="sky-fb-level-field">
+              <span id="fb-post-level-label">价格层级 <small>（可多选）</small></span>
+              <div class="sky-fb-level-options" role="group" aria-labelledby="fb-post-level-label">
+                <label><input class="fb-post-level-check" type="checkbox" value="Ladang" checked> L 农场</label>
+                <label><input class="fb-post-level-check" type="checkbox" value="Borong"> B 批发</label>
+                <label><input class="fb-post-level-check" type="checkbox" value="Runcit"> R 零售</label>
+              </div>
+            </div>
             <label>图片语言<select id="fb-post-language"><option value="both">马来文 + 中文</option><option value="bm">Bahasa Melayu</option><option value="zh">简体中文</option></select></label>
             <label>海报范围<select id="fb-post-mode"><option value="all">全部蔬菜品种（自动分页）</option><option value="popular">热门精选 12 种</option></select></label>
           </div>
@@ -310,7 +317,7 @@
                 <span id="fb-post-page-label" aria-live="polite">等待预览…</span>
                 <button type="button" class="sky-fb-arrow" id="fb-post-next" aria-label="下一张" disabled>下一张 →</button>
               </div>
-              <p class="sky-fb-preview-caption">点击图片可放大；上一张／下一张可浏览所选州的全部分页和 BM／中文版本。选择全国时可连续查看 16 个地区。</p>
+              <p class="sky-fb-preview-caption">点击图片可放大；上一张／下一张可浏览勾选层级、所选州、全部分页及 BM／中文版本。选择全国时可连续查看 16 个地区。</p>
             </div>
             <div class="sky-fb-tools">
               <h3>从 CSV 直接生成 Facebook 图片</h3>
@@ -318,11 +325,11 @@
               <div class="sky-fb-actions">
                 <button type="button" class="secondary-button" id="fb-post-preview">刷新图片预览</button>
                 <button type="button" class="secondary-button" id="fb-post-single">下载预览州 PNG / ZIP</button>
-                <button type="button" class="primary-button" id="fb-post-zip">下载所选州／全国 ZIP</button>
+                <button type="button" class="primary-button" id="fb-post-zip">一键下载所选层级 ZIP</button>
                 <button type="button" class="secondary-button" id="fb-post-copy">复制 FB 文案</button>
               </div>
               <div id="fb-post-status" class="sky-fb-status" role="status" aria-live="polite">正在初始化真实 FAMA 存档…</div>
-              <div class="sky-fb-rules">核对原则：仅使用 GitHub 上的真实 FAMA 日期 CSV；先去除已更新的旧 priceid；空白及零价格不列为有效报价；按价格层级及单位分开；没有记录显示「无数据」。不自动生成未经匹配验证的涨跌百分比。马来文或中文 FB 文案可使用「复制 FB 文案」，ZIP 只包含 PNG 和价格核对 CSV。中文版使用已审计词库，遇到尚未翻译的新蔬菜品种会明确报错，避免误发马来文。</div>
+              <div class="sky-fb-rules">核对原则：仅使用 GitHub 上的真实 FAMA 日期 CSV；先去除已更新的旧 priceid；空白及零价格不列为有效报价；按价格层级及单位分开；没有记录显示「无数据」。不自动生成未经匹配验证的涨跌百分比。马来文或中文 FB 文案可使用「复制 FB 文案」，ZIP 按 L／B／R 分文件夹，只包含所选层级的 PNG 与统一价格核对 CSV。中文版使用已审计词库，遇到尚未翻译的新蔬菜品种会明确报错，避免误发马来文。</div>
             </div>
           </div>
         </section>
