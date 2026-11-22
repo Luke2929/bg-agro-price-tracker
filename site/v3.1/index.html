@@ -131,6 +131,7 @@
             <button type="button" id="market-heatmap-back-all" class="market-hm-return" hidden>← 返回全马 16 州</button>
             <span class="market-hm-mode" id="market-heatmap-mode">全马总览 · 点击州标题放大查看全部产品</span>
             <label class="market-hm-lock"><input type="checkbox" id="market-heatmap-lock"> 历史回放锁定产品位置</label>
+            <button type="button" id="market-heatmap-fullscreen" class="market-hm-fullscreen" aria-pressed="false">全屏查看</button>
             <button type="button" id="market-heatmap-capture" class="market-hm-capture">导出热力图 PNG</button>
           </div>
           <p class="market-hm-summary" id="market-heatmap-summary" aria-live="polite">正在核对同市场历史比较…</p>
@@ -143,6 +144,16 @@
             <div id="market-heatmap-canvas" class="market-hm-canvas" role="group" aria-label="农产品涨跌热力图"></div>
           </div>
           <div class="market-hm-detail" id="market-heatmap-detail" aria-live="polite">悬停或选中某个色块查看详细价格变化。</div>
+          <section id="market-heatmap-crossstate" class="market-hm-crossstate" aria-labelledby="market-hm-crossstate-heading" hidden>
+            <div class="market-hm-crossstate-heading">
+              <div><h3 id="market-hm-crossstate-heading">同规格产品 · 跨州报价对比</h3>
+                <p id="market-heatmap-crossstate-status">按同一 FAMA 调查日、相同品种品级单位及价格层级比较；各州市场样本数量可能不同。</p>
+              </div>
+            </div>
+            <div class="market-hm-crossstate-scroll"><table><thead><tr>
+              <th>州属</th><th>产品 · 品级 · 单位</th><th>当日州级均价</th><th>历史涨跌</th><th>样本说明</th><th>历史记录</th>
+            </tr></thead><tbody id="market-heatmap-crossstate-body"></tbody></table></div>
+          </section>
           <section class="market-hm-replay" aria-label="FAMA 历史行情回放">
             <div class="market-hm-replay-header">
               <div class="market-hm-replay-heading">
