@@ -98,4 +98,16 @@ test('overview includes real heatmap controls after quick prices, with separate 
   const heatmap=readFileSync(new URL('../site/v3.1/heatmap.mjs',import.meta.url),'utf8');
   assert.match(heatmap,/showComparison\(tile\.evidence\)/);
   assert.match(css,/\.market-hm-canvas/);
+  for(const id of ['market-heatmap-prev','market-heatmap-next','market-heatmap-latest',
+    'market-heatmap-speed','market-heatmap-date-count','market-heatmap-ticks'])
+    assert.match(html,new RegExp('id="'+id+'"'));
+  assert.match(html,/历史行情回放/);
+  assert.match(html,/只播放有真实档案的日期/);
+  assert.match(heatmap,/dateTicks\.innerHTML=/);
+  assert.match(heatmap,/previousButton\.addEventListener\('click'/);
+  assert.match(heatmap,/nextButton\.addEventListener\('click'/);
+  assert.match(heatmap,/latestButton\.addEventListener\('click'/);
+  assert.match(heatmap,/speedSelector\.addEventListener\('change'/);
+  assert.match(css,/\.market-hm-replay-main/);
+  assert.match(css,/@media\(max-width:550px\)/);
 });
