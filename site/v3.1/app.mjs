@@ -5,11 +5,11 @@ import {FAMA_COLUMNS,escapeHtml,fmtMoney,fmtDate,ageDays,mytDate,quoteChange,
   comparisonEvidence,comparisonMarketDetails,matchedMarketStreaks,
   productAreaOptions} from './engine.mjs?rev=v3-5-completeness-1';
 import {buildXlsx,downloadXlsx} from './excel.mjs';
-import {createCreatorWorkspace} from './creator-app.mjs?rev=2026-11-22-low-sample-v2';
+import {createCreatorWorkspace} from './creator-app.mjs?rev=2026-11-22-full-state-history-v1';
 import {formatPercent,formatPrice} from './creator-core.mjs?rev=v3-5-completeness-1';
 import {buildFamaPdf,downloadPdf} from '../pdf.mjs';
 import {createCompletenessMonitor} from './completeness.mjs?rev=v3-5-completeness-1';
-import {createMarketHeatmap} from './heatmap.mjs?rev=2026-11-22-low-sample-v2';
+import {createMarketHeatmap} from './heatmap.mjs?rev=2026-11-22-full-state-history-v1';
 import {productHistoryRecords,productHistoryCSV} from './product-history.mjs?rev=2026-11-22-full-state-history-v1';
 
 const $=id=>document.getElementById(id);
@@ -21,7 +21,7 @@ const store={overview:null,index:null,meta:null,health:null,history:new Map(),pa
   period:1,visible:40,watch:[],fetching:false,rawCache:new Map(),dailyPending:new Map(),
   insightData:null,snapshots:new Map(),streaks:new Map(),comparison:null,comparisonRequest:0,
   priceData:null,priceDateRequest:0,
-  detail:{key:null,origin:'prices',rawRows:null,rawError:'',visible:80,rawRequest:0,historyRequest:0,historyTableRequest:0,historyRawRequest:0,historyRows:[],historyAll:null,historyVisible:60}};
+  detail:{key:null,origin:'prices',rawRows:null,rawError:'',visible:80,rawRequest:0,historyRequest:0,historyTableRequest:0,historyRawRequest:0,historyRows:[],historyAll:null,historyVisible:60,historySelectionKey:''}};
 let historyRequestSequence=0;
 const creator=createCreatorWorkspace({getOverview:()=>store.overview,
   getArchiveDates:()=>store.meta.archive_dates,loadSnapshot,loadEvidenceRows,
@@ -421,11 +421,15 @@ async function loadHistory(productKey){
   if(store.history.has(productKey))return store.history.get(productKey);
   const entry=store.index.products.find(p=>p.product_key===productKey);
   if(!entry || !/^history\/[0-9a-f]{20}\.json$/.test(entry.path))throw Error('找不到对应产品的历史数据');
-  const history=await fetchJson(BASE+entry.path+'?revision='+encodeURIComponent(store.overview.generated_at_utc));
-  if(history.schema!=='bg-agro/fama-history/v3'||history.product_key!==productKey||!Array.isArray(history.observations))
-    throw Error('历史数据格式或产品键不匹配');
-  store.history.set(productKey,history);
-  return history;
+  const pending=(async()=>{
+    const history=await fetchJson(BASE+entry.path+'?revision='+encodeURIComponent(store.overview.generated_at_utc));
+    if(history.schema!=='bg-agro/fama-history/v3'||history.product_key!==productKey||!Array.isArray(history.observations))
+      throw Error('历史数据格式或产品键不匹配');
+    return history;
+  })();
+  store.history.set(productKey,pending);
+  try{return await pending}
+  catch(error){if(store.history.get(productKey)===pending)store.history.delete(productKey);throw error}
 }
 
 function drawChart(points,start,end,svg=$('history-chart')){
@@ -546,6 +550,11 @@ function paintProductHistoryTable(){
 async function renderProductHistorical(){
   const detail=store.detail,request=++detail.historyTableRequest,key=detail.key;
   const state=$('product-state').value,level=$('product-history-level').value;
+  const selectionKey=JSON.stringify([key,state,level]);
+  if(detail.historySelectionKey===selectionKey&&detail.historyAll){
+    paintProductHistoryTable();return;
+  }
+  detail.historySelectionKey=selectionKey;
   detail.historyRows=[];detail.historyAll=null;detail.historyVisible=60;
   $('product-history-export').disabled=true;
   $('product-history-more').disabled=true;
@@ -571,6 +580,7 @@ async function renderProductHistorical(){
     paintProductHistoryTable();
   }catch(error){
     if(request!==detail.historyTableRequest||key!==detail.key)return;
+    detail.historySelectionKey='';
     $('product-history-status').textContent='无法加载该产品全部历史记录：'+error.message;
     $('product-history-body').innerHTML='<tr><td colspan="7" class="empty">历史档案读取失败，没有用其他州的价格代替。</td></tr>';
     alertUser('全部历史价格读取失败：'+error.message,true);
@@ -714,6 +724,7 @@ function openProductDetail(key,{state='',level='Borong',fullHistory=false}={}){
   detail.origin=store.page==='product'?detail.origin:store.page;
   detail.key=key;detail.rawRows=null;detail.rawError='';detail.visible=80;
   detail.rawRequest++;detail.historyRequest++;detail.historyTableRequest++;detail.historyRawRequest++;
+  detail.historySelectionKey='';
   const options=store.overview.states.includes(state)||!state?store.overview.states:
     [...store.overview.states,state].sort();
   selectOptions($('product-state'),options,{initialLabel:'全马平均'});
