@@ -49,10 +49,12 @@ test('heatmap preserves source date, magnitude and grade; never invents invalid 
   const out=prepareHeatmap([quote('REAL'),malformed,quote('BIG',{current:18})]);
   assert.equal(out.shown,2);
   assert.equal(out.excluded,1);
-  assert.equal(out.tiles[0].previousDate,'2026-11-14');
-  assert.equal(out.tiles[0].actualDays,7);
-  assert.equal(out.tiles[0].grade,'F.A.Q');
-  assert.equal(out.tiles[1].percent,80);
+  const real=out.tiles.find(tile=>tile.name==='REAL');
+  const big=out.tiles.find(tile=>tile.name==='BIG');
+  assert.equal(real.previousDate,'2026-11-14');
+  assert.equal(real.actualDays,7);
+  assert.equal(real.grade,'F.A.Q');
+  assert.equal(big.percent,80);
   assert.equal(prepareHeatmap([quote('REAL')],{period:12}).shown,0);
 });
 test('treemap tiles cover a box proportionally without overlap or negative coordinates',()=>{
