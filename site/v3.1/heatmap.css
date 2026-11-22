@@ -63,6 +63,18 @@
 .market-hm-canvas.all-states .market-hm-cell{
   padding:4px 3px;gap:3px;border:1px solid #112825;justify-content:center;
 }
+
+/* Muted red/green explicitly denotes a real but low-sample comparison. */
+.market-hm-cell.small-sample{
+  border-style:dashed;border-color:#d7f5e668;
+  box-shadow:inset 0 0 0 1px #050e0d40;
+}
+.market-hm-canvas.all-states .market-hm-cell.small-sample{
+  border:1.5px dashed #e7fff27c;
+}
+.market-hm-cell.small-sample .market-hm-change::after{
+  content:"*";font-size:.7em;vertical-align:super;margin-left:1px;
+}
 .market-hm-cell.uncomparable{
   color:#dcebe7;background:#354b4b;
 }
