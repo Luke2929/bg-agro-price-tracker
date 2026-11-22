@@ -114,12 +114,41 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
   const summary=$('market-heatmap-summary');
   const detail=$('market-heatmap-detail');
   const playButton=$('market-heatmap-play');
+  const previousButton=$('market-heatmap-prev');
+  const nextButton=$('market-heatmap-next');
+  const latestButton=$('market-heatmap-latest');
+  const speedSelector=$('market-heatmap-speed');
+  const dateCount=$('market-heatmap-date-count');
+  const dateTicks=$('market-heatmap-ticks');
   let dates=[],snapshot=null,selection=0,token=0,playing=false,playTimer=null,tiles=[];
   let observer=null;
 
+  const setPlayLabel=()=>{
+    const parts=playButton.querySelectorAll('span');
+    if(parts.length===2){
+      parts[0].textContent=playing?'Ⅱ':'▶';
+      parts[1].textContent=playing?'暂停回放':'开始回放';
+    }
+    playButton.setAttribute('aria-pressed',String(playing));
+    playButton.setAttribute('aria-label',playing?'暂停历史行情回放':'开始历史行情回放');
+  };
+  const updateDateControls=()=>{
+    const n=dates.length;
+    const progress=n>1?100*selection/(n-1):100;
+    dateSlider.style.setProperty('--replay-progress',progress.toFixed(2)+'%');
+    dateSlider.setAttribute('aria-valuetext',dates[selection]||'无可用调查日');
+    dateCount.textContent=n?(selection+1)+' / '+n+' 次调查':'— / —';
+    dateValue.textContent=dates[selection]||'—';
+    previousButton.disabled=n<2||selection<=0;
+    nextButton.disabled=n<2||selection>=n-1;
+    latestButton.disabled=n===0||selection>=n-1;
+    speedSelector.disabled=n<2;
+  };
   const stop=()=>{
     playing=false;clearTimeout(playTimer);playTimer=null;
-    playButton.textContent='▶ 播放';playButton.setAttribute('aria-pressed','false');
+    ++token; // Cancel a pending archive load when playback is interrupted.
+    setPlayLabel();
+    if(snapshot){status.textContent='已核对：'+snapshot.survey_date;status.dataset.loading='false';}
   };
   const state=()=>({
     level:$('market-heatmap-level').value,
@@ -208,7 +237,8 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
       if(data.survey_date!==day)throw Error('档案日期与请求不一致');
       snapshot=data;selection=index;dateSlider.value=String(index);
       status.textContent='已核对：'+day;
-      status.dataset.loading='false';paint();
+      status.dataset.loading='false';
+      updateDateControls();paint();
       return true;
     }catch(error){
       if(current===token){
@@ -225,27 +255,54 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
     const ok=await chooseDate(selection+1);
     if(!playing)return;
     if(!ok){stop();return;}
-    playTimer=setTimeout(step,1050);
+    if(selection>=dates.length-1){stop();return;}
+    playTimer=setTimeout(step,Number(speedSelector.value)||1050);
   };
   const bind=()=>{
     $('market-heatmap-period').addEventListener('change',()=>{stop();paint();});
     for(const id of ['market-heatmap-state','market-heatmap-level'])
       $(id).addEventListener('change',()=>{stop();paint();});
     dateSlider.addEventListener('input',()=>{
-      const day=dates[Number(dateSlider.value)];if(day)status.textContent='选择调查日：'+day;
+      stop();
+      const i=Number(dateSlider.value),day=dates[i];
+      if(!day)return;
+      const progress=dates.length>1?100*i/(dates.length-1):100;
+      dateSlider.style.setProperty('--replay-progress',progress.toFixed(2)+'%');
+      status.textContent='选择调查日：'+day;
     });
-    dateSlider.addEventListener('change',()=>{stop();chooseDate(Number(dateSlider.value));});
+    dateSlider.addEventListener('change',()=>{
+      const index=Number(dateSlider.value);
+      stop();chooseDate(index);
+    });
+    previousButton.addEventListener('click',()=>{
+      if(selection<=0)return;
+      stop();chooseDate(selection-1);
+    });
+    nextButton.addEventListener('click',()=>{
+      if(selection>=dates.length-1)return;
+      stop();chooseDate(selection+1);
+    });
+    latestButton.addEventListener('click',()=>{
+      if(!dates.length)return;
+      stop();chooseDate(dates.length-1);
+    });
+    speedSelector.addEventListener('change',()=>{
+      if(playing&&playTimer!==null){
+        clearTimeout(playTimer);
+        playTimer=setTimeout(step,Number(speedSelector.value)||1050);
+      }
+    });
     playButton.addEventListener('click',()=>{
       if(playing){stop();return;}
       if(dates.length<2)return;
+      playing=true;setPlayLabel();
       if(selection>=dates.length-1){
-        stop();
-        chooseDate(0).then(ok=>{if(ok){playing=true;playButton.textContent='Ⅱ 暂停';
-          playButton.setAttribute('aria-pressed','true');playTimer=setTimeout(step,950);}});
-      }else{
-        playing=true;playButton.textContent='Ⅱ 暂停';
-        playButton.setAttribute('aria-pressed','true');step();
-      }
+        chooseDate(0).then(ok=>{
+          if(!playing)return;
+          if(!ok){stop();return;}
+          playTimer=setTimeout(step,Number(speedSelector.value)||1050);
+        });
+      }else step();
     });
     canvas.addEventListener('pointerover',showDetail);
     canvas.addEventListener('focusin',showDetail);
@@ -269,6 +326,10 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
     dateSlider.min='0';dateSlider.max=String(Math.max(0,selection));
     dateSlider.value=String(selection);dateSlider.disabled=dates.length<=1;
     playButton.disabled=dates.length<=1;
+    dateTicks.innerHTML=dates.length>1?dates.map((_,index)=>
+      '<span style="--tick-position:'+(100*index/(dates.length-1)).toFixed(2)+'%"></span>'
+    ).join(''):'';
+    updateDateControls();setPlayLabel();
     $('market-heatmap-first-date').textContent=dates[0]||'—';
     $('market-heatmap-last-date').textContent=dates.at(-1)||'—';
     const selector=$('market-heatmap-state'),before=selector.value;
