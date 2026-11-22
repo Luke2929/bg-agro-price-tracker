@@ -9,7 +9,8 @@
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
   <link rel="stylesheet" href="./styles.css?rev=v3-5-completeness-1">
   <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
-  <script type="module" src="./app.mjs?rev=2026-11-22-remove-studio-v1"></script>
+  <script type="module" src="./app.mjs?rev=2026-11-22-market-heatmap-v1"></script>
+  <link rel="stylesheet" href="./heatmap.css?rev=2026-11-22-market-heatmap-v1">
   <link rel="stylesheet" href="./fb-export.css?rev=2026-11-21-multilevel-v1">
   <script type="module" src="./fb-export.mjs?rev=2026-11-21-multilevel-v1"></script>
 </head>
@@ -87,6 +88,47 @@
         <section class="panel movers-panel"><div class="panel-heading"><div><span class="eyebrow green">MARKET MOVERS</span><h2>价格涨跌榜</h2><p>同一批调查市场对比；只显示符合样本覆盖门槛的数据。</p></div><div class="segmented" role="group" aria-label="涨跌观察窗口"><button type="button" data-period="1" class="active">昨日对比</button><button type="button" data-period="7">7 天</button><button type="button" data-period="30">30 天</button></div></div><div class="movers-grid"><div><h3>上升幅度 <span class="up">↑</span></h3><div id="movers-up" class="mover-list"><p class="empty">载入中…</p></div></div><div><h3>下降幅度 <span class="down">↓</span></h3><div id="movers-down" class="mover-list"><p class="empty">载入中…</p></div></div></div><p class="method-note">仅显示全国范围、匹配市场数 ≥ 3 且前后市场覆盖率均 ≥ 50% 的可比数据；价格上涨不等于所有市场都涨价。</p></section>
 
         <section class="panel"><div class="panel-heading"><div><span class="eyebrow green">LATEST PRICES</span><h2>今日价格速览</h2><p>按实际调查日展示，不把旧报价冒充今天的报价。</p></div><button type="button" class="text-button" data-go="prices">全部价格 →</button></div><div id="quick-prices" class="quick-grid"></div></section>
+        <section class="market-heatmap-panel" aria-labelledby="market-heatmap-title">
+          <div class="market-heatmap-heading">
+            <div><span class="market-hm-eyebrow">FAMA · PRICE PERFORMANCE MAP</span>
+              <h2 id="market-heatmap-title">农产品价格 Heatmap <span>市场热力图</span></h2>
+              <p>参考股票市场 Heatmap：按真实调查市场覆盖规模分配方块面积，涨跌幅决定颜色。</p>
+            </div>
+            <div class="market-hm-legend" aria-label="色块说明">
+              <span><i class="market-hm-legend-swatch" style="background:#008452"></i>上涨</span>
+              <span><i class="market-hm-legend-swatch" style="background:#dc344b"></i>下跌</span>
+              <span><i class="market-hm-legend-swatch" style="background:#3b4b4c"></i>持平</span>
+            </div>
+          </div>
+          <div class="market-hm-toolbar" role="group" aria-label="热力图筛选">
+            <label>价格层级<select id="market-heatmap-level">
+              <option value="Borong" selected>Borong · 批发</option>
+              <option value="Ladang">Ladang · 农场</option>
+              <option value="Runcit">Runcit · 零售</option>
+            </select></label>
+            <label>地区<select id="market-heatmap-state"><option value="">全国平均</option></select></label>
+            <label>比较周期<select id="market-heatmap-period">
+              <option value="1">昨日对比</option>
+              <option value="7" selected>7 天</option>
+              <option value="30">30 天</option>
+            </select></label>
+            <span class="market-hm-status" id="market-heatmap-status" role="status" aria-live="polite">正在载入真实报价…</span>
+          </div>
+          <p class="market-hm-summary" id="market-heatmap-summary" aria-live="polite">正在核对同市场历史比较…</p>
+          <div class="market-hm-viewport">
+            <div id="market-heatmap-canvas" class="market-hm-canvas" role="group" aria-label="农产品涨跌热力图"></div>
+          </div>
+          <div class="market-hm-detail" id="market-heatmap-detail" aria-live="polite">悬停或选中某个色块查看详细价格变化。</div>
+          <div class="market-hm-timeline">
+            <button type="button" class="market-hm-play" id="market-heatmap-play" aria-pressed="false">▶ 播放</button>
+            <div class="market-hm-timeline-track">
+              <div class="market-hm-timeline-label"><span>FAMA 实际调查日</span><strong id="market-heatmap-date-value">—</strong></div>
+              <input id="market-heatmap-date" type="range" min="0" max="0" value="0" step="1" aria-label="切换历史 FAMA 调查日">
+              <div class="market-hm-timeline-ends"><span id="market-heatmap-first-date">—</span><span id="market-heatmap-last-date">—</span></div>
+            </div>
+          </div>
+          <p class="market-hm-disclaimer">数据来源：FAMA AMI。绿色＝同市场均价上升，红色＝下降；色块面积＝可比的共同调查市场数量，并非销量、市值或产量。仅展示至少 3 个共同市场且两期市场覆盖率各达 50% 的报价；不具可比性的记录不着色。历史播放仅使用归档的真实调查日。</p>
+        </section>
       </section>
 
       <section data-screen="prices" class="screen" aria-labelledby="prices-title"><div class="page-intro"><span class="eyebrow green">FAMA PRICE EXPLORER</span><h1 id="prices-title">价格明细</h1><p>筛选产品、州别与价格层级；所有报价都来自所显示的调查日期。</p></div>
