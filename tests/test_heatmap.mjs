@@ -104,7 +104,8 @@ test('legitimate low-sample matched movement is visible, qualified, and not prom
   assert.equal(result.tiles[0].quality,'small-sample');
   assert.equal(result.tiles[0].previousMean,8);
   assert.equal(result.tiles[0].currentMean,8.3);
-  assert.match(heatmapColor(result.tiles[0].percent,'small-sample'),/hsl\(153 42%/);
+  assert.equal(heatmapColor(result.tiles[0].percent,'small-sample'),
+    heatmapColor(result.tiles[0].percent,'strict'));
   assert.equal(smallSampleEvidence({...low,changes:{7:{...low.changes[7],current:900}}},7),null,
     'tampered prices cannot be displayed as genuine low sample');
   assert.equal(smallSampleEvidence({...low,changes:{7:{...low.changes[7],percent:900}}},7),null,
@@ -139,6 +140,37 @@ test('real FAMA archived days retain Perak matched comparisons instead of gray-o
   assert.ok(map.smallSample>=400);
 });
 
+test('V4 selected-state view has ALL products while all-states board previews nine each',()=>{
+  const rows=Array.from({length:42},(_,i)=>quote('ITEM-'+String(i).padStart(2,'0'),
+    {state:'PERAK',current:10+i*.2,category:i%2?'Buah-Buahan':'Sayur-Sayuran'}));
+  const national=prepareHeatmap(rows,{state:'__ALL_STATES__',level:'Borong',period:7});
+  const perak=national.groups.find(g=>g.name==='PERAK');
+  assert.equal(perak.observed,42);
+  assert.equal(perak.items.length,9);
+  const selected=prepareHeatmap(rows,{state:'PERAK',level:'Borong',period:7});
+  assert.equal(selected.total,42);
+  assert.equal(selected.shown,42);
+  assert.equal(selected.groups.reduce((v,g)=>v+g.items.length,0),42);
+  const filtered=prepareHeatmap(rows,{state:'PERAK',search:'ITEM-02',
+    category:'Sayur-Sayuran',sort:'name'});
+  assert.ok(filtered.tiles.every(t=>t.name.includes('ITEM-02')&&t.category==='Sayur-Sayuran'));
+  assert.ok(filtered.tiles.length>0);
+  const up=prepareHeatmap(rows,{state:'PERAK',sort:'rise'}).tiles;
+  assert.ok(up[0].percent>=up.at(-1).percent);
+  const down=prepareHeatmap(rows,{state:'PERAK',sort:'fall'}).tiles;
+  assert.ok(down[0].percent<=down.at(-1).percent);
+});
+test('V4 search and sorting keep states distinct and do not invent missing quotes',()=>{
+  const rows=[quote('TIMUN',{state:'PERAK',current:12}),
+    quote('CILI',{state:'SARAWAK',previous:10,current:8}),
+    quote('TIMUN',{state:'SELANGOR',current:14})];
+  const out=prepareHeatmap(rows,{state:'__ALL_STATES__',search:'TIMUN'});
+  assert.equal(out.groups.length,16);
+  assert.equal(out.groups.find(g=>g.name==='SARAWAK').items.length,0);
+  assert.equal(out.groups.find(g=>g.name==='PERAK').items.length,1);
+  assert.equal(out.groups.find(g=>g.name==='SELANGOR').items.length,1);
+  assert.equal(out.shown,2);
+});
 test('treemap tiles cover a box proportionally without overlap or negative coordinates',()=>{
   for(const [width,height] of [[1200,570],[350,730],[90,90]]){
     const items=[{weight:20},{weight:12},{weight:6},{weight:3},{weight:1}];
@@ -161,8 +193,10 @@ test('treemap tiles cover a box proportionally without overlap or negative coord
 test('color semantics: positive green, negative red, near-zero neutral',()=>{
   assert.match(heatmapColor(10),/hsl\(153 /);
   assert.match(heatmapColor(-10),/hsl\(355 /);
-  assert.equal(heatmapColor(0),'#3b4b4c');
-  assert.equal(heatmapColor(NaN),'#3b4b4c');
+  assert.equal(heatmapColor(0),'#667780');
+  assert.equal(heatmapColor(NaN),'#34484b');
+  assert.equal(heatmapColor(-20,'small-sample'),heatmapColor(-20,'strict'));
+  assert.notEqual(heatmapColor(-20,'small-sample'),heatmapColor(-10,'small-sample'));
 });
 test('overview includes real heatmap controls after quick prices, with separate page state',()=>{
   const html=readFileSync(new URL('../site/v3.1/index.html',import.meta.url),'utf8');
@@ -178,7 +212,7 @@ test('overview includes real heatmap controls after quick prices, with separate 
   assert.match(app,/marketHeatmap\.bind\(\)/);
   const heatmap=readFileSync(new URL('../site/v3.1/heatmap.mjs',import.meta.url),'utf8');
   assert.match(heatmap,/showComparison\(tile\.evidence\)/);
-  assert.match(heatmap,/tile\?\.quality==='strict'/);
+  assert.match(heatmap,/showPreview\(tile,snapshot\)/);
   assert.match(css,/\.market-hm-canvas/);
   for(const id of ['market-heatmap-prev','market-heatmap-next','market-heatmap-latest',
     'market-heatmap-speed','market-heatmap-date-count','market-heatmap-ticks'])
