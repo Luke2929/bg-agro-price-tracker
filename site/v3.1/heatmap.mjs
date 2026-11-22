@@ -21,7 +21,7 @@ export function prepareHeatmap(prices,{level='Borong',state='',period=7,limit=12
     candidates.push({
       key:quote.product_key,name:quote.varieti,grade:quote.gred||'未分级',
       unit:quote.unit,category:String(quote.kategori||'未分类').trim()||'未分类',
-      percent:evidence.percent,level,region:state,
+      percent:evidence.percent,level,region:state,evidence,
       markets:evidence.markets,previousMean:evidence.previousMean,
       currentMean:evidence.currentMean,previousDate:evidence.previousDate,
       currentDate:evidence.currentDate,actualDays:evidence.actualDays,
@@ -105,7 +105,7 @@ export function heatmapColor(percent){
   return percent>0?'hsl(153 80% '+light+'%)':'hsl(355 79% '+light+'%)';
 }
 
-export function createMarketHeatmap({loadSnapshot,showProduct,notify}){
+export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
   const $=id=>document.getElementById(id);
   const canvas=$('market-heatmap-canvas');
   const dateSlider=$('market-heatmap-date');
@@ -172,7 +172,7 @@ export function createMarketHeatmap({loadSnapshot,showProduct,notify}){
           (huge?'<small>'+escapeHtml(item.grade)+'</small>':'');
         return '<button type="button" class="market-hm-cell'+
           (huge?' large':medium?' medium':tiny?' tiny':'')+
-          '" data-market-hm-index="'+idx+'" data-product-open="'+escapeHtml(item.key)+
+          '" data-market-hm-index="'+idx+
           '" title="'+escapeHtml(label)+'" aria-label="'+escapeHtml(label)+
           '" style="'+rectStyle(tileRect)+';background:'+heatmapColor(item.percent)+'">'+inner+'</button>';
       }).join('');
@@ -182,7 +182,7 @@ export function createMarketHeatmap({loadSnapshot,showProduct,notify}){
         '<div class="market-hm-group-body" style="top:'+head+'px">'+cells+'</div></div>';
     }
     canvas.innerHTML=markup;
-    detail.textContent='悬停查看真实价格对比，点击色块查看农产品详情。方块面积表示共同调查市场数量。';
+    detail.textContent='悬停查看同市场均价，点击色块核对该调查日的逐市场报价。面积表示共同调查市场数量。';
   };
   const showDetail=event=>{
     const btn=event.target.closest('[data-market-hm-index]');
@@ -193,7 +193,7 @@ export function createMarketHeatmap({loadSnapshot,showProduct,notify}){
     detail.textContent=tile.name+' · '+tile.grade+' | '+tile.level+' · '+
       (tile.region||'全国')+' | '+tile.previousDate+' → '+tile.currentDate+
       '（实际 '+tile.actualDays+' 天） | 同市场平均 '+
-      fmtMoney(tile.previousMean)+' → '+fmtMoney(tile.currentMean)+
+      fmtMoney(tile.previousMean)+' / '+tile.unit+' → '+fmtMoney(tile.currentMean)+' / '+tile.unit+
       ' | '+dir+' '+Math.abs(tile.percent).toFixed(1)+'% | '+tile.markets+' 个共同市场'+
       (Math.abs(tile.percent)>=50?' · ⚠ 大幅波动，建议核实原始报价':'');
   };
@@ -252,9 +252,8 @@ export function createMarketHeatmap({loadSnapshot,showProduct,notify}){
     canvas.addEventListener('click',event=>{
       const btn=event.target.closest('[data-market-hm-index]');
       if(btn&&canvas.contains(btn)){
-        event.stopPropagation(); // The main dashboard also delegates product clicks.
         const tile=tiles[Number(btn.dataset.marketHmIndex)];
-        if(tile)showProduct(tile.key);
+        if(tile)showComparison(tile.evidence);
       }
     });
     if(typeof ResizeObserver!=='undefined'){
