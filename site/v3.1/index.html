@@ -9,8 +9,8 @@
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
   <link rel="stylesheet" href="./styles.css?rev=v3-5-completeness-1">
   <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
-  <script type="module" src="./app.mjs?rev=2026-11-22-replay-polish-v2"></script>
-  <link rel="stylesheet" href="./heatmap.css?rev=2026-11-22-replay-polish-v2">
+  <script type="module" src="./app.mjs?rev=2026-11-22-all-states-v1"></script>
+  <link rel="stylesheet" href="./heatmap.css?rev=2026-11-22-all-states-v1">
   <link rel="stylesheet" href="./fb-export.css?rev=2026-11-21-multilevel-v1">
   <script type="module" src="./fb-export.mjs?rev=2026-11-21-multilevel-v1"></script>
 </head>
@@ -97,7 +97,7 @@
             <div class="market-hm-legend" aria-label="色块说明">
               <span><i class="market-hm-legend-swatch" style="background:#008452"></i>上涨</span>
               <span><i class="market-hm-legend-swatch" style="background:#dc344b"></i>下跌</span>
-              <span><i class="market-hm-legend-swatch" style="background:#3b4b4c"></i>持平</span>
+              <span><i class="market-hm-legend-swatch" style="background:#3b4b4c"></i>不可比／基本持平</span>
             </div>
           </div>
           <div class="market-hm-toolbar" role="group" aria-label="热力图筛选">
@@ -106,7 +106,7 @@
               <option value="Ladang">Ladang · 农场</option>
               <option value="Runcit">Runcit · 零售</option>
             </select></label>
-            <label>地区<select id="market-heatmap-state"><option value="">全国平均</option></select></label>
+            <label>地区<select id="market-heatmap-state"><option value="__ALL_STATES__" selected>全马各州（16 州／直辖区）</option><option value="">全国均价（同市场）</option></select></label>
             <label>比较周期<select id="market-heatmap-period">
               <option value="1">昨日对比</option>
               <option value="7" selected>7 天</option>
@@ -163,7 +163,7 @@
               <button type="button" id="market-heatmap-latest">回到最新 <span aria-hidden="true">↗</span></button>
             </div>
           </section>
-          <p class="market-hm-disclaimer">数据来源：FAMA AMI。绿色＝同市场均价上升，红色＝下降；色块面积＝可比的共同调查市场数量，并非销量、市值或产量。仅展示至少 3 个共同市场且两期市场覆盖率各达 50% 的报价；不具可比性的记录不着色。历史播放仅使用归档的真实调查日。</p>
+          <p class="market-hm-disclaimer">数据来源：FAMA AMI。全马州别模式固定显示 13 州及 3 直辖区：当日有报价但不足以计算涨跌的产品以灰色显示实际均价；当天无该层级报价则标示无数据，绝不借用其他日期。绿色／红色只用于至少 3 个共同市场且两期覆盖率各 ≥ 50% 的真实价格涨跌。州别视图每州等大；单州／全国均价视图的方块面积按共同或调查市场数分配，均不代表产量或交易额。回放仅使用真实归档调查日。</p>
         </section>
       </section>
 
