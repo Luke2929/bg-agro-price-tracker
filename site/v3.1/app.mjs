@@ -749,6 +749,78 @@ function openHeatmapProductHistory(key,state,level,date,snapshot){
   openProductDetail(key,{state,level,fullHistory:true,snapshot});
 }
 
+async function showHeatmapPreview(tile,snapshot){
+  if(!tile||!snapshot||tile.missing)return;
+  const dialog=$('market-heatmap-preview'),request=++previewSequence;
+  currentHeatmapPreview={tile,snapshot};
+  $('market-heatmap-preview-title').textContent=tile.name;
+  $('market-heatmap-preview-meta').textContent=[
+    tile.region||'全国',tile.grade,tile.level,tile.unit,
+    '调查日 '+snapshot.survey_date].join(' · ');
+  const metrics=[
+    ['先前同市场均价',tile.evidence?fmtMoney(tile.previousMean):'N/A'],
+    ['本次同市场均价',tile.evidence?fmtMoney(tile.currentMean):fmtMoney(tile.price)],
+    ['比较变化',tile.evidence?
+      (tile.percent>0?'+':'')+tile.percent.toFixed(1)+'%':'不可比较']
+  ];
+  $('market-heatmap-preview-summary').innerHTML=metrics.map(([label,value])=>
+    '<div class="market-hm-preview-metric"><small>'+escapeHtml(label)+
+    '</small><strong>'+escapeHtml(value)+'</strong></div>').join('');
+  const sourceNote=tile.evidence?
+    (tile.quality==='small-sample'?'⚠ 小样本：'+tile.markets+
+      ' 个共同市场，不能代表整州价格普遍变动。':
+      '严格同市场比较：'+tile.markets+' 个共同市场。')+
+      ' '+tile.previousDate+' → '+tile.currentDate+' · 实际 '+tile.actualDays+
+      ' 天。当前州均价可能与配对市场均价不同。':
+    '此调查日有当日报价，但没有可靠的同市场历史配对；不提供虚构涨跌百分比。';
+  $('market-heatmap-preview-status').textContent=sourceNote+' 正在读取历史档案…';
+  $('market-heatmap-preview-chart').textContent='读取过去真实价格中…';
+  $('market-heatmap-preview-rows').textContent='';
+  if(!dialog.open)dialog.showModal();
+  try{
+    const history=await loadHistory(tile.key);
+    if(request!==previewSequence||!dialog.open)return;
+    const rows=productHistoryRecords(history,{
+      state:tile.region,level:tile.level,endDate:snapshot.survey_date
+    });
+    const recent=rows.slice(0,12);
+    const series=rows.slice(0,90).reverse();
+    if(series.length){
+      const prices=series.map(x=>x.price),min=Math.min(...prices),
+        max=Math.max(...prices),span=Math.max(.001,max-min),days=Math.max(1,
+          (Date.parse(series.at(-1).date)-Date.parse(series[0].date))/86400000);
+      const coords=series.map(p=>{
+        const n=(Date.parse(p.date)-Date.parse(series[0].date))/86400000;
+        return {x:28+n/days*622,y:136-(p.price-min)/span*105,price:p.price,date:p.date};
+      });
+      const points=coords.map(p=>p.x.toFixed(2)+','+p.y.toFixed(2)).join(' ');
+      const circles=coords.length===1?
+        '<circle cx="'+coords[0].x+'" cy="'+coords[0].y+'" r="4" fill="#80e1ab"/>':'';
+      $('market-heatmap-preview-chart').innerHTML=
+        '<svg viewBox="0 0 680 166" role="img" aria-label="所选州最近实际归档价格走势图">'+
+        '<path d="M28 140 H650" stroke="#5c7e6d" stroke-width="1"/>'+
+        '<polyline fill="none" stroke="#76e2ac" stroke-width="3" stroke-linejoin="round" points="'+
+        points+'"/>'+circles+
+        '<text x="28" y="160" fill="#c1e3d0" font-size="11">'+escapeHtml(series[0].date)+'</text>'+
+        '<text x="650" y="160" text-anchor="end" fill="#c1e3d0" font-size="11">'+
+        escapeHtml(series.at(-1).date)+'</text></svg>';
+    }else $('market-heatmap-preview-chart').textContent=
+      '在此州、价格层级和所选调查日之前没有真实历史记录。';
+    const table='<table><thead><tr><th>调查日期</th><th>州级均价</th><th>市场数量</th></tr></thead><tbody>'+
+      recent.map(row=>'<tr><td>'+escapeHtml(row.date)+'</td><td>'+
+        fmtMoney(row.price)+' / '+escapeHtml(history.unit)+'</td><td>'+
+        row.markets+'</td></tr>').join('')+'</tbody></table>';
+    $('market-heatmap-preview-rows').innerHTML=recent.length?table:'没有可显示的历史报价。';
+    $('market-heatmap-preview-status').textContent=sourceNote+
+      ' 本产品在 '+(tile.region||'全国')+' 截至 '+snapshot.survey_date+
+      ' 共 '+rows.length+' 条已归档同层级报价；图形仅连接真实调查日。';
+  }catch(error){
+    if(request!==previewSequence||!dialog.open)return;
+    $('market-heatmap-preview-chart').textContent='历史档案读取失败：'+error.message;
+    $('market-heatmap-preview-status').textContent='此窗口未填入任何推测报价。'+sourceNote;
+  }
+}
+
 function renderExportDates(){
   if(!store.overview||!store.meta)return;
   const available=store.meta.archive_dates||[];
@@ -921,6 +993,19 @@ function bindEvents(){
   });
   $('product-raw-more').addEventListener('click',()=>{
     store.detail.visible+=80;renderProductRaw();
+  });
+  $('market-heatmap-preview-close').addEventListener('click',()=>{
+    $('market-heatmap-preview').close();
+  });
+  $('market-heatmap-preview').addEventListener('close',()=>{
+    ++previewSequence;currentHeatmapPreview=null;
+  });
+  $('market-heatmap-preview-full').addEventListener('click',()=>{
+    const selected=currentHeatmapPreview;
+    if(!selected)return;
+    $('market-heatmap-preview').close();
+    openHeatmapProductHistory(selected.tile.key,selected.tile.region,
+      selected.tile.level,selected.snapshot.survey_date,selected.snapshot);
   });
   $('comparison-sort').addEventListener('change',renderComparisonRows);
   $('comparison-dialog').addEventListener('close',()=>{
