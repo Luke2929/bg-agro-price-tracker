@@ -38,6 +38,7 @@ test('heatmap uses only real, matched-market eligible data in the requested leve
   assert.deepEqual(result.tiles.map(x=>x.name),['TIMUN','CILI','PISANG']);
   assert.equal(result.tiles[0].weight,12);
   assert.equal(result.tiles[0].currentMean,11);
+  assert.equal(result.tiles[0].evidence.currentDate,'2026-11-21');
   assert.equal(result.tiles[1].percent,-25);
   assert.equal(prepareHeatmap(all,{level:'Ladang',period:7}).shown,1);
   assert.equal(prepareHeatmap(all,{state:'PERAK',period:7}).shown,1);
@@ -94,5 +95,7 @@ test('overview includes real heatmap controls after quick prices, with separate 
   assert.match(html,/heatmap\.css\?rev=/);
   assert.match(app,/marketHeatmap\.refresh\(overview,meta\)/);
   assert.match(app,/marketHeatmap\.bind\(\)/);
+  const heatmap=readFileSync(new URL('../site/v3.1/heatmap.mjs',import.meta.url),'utf8');
+  assert.match(heatmap,/showComparison\(tile\.evidence\)/);
   assert.match(css,/\.market-hm-canvas/);
 });
