@@ -507,7 +507,7 @@ function updateProductAreaOptions(){
 function renderProductPriceCards(){
   const productKey=store.detail.key,state=$('product-state').value,
     district=$('product-district').value,location=$('product-location').value;
-  const isLocal=Boolean(district),excluded=store.meta.superseded_priceids?.[store.overview.survey_date]||[];
+  const isLocal=Boolean(district),excluded=store.meta.superseded_priceids?.[detailSnapshot().survey_date]||[];
   const quotes=productScopePrices(detailSnapshot().prices,store.detail.rawRows,
     {productKey,state,district,location,excludedPriceIds:excluded});
   const scope=isLocal?[state,district,location].filter(Boolean).join(' / '):state||'全马';
