@@ -1,5 +1,5 @@
 /* FAMA market heatmap: evidence-based product treemap, no synthetic prices. */
-import {comparisonEvidence,escapeHtml,fmtMoney} from './engine.mjs?rev=v3-5-completeness-1';
+import {comparisonEvidence,escapeHtml,fmtMoney,ageDays,isValidISODate} from './engine.mjs?rev=v3-5-completeness-1';
 
 const VALID_PERIODS=[1,7,30];
 const VALID_LEVELS=['Ladang','Borong','Runcit'];
@@ -14,6 +14,43 @@ export const MALAYSIA_STATES=[
   'TERENGGANU','W.P. KUALA LUMPUR','W.P. LABUAN','W.P. PUTRAJAYA'
 ];
 
+// Real matched-market calculations with too few shared markets to be a robust
+// statewide trend. Keep their provenance and a permanent small-sample label.
+export function smallSampleEvidence(quote,period){
+  const days=Number(period),c=quote?.changes?.[String(days)];
+  if(![1,7,30].includes(days)||!c||c.eligible!==false||
+    !isValidISODate(quote?.date)||c.currentDate!==quote.date||
+    !isValidISODate(c.previousDate)||!['Ladang','Borong','Runcit'].includes(quote.level)||
+    typeof quote.state!=='string'||!quote.varieti||!quote.unit)return null;
+  const actual=ageDays(c.previousDate,quote.date);
+  const window={1:6,7:4,30:7}[days];
+  if(actual!==c.actualDays||actual<days||actual>days+window||c.days!==days||
+    !Number.isInteger(c.markets)||c.markets<1||
+    !Number.isInteger(c.currentMarkets)||!Number.isInteger(c.previousMarkets)||
+    c.currentMarkets<c.markets||c.previousMarkets<c.markets||
+    !Number.isFinite(c.current)||c.current<0||!Number.isFinite(c.previous)||c.previous<=0||
+    !Number.isFinite(c.percent)||!Number.isFinite(c.rmDifference))return null;
+  const close=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&
+    Math.abs(a-b)<=1e-8*Math.max(1,Math.abs(a),Math.abs(b));
+  const coverageNow=c.markets/c.currentMarkets,coverageBefore=c.markets/c.previousMarkets;
+  const raw=(c.current-c.previous)/c.previous*100;
+  if(!close(coverageNow,c.currentCoverage)||!close(coverageBefore,c.previousCoverage)||
+    !close(c.current-c.previous,c.rmDifference)||
+    !close(c.percent,Math.abs(raw)<0.05?0:raw)||
+    (c.rawPercent!==undefined&&!close(c.rawPercent,raw)))return null;
+  // Do not reinterpret unexplained source ineligibility as a verified claim.
+  if(c.markets>=3&&coverageNow>=.5&&coverageBefore>=.5)return null;
+  return {
+    productKey:quote.product_key,product:quote.varieti,grade:quote.gred,unit:quote.unit,
+    level:quote.level,region:quote.state,period:days,actualDays:actual,
+    currentDate:quote.date,previousDate:c.previousDate,
+    currentMean:c.current,previousMean:c.previous,rmDifference:c.rmDifference,
+    percent:c.percent,markets:c.markets,currentMarkets:c.currentMarkets,
+    previousMarkets:c.previousMarkets,currentCoverage:coverageNow,
+    previousCoverage:coverageBefore,quality:'small-sample'
+  };
+}
+
 export function prepareHeatmap(prices,{level='Borong',state=ALL_STATES,period=7,limit=120}={}){
   if(!Array.isArray(prices)||!VALID_LEVELS.includes(level)||
     !VALID_PERIODS.includes(Number(period))||typeof state!=='string')
@@ -23,7 +60,9 @@ export function prepareHeatmap(prices,{level='Borong',state=ALL_STATES,period=7,
     (allStates?MALAYSIA_STATES.includes(q.state):q.state===state));
   const candidates=[];
   for(const quote of source){
-    const evidence=comparisonEvidence(quote,Number(period),quote.date);
+    const strictEvidence=comparisonEvidence(quote,Number(period),quote.date);
+    const provisional=strictEvidence?null:smallSampleEvidence(quote,Number(period));
+    const evidence=strictEvidence||provisional;
     // National aggregate mode remains evidence-only. Individual states retain
     // actual quoted prices even when there are too few matched markets.
     if(!allStates&&!state&&!evidence)continue;
@@ -31,6 +70,7 @@ export function prepareHeatmap(prices,{level='Borong',state=ALL_STATES,period=7,
       key:quote.product_key,name:quote.varieti,grade:quote.gred||'未分级',
       unit:quote.unit,category:String(quote.kategori||'未分类').trim()||'未分类',
       percent:evidence?.percent??null,level,region:quote.state,evidence,
+      quality:strictEvidence?'strict':provisional?'small-sample':'no-comparison',
       markets:evidence?.markets??quote.markets,
       surveyedMarkets:quote.markets,
       price:quote.price,previousMean:evidence?.previousMean??null,
@@ -49,12 +89,16 @@ export function prepareHeatmap(prices,{level='Borong',state=ALL_STATES,period=7,
     const groups=MALAYSIA_STATES.map(name=>{
       const all=candidates.filter(tile=>tile.region===name);
       const items=all.slice(0,9);
-      return {name,weight:1,items,
-        observed:all.length,comparable:all.filter(tile=>tile.evidence).length};
+      return {name,weight:1,items,observed:all.length,
+        comparable:all.filter(tile=>tile.evidence).length,
+        strict:all.filter(tile=>tile.quality==='strict').length,
+        smallSample:all.filter(tile=>tile.quality==='small-sample').length};
     });
     const tiles=groups.flatMap(g=>g.items);
     return {groups,tiles,total:candidates.length,shown:tiles.length,
       comparable:candidates.filter(x=>x.evidence).length,
+      strict:candidates.filter(x=>x.quality==='strict').length,
+      smallSample:candidates.filter(x=>x.quality==='small-sample').length,
       coverage:groups.filter(g=>g.observed>0).length,
       excluded:candidates.filter(x=>!x.evidence).length,allStates:true};
   }
@@ -70,6 +114,8 @@ export function prepareHeatmap(prices,{level='Borong',state=ALL_STATES,period=7,
     a.name.localeCompare(b.name));
   return {groups,tiles,total:source.length,shown:tiles.length,
     comparable:candidates.filter(x=>x.evidence).length,
+    strict:candidates.filter(x=>x.quality==='strict').length,
+    smallSample:candidates.filter(x=>x.quality==='small-sample').length,
     coverage:Number(source.length>0),
     excluded:source.length-candidates.filter(x=>x.evidence).length,
     allStates:false};
@@ -128,11 +174,14 @@ export function treemapLayout(items,width,height){
   return output;
 }
 
-export function heatmapColor(percent){
+export function heatmapColor(percent,quality='strict'){
   if(!Number.isFinite(percent)||Math.abs(percent)<0.05)return '#3b4b4c';
   const intensity=Math.min(1,Math.log1p(Math.abs(percent))/Math.log1p(30));
-  const light=round(25+17*intensity);
-  return percent>0?'hsl(153 80% '+light+'%)':'hsl(355 79% '+light+'%)';
+  const isLimited=quality==='small-sample';
+  const light=round((isLimited?21:25)+(isLimited?11:17)*intensity);
+  const saturation=isLimited?42:80;
+  return percent>0?'hsl(153 '+saturation+'% '+light+'%)':
+    'hsl(355 '+(isLimited?48:79)+'% '+light+'%)';
 }
 
 export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
