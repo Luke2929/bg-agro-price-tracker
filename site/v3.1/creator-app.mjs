@@ -136,11 +136,10 @@ export function createCreatorWorkspace({
   function signalsRender(){
     const data=signalData;
     if(!data)return;
-    const filter=filters(),last=active();
+    const filter=filters();
     signals=findContentSignals(data.prices,filter);
     pool=signals.filter(x=>x.publishable);
     if(selectedEvidence&&!pool.some(x=>x.id===selectedEvidence.id))pool.unshift(selectedEvidence);
-    renderTopics(last?.id||selectedEvidence?.id);
     $('creator-signal-summary').textContent=data.survey_date+' · '+signals.length+
       ' 个候选，'+signals.filter(x=>x.publishable).length+' 个可写，'+
       signals.filter(x=>x.flagged).length+' 个含大幅波动。展示前 80 个。';
@@ -164,8 +163,7 @@ export function createCreatorWorkspace({
         '<div class="creator-score"><strong>'+s.score+'<small>/100</small></strong><span>选题优先级</span></div>'+
         '<div class="creator-actions"><button type="button" class="secondary-button small" data-creator-details="'+i+'">查看价格对比依据</button>'+
         '<button type="button" class="secondary-button small" data-creator-history="'+i+'">检查历史</button>'+
-        '<button type="button" class="primary-button small" data-creator-draft="'+i+'"'+
-        (s.publishable?'':' disabled')+'>写这条选题</button></div></article>';
+        '</div></article>';
     }).join('')||'<p class="empty">当前筛选暂无合格比较。可切换日期、周期、地区或层级。</p>';
     renderResearch(data,filter);
   }
@@ -213,7 +211,6 @@ export function createCreatorWorkspace({
     ++researchRequest;
     signalData=null;
     signals=[];pool=selectedEvidence?[selectedEvidence]:[];
-    renderTopics(selectedEvidence?.id);
     $('creator-signal-summary').textContent='正在读取 '+day+' 的调查比较…';
     $('creator-signal-list').replaceChildren();
     $('creator-trends').replaceChildren();
@@ -242,7 +239,6 @@ export function createCreatorWorkspace({
       useSignalSnapshot(overview);
     }else changeSignalDate();
     calendarRender();
-    if(currentEvidence())verifyEvidence();
   }
   function verifyAgainstArchive(s){
     const key=JSON.stringify([s.productKey,s.level,s.region,s.currentDate,s.period]);
@@ -428,10 +424,9 @@ export function createCreatorWorkspace({
       cells+='<div class="creator-day'+(isToday?' creator-day-today':'')+'">'+
         '<span class="creator-day-number">'+number+'</span>'+
         events.slice(0,3).map(r=>
-          '<button type="button" class="creator-day-event creator-event-'+
-          r.status+'" data-creator-edit="'+escapeHtml(r.id)+'" title="'+
-          escapeHtml(names[r.status]+' · '+r.title)+'">'+
-          escapeHtml(r.title.slice(0,17))+'</button>').join('')+
+          '<span class="creator-day-event creator-event-'+
+          r.status+'" title="'+escapeHtml(names[r.status]+' · '+r.title)+'">'+
+          escapeHtml(r.title.slice(0,17))+'</span>').join('')+
         (events.length>3?'<small>另有 '+(events.length-3)+' 篇</small>':'')+
         '</div>';
     }
@@ -441,10 +436,9 @@ export function createCreatorWorkspace({
       '</strong><small>'+channels[r.channel]+' · '+names[r.status]+' · '+
       escapeHtml(recordDay(r)||'尚未排期')+'</small>'+
       (r.postUrl?'<a href="'+escapeHtml(r.postUrl)+'" target="_blank" rel="noopener noreferrer">打开原帖 ↗</a>':'')+
-      '</div><div class="creator-actions"><button type="button" class="secondary-button small" data-creator-edit="'+
-      escapeHtml(r.id)+'">编辑</button><button type="button" class="secondary-button small" data-creator-delete="'+
+      '</div><div class="creator-actions"><button type="button" class="secondary-button small" data-creator-delete="'+
       escapeHtml(r.id)+'">删除</button></div></article>'
-    ).join('')||'<p class="empty">这里还没有内容。去内容工作室保存第一篇草稿。</p>';
+    ).join('')||'<p class="empty">这里还没有历史内容记录。</p>';
     const top=workspace.records.filter(r=>r.status==='published').sort(
       (a,b)=>b.metrics.comments+b.metrics.shares-a.metrics.comments-a.metrics.shares).slice(0,5);
     $('creator-top-posts').innerHTML=top.length?
@@ -467,7 +461,7 @@ export function createCreatorWorkspace({
       if(!confirm('导入会覆盖此浏览器当前 '+workspace.records.length+
         ' 篇内容，以备份中的 '+snapshot.records.length+' 篇替换。确认继续？'))return;
       localStorage.setItem(WORKSPACE_KEY,JSON.stringify(snapshot));
-      workspace=snapshot;blocked=false;reset();calendarRender();tell('备份导入成功');
+      workspace=snapshot;blocked=false;calendarRender();tell('备份导入成功');
     }catch(e){tell('导入失败：'+e.message,true);}
     finally{input.value='';}
   }
@@ -477,38 +471,6 @@ export function createCreatorWorkspace({
       .forEach(id=>$(id).addEventListener('change',signalsRender));
     $('creator-signal-date').addEventListener('change',changeSignalDate);
     $('creator-signal-search').addEventListener('input',signalsRender);
-    $('creator-topic').addEventListener('change',()=>{
-      const next=active();
-      reset({keepSettings:true});
-      selectedEvidence=next;
-      $('creator-topic').value=next?.id||'';
-      evidence();
-    });
-    for(const id of ['creator-title','creator-body'])$(id).addEventListener('input',updateValidation);
-    for(const id of ['creator-channel','creator-language','creator-format',...Object.values(settingsInputs)])
-      $(id).addEventListener('change',updateValidation);
-    $('creator-generate').addEventListener('click',generate);
-    $('creator-save').addEventListener('click',save);
-    $('creator-new').addEventListener('click',()=>reset());
-    $('creator-copy').addEventListener('click',async()=>{
-      try{
-        const validation=updateValidation();
-        if(!validation.valid)throw Error(validation.message);
-        await navigator.clipboard.writeText(v('creator-body'));tell('已复制正文');
-      }catch(e){tell('复制失败：'+e.message,true);}
-    });
-    for(const [id,platform] of [['creator-export-fb','facebook'],['creator-export-tiktok','tiktok']]){
-      $(id).addEventListener('click',()=>{
-        try{
-          const validation=updateValidation();
-          if(!validation.valid)throw Error(validation.message);
-          makeCard(verifiedEvidence,platform,options().settings);
-        }catch(e){tell(e.message,true);}
-      });
-    }
-    $('creator-studio-details').addEventListener('click',()=>{
-      if(verifiedEvidence)showComparison(verifiedEvidence);
-    });
     ['creator-calendar-month','creator-calendar-state','creator-calendar-platform']
       .forEach(id=>$(id).addEventListener('change',calendarRender));
     $('creator-metric-post').addEventListener('change',metricValues);
@@ -539,41 +501,28 @@ export function createCreatorWorkspace({
     });
     $('creator-import-json').addEventListener('change',e=>importBackup(e.target));
     $('creator-signal-list').addEventListener('click',e=>{
-      const topic=e.target.closest('[data-creator-draft]');
-      if(topic){
-        const s=signals[Number(topic.dataset.creatorDraft)];
-        if(s?.publishable)openTopic(s);
-      }
       const detail=e.target.closest('[data-creator-details]');
       if(detail){
-        const s=signals[Number(detail.dataset.creatorDetails)];
-        if(s)showComparison(s);
+        const record=signals[Number(detail.dataset.creatorDetails)];
+        if(record)showComparison(record);
       }
       const trend=e.target.closest('[data-creator-history]');
       if(trend)inspectHistory(Number(trend.dataset.creatorHistory));
     });
-    $('creator-calendar-grid').addEventListener('click',e=>{
-      const action=e.target.closest('[data-creator-edit]');
-      if(action)edit(action.dataset.creatorEdit);
-    });
     $('creator-schedule').addEventListener('click',e=>{
-      const btn=e.target.closest('[data-creator-edit]');
-      if(btn)return edit(btn.dataset.creatorEdit);
       const gone=e.target.closest('[data-creator-delete]');
       if(!gone)return;
       const found=workspace.records.find(r=>r.id===gone.dataset.creatorDelete);
       if(!found||!confirm('确定删除「'+found.title+'」？只能从 JSON 备份恢复。'))return;
       try{
         persist({...workspace,records:workspace.records.filter(r=>r.id!==found.id)});
-        if(editingId===found.id)reset();
         calendarRender();
       }catch(err){tell(err.message,true);}
     });
   }
   function render(page){
     if(page==='signals')signalsRender();
-    if(page==='studio')evidence();
     if(page==='calendar')calendarRender();
   }
-  return {bind,render,refresh,openTopic};
+  return {bind,render,refresh};
 }
