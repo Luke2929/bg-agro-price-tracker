@@ -51,58 +51,77 @@ export function smallSampleEvidence(quote,period){
   };
 }
 
-export function prepareHeatmap(prices,{level='Borong',state=ALL_STATES,period=7,limit=120}={}){
+export function prepareHeatmap(prices,{
+  level='Borong',state=ALL_STATES,period=7,limit=120,
+  search='',category='',sort='coverage'
+}={}){
   if(!Array.isArray(prices)||!VALID_LEVELS.includes(level)||
-    !VALID_PERIODS.includes(Number(period))||typeof state!=='string')
+     !VALID_PERIODS.includes(Number(period))||typeof state!=='string')
     return {groups:[],tiles:[],total:0,shown:0,excluded:0,comparable:0,coverage:0};
   const allStates=state===ALL_STATES;
   const source=prices.filter(q=>q?.level===level&&
     (allStates?MALAYSIA_STATES.includes(q.state):q.state===state));
+  const query=String(search||'').trim().toLocaleUpperCase();
   const candidates=[];
   for(const quote of source){
+    if(category&&quote.kategori!==category)continue;
+    if(query&&![quote.varieti,quote.gred,quote.unit].some(v=>
+      String(v||'').toLocaleUpperCase().includes(query)))continue;
     const strictEvidence=comparisonEvidence(quote,Number(period),quote.date);
     const provisional=strictEvidence?null:smallSampleEvidence(quote,Number(period));
     const evidence=strictEvidence||provisional;
-    // National aggregate mode remains evidence-only. Individual states retain
-    // actual quoted prices even when there are too few matched markets.
     if(!allStates&&!state&&!evidence)continue;
     candidates.push({
       key:quote.product_key,name:quote.varieti,grade:quote.gred||'未分级',
       unit:quote.unit,category:String(quote.kategori||'未分类').trim()||'未分类',
       percent:evidence?.percent??null,level,region:quote.state,evidence,
       quality:strictEvidence?'strict':provisional?'small-sample':'no-comparison',
-      markets:evidence?.markets??quote.markets,
-      surveyedMarkets:quote.markets,
+      markets:evidence?.markets??quote.markets, surveyedMarkets:quote.markets,
       price:quote.price,previousMean:evidence?.previousMean??null,
-      currentMean:evidence?.currentMean??null,
-      previousDate:evidence?.previousDate??null,
+      currentMean:evidence?.currentMean??null,previousDate:evidence?.previousDate??null,
       currentDate:quote.date,actualDays:evidence?.actualDays??null,
       weight:Math.max(1,evidence?.markets??quote.markets??1)
     });
   }
-  candidates.sort((a,b)=>Number(Boolean(b.evidence))-Number(Boolean(a.evidence))||
-    b.weight-a.weight||
-    Math.abs(b.percent??0)-Math.abs(a.percent??0)||a.name.localeCompare(b.name));
+  const byName=(a,b)=>a.name.localeCompare(b.name)||a.grade.localeCompare(b.grade);
+  const byPercent=(a,b,mode)=>{
+    const x=Number.isFinite(a.percent),y=Number.isFinite(b.percent);
+    if(x!==y)return x?-1:1; // unmatched values always at the end
+    if(x&&y){
+      const diff=mode==='rise'?b.percent-a.percent:mode==='fall'?a.percent-b.percent:
+        Math.abs(b.percent)-Math.abs(a.percent);
+      if(diff)return diff;
+    }
+    return byName(a,b);
+  };
+  const sortRows=(items)=>items.sort((a,b)=>{
+    if(sort==='name')return byName(a,b);
+    if(sort==='rise'||sort==='fall'||sort==='swing')return byPercent(a,b,sort);
+    return b.weight-a.weight||byName(a,b);
+  });
+  sortRows(candidates);
+  const comparable=candidates.filter(x=>x.evidence).length;
+  const strict=candidates.filter(x=>x.quality==='strict').length;
+  const smallSample=candidates.filter(x=>x.quality==='small-sample').length;
   if(allStates){
-    // Every state/federal territory keeps a visible slot, including those
-    // without data on the chosen FAMA survey date or price level.
+    // The national board previews at most 9 per state. The state header reveals
+    // the true full count and opens the complete, uncapped state view.
     const groups=MALAYSIA_STATES.map(name=>{
       const all=candidates.filter(tile=>tile.region===name);
-      const items=all.slice(0,9);
-      return {name,weight:1,items,observed:all.length,
+      return {name,weight:1,items:all.slice(0,9),observed:all.length,
         comparable:all.filter(tile=>tile.evidence).length,
         strict:all.filter(tile=>tile.quality==='strict').length,
-        smallSample:all.filter(tile=>tile.quality==='small-sample').length};
+        smallSample:all.filter(tile=>tile.quality==='small-sample').length,
+        totalActual:source.filter(q=>q.state===name).length};
     });
     const tiles=groups.flatMap(g=>g.items);
-    return {groups,tiles,total:candidates.length,shown:tiles.length,
-      comparable:candidates.filter(x=>x.evidence).length,
-      strict:candidates.filter(x=>x.quality==='strict').length,
-      smallSample:candidates.filter(x=>x.quality==='small-sample').length,
-      coverage:groups.filter(g=>g.observed>0).length,
-      excluded:candidates.filter(x=>!x.evidence).length,allStates:true};
+    return {groups,tiles,total:candidates.length,shown:tiles.length,comparable,strict,
+      smallSample,coverage:groups.filter(g=>g.totalActual>0).length,
+      excluded:candidates.length-comparable,allStates:true};
   }
-  const tiles=candidates.slice(0,Math.max(1,Math.min(250,Number(limit)||120)));
+  // A single selected state displays every matching product, never an arbitrary
+  // "first 75/130" cutoff. The plain national aggregate keeps its earlier limit.
+  const tiles=state?candidates:candidates.slice(0,Math.max(1,Math.min(250,Number(limit)||120)));
   const grouped=new Map();
   for(const tile of tiles){
     if(!grouped.has(tile.category))grouped.set(tile.category,
@@ -112,13 +131,9 @@ export function prepareHeatmap(prices,{level='Borong',state=ALL_STATES,period=7,
   }
   const groups=[...grouped.values()].sort((a,b)=>b.weight-a.weight||
     a.name.localeCompare(b.name));
-  return {groups,tiles,total:source.length,shown:tiles.length,
-    comparable:candidates.filter(x=>x.evidence).length,
-    strict:candidates.filter(x=>x.quality==='strict').length,
-    smallSample:candidates.filter(x=>x.quality==='small-sample').length,
-    coverage:Number(source.length>0),
-    excluded:source.length-candidates.filter(x=>x.evidence).length,
-    allStates:false};
+  return {groups,tiles,total:candidates.length,shown:tiles.length,comparable,
+    strict,smallSample,coverage:Number(source.length>0),
+    excluded:candidates.length-comparable,allStates:false};
 }
 
 // Squarified treemap. Both group and product areas are proportional to market coverage.
@@ -175,13 +190,13 @@ export function treemapLayout(items,width,height){
 }
 
 export function heatmapColor(percent,quality='strict'){
-  if(!Number.isFinite(percent)||Math.abs(percent)<0.05)return '#3b4b4c';
+  // Confidence is intentionally NOT part of the hue or lightness. The same
+  // percentage has exactly the same color regardless of matched market count.
+  if(!Number.isFinite(percent))return '#34484b'; // No comparison (N/A)
+  if(Math.abs(percent)<0.05)return '#667780'; // Verified 0.0%, not missing.
   const intensity=Math.min(1,Math.log1p(Math.abs(percent))/Math.log1p(30));
-  const isLimited=quality==='small-sample';
-  const light=round((isLimited?21:25)+(isLimited?11:17)*intensity);
-  const saturation=isLimited?42:80;
-  return percent>0?'hsl(153 '+saturation+'% '+light+'%)':
-    'hsl(355 '+(isLimited?48:79)+'% '+light+'%)';
+  const light=Math.round(42-13*intensity);
+  return percent>0?'hsl(153 78% '+light+'%)':'hsl(355 75% '+light+'%)';
 }
 
 export function createMarketHeatmap({loadSnapshot,showComparison,showProductHistory,notify}){
