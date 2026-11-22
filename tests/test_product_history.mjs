@@ -15,7 +15,10 @@ test('full state archive does not drop old observations and never substitutes ot
   assert.ok(full.every(p=>p.state==='PERAK'));
   assert.ok(full.every(p=>p.date<=history.observations.at(-1).date));
   assert.deepEqual([...full].map(p=>p.date),[...full].map(p=>p.date).sort().reverse());
-  assert.deepEqual(new Set(full.map(p=>p.level)),new Set(['Ladang','Borong','Runcit']));
+  // FAMA archive for this Perak product has Borong and Runcit, not Ladang.
+  // Do not require or manufacture a price level absent from the source.
+  assert.deepEqual(new Set(full.map(p=>p.level)),new Set(['Borong','Runcit']));
+  assert.equal(full.some(p=>p.level==='Ladang'),false);
 });
 
 test('filtered Borong archive contains every date from the true FAMA history JSON',()=>{
