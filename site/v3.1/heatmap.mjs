@@ -7,42 +7,72 @@ const round=n=>Math.round(n*10)/10;
 const position=n=>Number.isFinite(n)?Math.max(0,n).toFixed(2):'0';
 const tooltipValue=n=>Number.isFinite(n)?n.toFixed(1)+'%':'—';
 
-export function prepareHeatmap(prices,{level='Borong',state='',period=7,limit=120}={}){
+export const ALL_STATES='__ALL_STATES__';
+export const MALAYSIA_STATES=[
+  'JOHOR','KEDAH','KELANTAN','MELAKA','NEGERI SEMBILAN','PAHANG',
+  'PERAK','PERLIS','PULAU PINANG','SABAH','SARAWAK','SELANGOR',
+  'TERENGGANU','W.P. KUALA LUMPUR','W.P. LABUAN','W.P. PUTRAJAYA'
+];
+
+export function prepareHeatmap(prices,{level='Borong',state=ALL_STATES,period=7,limit=120}={}){
   if(!Array.isArray(prices)||!VALID_LEVELS.includes(level)||
-    !VALID_PERIODS.includes(Number(period))||typeof state!=='string')return {groups:[],total:0,shown:0,excluded:0};
-  let available=0;
+    !VALID_PERIODS.includes(Number(period))||typeof state!=='string')
+    return {groups:[],tiles:[],total:0,shown:0,excluded:0,comparable:0,coverage:0};
+  const allStates=state===ALL_STATES;
+  const source=prices.filter(q=>q?.level===level&&
+    (allStates?MALAYSIA_STATES.includes(q.state):q.state===state));
   const candidates=[];
-  for(const quote of prices){
-    if(quote?.level!==level||quote.state!==state)continue;
-    available++;
-    // The same market, grade, unit and price level must be comparable.
+  for(const quote of source){
     const evidence=comparisonEvidence(quote,Number(period),quote.date);
-    if(!evidence)continue;
+    // National aggregate mode remains evidence-only. Individual states retain
+    // actual quoted prices even when there are too few matched markets.
+    if(!allStates&&!state&&!evidence)continue;
     candidates.push({
       key:quote.product_key,name:quote.varieti,grade:quote.gred||'未分级',
       unit:quote.unit,category:String(quote.kategori||'未分类').trim()||'未分类',
-      percent:evidence.percent,level,region:state,evidence,
-      markets:evidence.markets,previousMean:evidence.previousMean,
-      currentMean:evidence.currentMean,previousDate:evidence.previousDate,
-      currentDate:evidence.currentDate,actualDays:evidence.actualDays,
-      // Area represents the true number of matched markets (not market value).
-      weight:evidence.markets
+      percent:evidence?.percent??null,level,region:quote.state,evidence,
+      markets:evidence?.markets??quote.markets,
+      surveyedMarkets:quote.markets,
+      price:quote.price,previousMean:evidence?.previousMean??null,
+      currentMean:evidence?.currentMean??null,
+      previousDate:evidence?.previousDate??null,
+      currentDate:quote.date,actualDays:evidence?.actualDays??null,
+      weight:Math.max(1,evidence?.markets??quote.markets??1)
     });
   }
-  candidates.sort((a,b)=>b.markets-a.markets||
-    Math.abs(b.percent)-Math.abs(a.percent)||a.name.localeCompare(b.name));
+  candidates.sort((a,b)=>Number(Boolean(b.evidence))-Number(Boolean(a.evidence))||
+    b.weight-a.weight||
+    Math.abs(b.percent??0)-Math.abs(a.percent??0)||a.name.localeCompare(b.name));
+  if(allStates){
+    // Every state/federal territory keeps a visible slot, including those
+    // without data on the chosen FAMA survey date or price level.
+    const groups=MALAYSIA_STATES.map(name=>{
+      const all=candidates.filter(tile=>tile.region===name);
+      const items=all.slice(0,9);
+      return {name,weight:1,items,
+        observed:all.length,comparable:all.filter(tile=>tile.evidence).length};
+    });
+    const tiles=groups.flatMap(g=>g.items);
+    return {groups,tiles,total:candidates.length,shown:tiles.length,
+      comparable:candidates.filter(x=>x.evidence).length,
+      coverage:groups.filter(g=>g.observed>0).length,
+      excluded:candidates.filter(x=>!x.evidence).length,allStates:true};
+  }
   const tiles=candidates.slice(0,Math.max(1,Math.min(250,Number(limit)||120)));
-  const groupsByName=new Map();
+  const grouped=new Map();
   for(const tile of tiles){
-    if(!groupsByName.has(tile.category))
-      groupsByName.set(tile.category,{name:tile.category,weight:0,items:[]});
-    const group=groupsByName.get(tile.category);
+    if(!grouped.has(tile.category))grouped.set(tile.category,
+      {name:tile.category,weight:0,items:[]});
+    const group=grouped.get(tile.category);
     group.items.push(tile);group.weight+=tile.weight;
   }
-  const groups=[...groupsByName.values()].sort((a,b)=>b.weight-a.weight||
+  const groups=[...grouped.values()].sort((a,b)=>b.weight-a.weight||
     a.name.localeCompare(b.name));
-  return {groups,tiles,total:candidates.length,shown:tiles.length,
-    excluded:available-candidates.length};
+  return {groups,tiles,total:source.length,shown:tiles.length,
+    comparable:candidates.filter(x=>x.evidence).length,
+    coverage:Number(source.length>0),
+    excluded:source.length-candidates.filter(x=>x.evidence).length,
+    allStates:false};
 }
 
 // Squarified treemap. Both group and product areas are proportional to market coverage.
@@ -159,72 +189,117 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
     'px;width:'+position(r.w)+'px;height:'+position(r.h)+'px';
   const paint=()=>{
     if(!snapshot)return;
-    const w=canvas.clientWidth,h=canvas.clientHeight;
-    if(w<100||h<100)return;
-    const filter=state();
+    const filter=state(),allStates=filter.region===ALL_STATES;
+    const w=canvas.clientWidth;
+    if(w<100)return;
+    // State overview uses equal-size state panels; no state silently disappears.
+    const columns=w>=1040?4:w>=720?3:2;
+    const rows=Math.ceil(MALAYSIA_STATES.length/columns);
+    canvas.classList.toggle('all-states',allStates);
+    canvas.style.height=allStates?String(rows*(w<550?244:252))+'px':'';
+    const h=canvas.clientHeight;
+    if(h<100)return;
     const result=prepareHeatmap(snapshot.prices,{
       level:filter.level,state:filter.region,period:filter.period,
       limit:w<700?75:130
     });
-    tiles=result.tiles||[];
+    tiles=[];
     const label=filter.period===1?'昨日':filter.period+' 天';
-    summary.textContent=snapshot.survey_date+' · '+filter.level+' · '+
-      (filter.region||'全国')+' · '+label+'可比：'+result.shown+' / '+result.total+
-      ' 项'+(result.excluded?' · '+result.excluded+' 项样本不足未上色':'');
+    const regionLabel=allStates?'全马州别':filter.region||'全国均价';
+    summary.textContent=allStates?
+      snapshot.survey_date+' · '+filter.level+' · 全马 16 州／直辖区 · 有该层级报价 '+
+        result.coverage+'/16 · 合格 '+label+'涨跌 '+result.comparable+
+        ' 组；其余保留真实价格，以灰色标示不可比':
+      snapshot.survey_date+' · '+filter.level+' · '+regionLabel+' · '+label+
+        '可比 '+result.comparable+' 组'+
+        (result.excluded?' · '+result.excluded+' 组仅有当日价格，无合格涨跌对比':'');
     dateValue.textContent=snapshot.survey_date;
     if(!result.groups.length){
       canvas.innerHTML='<div class="market-heatmap-empty">当前筛选没有满足同市场样本门槛的涨跌数据。<span>可切换价格层级、地区或比较周期。</span></div>';
-      detail.textContent='只显示有真实 FAMA 同市场对比依据的数据。';return;
+      detail.textContent='只显示实际 FAMA 价格，不补造缺失的比较数据。';return;
     }
-    const groupRects=treemapLayout(result.groups,w,h);
-    let tileIndex=0;
-    let markup='';
+    const groupRects=allStates?
+      result.groups.map((group,i)=>({
+        item:group,x:(i%columns)*w/columns,y:Math.floor(i/columns)*h/rows,
+        w:w/columns,h:h/rows
+      })):
+      treemapLayout(result.groups,w,h);
+    let index=0,markup='';
     for(const r of groupRects){
       const group=r.item;
       if(r.w<1||r.h<1)continue;
-      const showHeader=r.h>=52&&r.w>=100;
-      const head=showHeader?24:0;
+      const showHeader=allStates||r.h>=52&&r.w>=100;
+      const head=showHeader?(allStates?31:24):0;
       const innerW=Math.max(0,r.w-4),innerH=Math.max(0,r.h-head-4);
-      const itemRects=treemapLayout(group.items,innerW,innerH);
-      const cells=itemRects.map(tileRect=>{
-        const item=tileRect.item;
-        const idx=tileIndex++;
-        tiles[idx]=item;
-        const huge=tileRect.w>=132&&tileRect.h>=99;
-        const medium=tileRect.w>=77&&tileRect.h>=62;
-        const tiny=tileRect.w<58||tileRect.h<37;
-        const value=(item.percent>0?'+':'')+tooltipValue(item.percent);
+      const itemRects=allStates?
+        group.items.map((item,i)=>({
+          item,x:(i%2)*innerW/2,
+          y:Math.floor(i/2)*innerH/Math.ceil(group.items.length/2),
+          w:innerW/2,h:innerH/Math.ceil(group.items.length/2)
+        })):
+        treemapLayout(group.items,innerW,innerH);
+      const cells=itemRects.map(t=>{
+        const item=t.item,idx=index++;tiles[idx]=item;
+        const huge=t.w>=132&&t.h>=99;
+        const medium=t.w>=77&&t.h>=62;
+        const tiny=t.w<58||t.h<37;
+        const move=item.evidence?(item.percent>0?'+':'')+tooltipValue(item.percent):'—';
+        const current=fmtMoney(item.price);
+        const display=item.evidence?move:current;
         const label=item.name+' · '+item.grade+' · '+filter.level+
-          ' · '+value+' · '+item.markets+' 个共同市场';
-        const inner='<span class="market-hm-name">'+escapeHtml(item.name)+'</span>'+
-          (tiny?'':'<strong class="market-hm-change">'+escapeHtml(value)+'</strong>')+
+          ' · '+(item.evidence?move+' · 共同市场 '+item.markets:
+            '当日均价 '+current+'/'+item.unit+' · '+item.surveyedMarkets+
+            ' 个报价市场 · 涨跌不可比');
+        const content='<span class="market-hm-name">'+escapeHtml(item.name)+'</span>'+
+          (tiny?'':'<strong class="market-hm-change">'+escapeHtml(display)+'</strong>')+
           (huge?'<small>'+escapeHtml(item.grade)+'</small>':'');
         return '<button type="button" class="market-hm-cell'+
           (huge?' large':medium?' medium':tiny?' tiny':'')+
+          (item.evidence?'':' uncomparable')+
           '" data-market-hm-index="'+idx+
           '" title="'+escapeHtml(label)+'" aria-label="'+escapeHtml(label)+
-          '" style="'+rectStyle(tileRect)+';background:'+heatmapColor(item.percent)+'">'+inner+'</button>';
+          '" style="'+rectStyle(t)+';background:'+heatmapColor(item.percent)+'">'+
+          content+'</button>';
       }).join('');
-      markup+='<div class="market-hm-group" style="'+rectStyle(r)+'" title="'+escapeHtml(group.name)+'">'+
+      const groupDescription=allStates?
+        (group.observed?
+          (group.observed+' 组当日报价 · '+group.comparable+' 组可比'):
+          '该层级当天无报价'):
+        group.items.length+' 项';
+      const placeholder=allStates&&!group.items.length?
+        '<div class="market-hm-no-data">该调查日此层级无报价<br><small>不使用其他日期填补</small></div>':'';
+      markup+='<div class="market-hm-group'+(allStates?' market-hm-state':'')+
+        '" style="'+rectStyle(r)+'" title="'+escapeHtml(group.name)+'">'+
         (showHeader?'<div class="market-hm-group-header"><strong>'+escapeHtml(group.name)+
-        '</strong><span>'+group.items.length+' 项</span></div>':'')+
-        '<div class="market-hm-group-body" style="top:'+head+'px">'+cells+'</div></div>';
+          '</strong><span>'+escapeHtml(groupDescription)+'</span></div>':'')+
+        '<div class="market-hm-group-body" style="top:'+head+'px">'+
+        cells+placeholder+'</div></div>';
     }
     canvas.innerHTML=markup;
-    detail.textContent='悬停查看同市场均价，点击色块核对该调查日的逐市场报价。面积表示共同调查市场数量。';
+    detail.textContent=allStates?
+      '16 个州／直辖区均显示；彩色为可比涨跌，灰色为当天有报价但涨跌不可比。点击方块查看依据或当日价格。':
+      '悬停查看报价，点击有可比涨跌的色块核对逐市场记录。';
   };
   const showDetail=event=>{
     const btn=event.target.closest('[data-market-hm-index]');
     if(!btn||!canvas.contains(btn))return;
-    const tile=tiles[Number(btn.dataset.marketHmIndex)];
-    if(!tile)return;
-    const dir=tile.percent>0?'上涨':tile.percent<0?'下跌':'持平';
-    detail.textContent=tile.name+' · '+tile.grade+' | '+tile.level+' · '+
-      (tile.region||'全国')+' | '+tile.previousDate+' → '+tile.currentDate+
-      '（实际 '+tile.actualDays+' 天） | 同市场平均 '+
-      fmtMoney(tile.previousMean)+' / '+tile.unit+' → '+fmtMoney(tile.currentMean)+' / '+tile.unit+
-      ' | '+dir+' '+Math.abs(tile.percent).toFixed(1)+'% | '+tile.markets+' 个共同市场'+
-      (Math.abs(tile.percent)>=50?' · ⚠ 大幅波动，建议核实原始报价':'');
+    const item=tiles[Number(btn.dataset.marketHmIndex)];
+    if(!item)return;
+    if(!item.evidence){
+      detail.textContent=item.region+' · '+item.name+' · '+item.grade+' · '+
+        item.level+' | '+item.currentDate+' 当日市场均价 '+
+        fmtMoney(item.price)+' / '+item.unit+' | '+item.surveyedMarkets+
+        ' 个报价市场；没有达到同市场 3 个共同市场及覆盖率 50% 的比较标准，因此不显示涨跌百分比。';
+      return;
+    }
+    const direction=item.percent>0?'上涨':item.percent<0?'下跌':'持平';
+    detail.textContent=(item.region||'全国')+' · '+item.name+' · '+item.grade+
+      ' | '+item.level+' | '+item.previousDate+' → '+item.currentDate+
+      '（实际 '+item.actualDays+' 天） | 同市场均价 '+
+      fmtMoney(item.previousMean)+' / '+item.unit+' → '+
+      fmtMoney(item.currentMean)+' / '+item.unit+' | '+direction+' '+
+      Math.abs(item.percent).toFixed(1)+'% | '+item.markets+' 个共同市场'+
+      (Math.abs(item.percent)>=50?' · ⚠ 大幅波动，建议核实原始报价':'');
   };
   const chooseDate=async(index)=>{
     if(!dates.length)return false;
@@ -310,7 +385,8 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
       const btn=event.target.closest('[data-market-hm-index]');
       if(btn&&canvas.contains(btn)){
         const tile=tiles[Number(btn.dataset.marketHmIndex)];
-        if(tile)showComparison(tile.evidence);
+        if(tile?.evidence)showComparison(tile.evidence);
+        else if(tile)showDetail({target:btn});
       }
     });
     if(typeof ResizeObserver!=='undefined'){
@@ -333,9 +409,11 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
     $('market-heatmap-first-date').textContent=dates[0]||'—';
     $('market-heatmap-last-date').textContent=dates.at(-1)||'—';
     const selector=$('market-heatmap-state'),before=selector.value;
-    selector.replaceChildren(new Option('全国平均',''));
-    for(const region of overview.states)selector.add(new Option(region,region));
-    selector.value=overview.states.includes(before)?before:'';
+    selector.replaceChildren(new Option('全马各州（16 州／直辖区）',ALL_STATES),
+      new Option('全国均价（同市场）',''));
+    for(const region of MALAYSIA_STATES)selector.add(new Option(region,region));
+    selector.value=before===ALL_STATES||before===''?ALL_STATES:
+      MALAYSIA_STATES.includes(before)?before:ALL_STATES;
     snapshot=overview;status.textContent='已核对：'+overview.survey_date;
     status.dataset.loading='false';paint();
   };
