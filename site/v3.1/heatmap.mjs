@@ -389,10 +389,10 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
     const item=tiles[Number(btn.dataset.marketHmIndex)];
     if(!item)return;
     if(!item.evidence){
-      detail.textContent=item.region+' · '+item.name+' · '+item.grade+' · '+
-        item.level+' | '+item.currentDate+' 当日市场均价 '+
-        fmtMoney(item.price)+' / '+item.unit+' | '+item.surveyedMarkets+
-        ' 个报价市场；没有达到同市场 3 个共同市场及覆盖率 50% 的比较标准，因此不显示涨跌百分比。';
+      detail.textContent=item.missing?'该产品在 '+snapshot.survey_date+' 没有真实报价；没有沿用旧价。':
+        item.region+' · '+item.name+' · '+item.grade+' · '+item.level+
+        ' | '+item.currentDate+' 均价 '+fmtMoney(item.price)+' / '+item.unit+
+        ' · '+item.surveyedMarkets+' 个调查市场；没有可核查的同市场历史比较。';
       return;
     }
     const direction=item.percent>0?'上涨':item.percent<0?'下跌':'持平';
@@ -437,10 +437,79 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
     if(selection>=dates.length-1){stop();return;}
     playTimer=setTimeout(step,Number(speedSelector.value)||1050);
   };
+  const capturePNG=()=>{
+    try{
+      const area=canvas.getBoundingClientRect();
+      if(!area.width||!area.height)throw Error('热力图尚未生成');
+      const ratio=2,pad=26,heading=74;
+      const out=document.createElement('canvas');
+      out.width=Math.round((area.width+pad*2)*ratio);
+      out.height=Math.round((area.height+pad*2+heading)*ratio);
+      const ctx=out.getContext('2d');
+      if(!ctx)throw Error('浏览器不支持 Canvas');
+      ctx.scale(ratio,ratio);
+      ctx.fillStyle='#081616';ctx.fillRect(0,0,out.width/ratio,out.height/ratio);
+      ctx.textBaseline='middle';ctx.fillStyle='#f5fff8';ctx.font='bold 19px sans-serif';
+      ctx.fillText('BG AGRO · 农产品价格 Heatmap',pad,29);
+      ctx.fillStyle='#a8d8bf';ctx.font='11px sans-serif';
+      ctx.fillText(snapshot.survey_date+' · '+state().region+' · '+
+        state().level+' · '+state().period+' 天涨跌 | 数据来源 FAMA AMI',pad,56);
+      const ox=pad,oy=heading+pad;
+      for(const group of canvas.querySelectorAll('.market-hm-group,.market-hm-single-category')){
+        const r=group.getBoundingClientRect();
+        ctx.fillStyle='#102925';ctx.fillRect(ox+r.left-area.left,oy+r.top-area.top,r.width,r.height);
+      }
+      for(const cell of canvas.querySelectorAll('.market-hm-cell')){
+        const r=cell.getBoundingClientRect();
+        if(r.width<=0||r.height<=0)continue;
+        const x=ox+r.left-area.left,y=oy+r.top-area.top;
+        ctx.fillStyle=getComputedStyle(cell).backgroundColor;
+        ctx.fillRect(x+.6,y+.6,Math.max(0,r.width-1.2),Math.max(0,r.height-1.2));
+        const index=Number(cell.dataset.marketHmIndex),item=tiles[index];
+        if(!item)continue;
+        ctx.fillStyle='#fff';ctx.textAlign='center';
+        ctx.font='bold 10px sans-serif';
+        const product=item.name.length>20?item.name.slice(0,18)+'…':item.name;
+        ctx.fillText(product,x+r.width/2,y+r.height/2-8,Math.max(25,r.width-9));
+        ctx.font='bold 12px sans-serif';
+        const label=item.missing?'无报价':item.evidence?
+          (item.percent>0?'+':'')+tooltipValue(item.percent):'N/A';
+        ctx.fillText(label+(item.quality==='small-sample'?'*':''),x+r.width/2,
+          y+r.height/2+10,Math.max(25,r.width-9));
+        if(item.quality==='small-sample'){
+          ctx.setLineDash([3,3]);ctx.strokeStyle='#f4fffe';
+          ctx.strokeRect(x+1.5,y+1.5,r.width-3,r.height-3);ctx.setLineDash([]);
+        }
+      }
+      for(const group of canvas.querySelectorAll('.market-hm-group-header,.market-hm-single-category>h3')){
+        const r=group.getBoundingClientRect();
+        ctx.fillStyle='#d9eee1';ctx.font='bold 11px sans-serif';ctx.textAlign='left';
+        ctx.fillText(group.querySelector('strong,.market-hm-open-state')?.textContent||
+          group.textContent.split('项')[0],ox+r.left-area.left+7,oy+r.top-area.top+12,
+          Math.max(40,r.width-15));
+      }
+      ctx.fillStyle='#a9c6b6';ctx.font='10px sans-serif';ctx.textAlign='left';
+      ctx.fillText('红跌绿涨｜虚线 * 小样本｜0% 持平｜N/A 无法比较',pad,
+        out.height/ratio-12);
+      out.toBlob(blob=>{
+        if(!blob){notify('PNG 生成失败',true);return;}
+        const url=URL.createObjectURL(blob),link=document.createElement('a');
+        link.href=url;link.download='BG_AGRO_Heatmap_'+snapshot.survey_date+'_'+
+          (state().region||'NATIONAL')+'.png';
+        document.body.appendChild(link);link.click();link.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1200);
+      },'image/png');
+    }catch(error){notify('Heatmap 图片导出失败：'+error.message,true);}
+  };
   const bind=()=>{
-    $('market-heatmap-period').addEventListener('change',()=>{stop();paint();});
-    for(const id of ['market-heatmap-state','market-heatmap-level'])
-      $(id).addEventListener('change',()=>{stop();paint();});
+    const changeFilters=()=>{stop();resetLayout();paint();};
+    $('market-heatmap-period').addEventListener('change',changeFilters);
+    for(const id of ['market-heatmap-state','market-heatmap-level','market-heatmap-category','market-heatmap-sort'])
+      $(id).addEventListener('change',changeFilters);
+    searchEl.addEventListener('input',changeFilters);
+    lockEl.addEventListener('change',()=>{stop();resetLayout();paint();});
+    backEl.addEventListener('click',()=>{stateEl.value=ALL_STATES;changeFilters();});
+    captureEl.addEventListener('click',capturePNG);
     dateSlider.addEventListener('input',()=>{
       stop();
       const i=Number(dateSlider.value),day=dates[i];
@@ -486,15 +555,21 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
     canvas.addEventListener('pointerover',showDetail);
     canvas.addEventListener('focusin',showDetail);
     canvas.addEventListener('click',event=>{
-      const btn=event.target.closest('[data-market-hm-index]');
-      if(btn&&canvas.contains(btn)){
-        const tile=tiles[Number(btn.dataset.marketHmIndex)];
-        if(tile?.region&&typeof showProductHistory==='function'){
-          stop();
-          showProductHistory(tile.key,tile.region,tile.level);
-        }else if(tile?.quality==='strict'&&tile.evidence)showComparison(tile.evidence);
-        else if(tile)showDetail({target:btn});
+      const stateButton=event.target.closest('[data-hm-state]');
+      if(stateButton&&canvas.contains(stateButton)){
+        stateEl.value=stateButton.dataset.hmState;
+        stop();resetLayout();paint();return;
       }
+      const btn=event.target.closest('[data-market-hm-index]');
+      if(!btn||!canvas.contains(btn))return;
+      const tile=tiles[Number(btn.dataset.marketHmIndex)];
+      if(!tile||tile.missing)return;
+      stop();
+      if(typeof showPreview==='function')showPreview(tile,snapshot);
+      else if(tile.region&&typeof showProductHistory==='function')
+        showProductHistory(tile.key,tile.region,tile.level,snapshot.survey_date,snapshot);
+      else if(tile.quality==='strict'&&tile.evidence)showComparison(tile.evidence);
+      else showDetail({target:btn});
     });
     if(typeof ResizeObserver!=='undefined'){
       observer=new ResizeObserver(()=>paint());observer.observe(canvas);
@@ -521,6 +596,12 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
     for(const region of MALAYSIA_STATES)selector.add(new Option(region,region));
     selector.value=before===ALL_STATES||before===''?ALL_STATES:
       MALAYSIA_STATES.includes(before)?before:ALL_STATES;
+    const categories=[...new Set(overview.prices.map(q=>q.kategori).filter(Boolean))].sort();
+    const priorCategory=categoryEl.value;
+    categoryEl.replaceChildren(new Option('全部分类',''));
+    for(const category of categories)categoryEl.add(new Option(category,category));
+    categoryEl.value=categories.includes(priorCategory)?priorCategory:'';
+    resetLayout();
     snapshot=overview;status.textContent='已核对：'+overview.survey_date;
     status.dataset.loading='false';paint();
   };
