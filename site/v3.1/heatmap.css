@@ -1,0 +1,90 @@
+/* FAMA stock-style sector heatmap. Scoped to overview only. */
+.market-heatmap-panel{margin-top:22px;margin-bottom:24px;padding:24px;background:#091314;
+  color:#f4fcf8;border:1px solid #152c2a;border-radius:16px;
+  box-shadow:0 14px 35px #0d292524;overflow:hidden}
+.market-heatmap-heading{display:flex;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap;gap:15px;margin-bottom:18px}
+.market-hm-eyebrow{display:block;color:#6daea4;font-size:10px;font-weight:800;letter-spacing:1.75px}
+.market-heatmap-heading h2{color:#f4fcf8;margin:7px 0 6px;font-size:24px;font-weight:820;letter-spacing:-.7px}
+.market-heatmap-heading h2 span{color:#8faea9;font-size:14px;font-weight:600;letter-spacing:0}
+.market-heatmap-heading p{font-size:11px;line-height:1.6;color:#9bb5ae;margin:0}
+.market-hm-legend{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:8px 0;
+  color:#a7c2ba;font-size:11px;font-weight:650}
+.market-hm-legend>span{display:flex;gap:6px;align-items:center}
+.market-hm-legend-swatch{width:12px;height:12px;border-radius:2px;border:1px solid #ffffff32}
+.market-hm-toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:10px 13px;
+  padding:12px;background:#122124;border:1px solid #294041;border-radius:10px}
+.market-hm-toolbar label{display:flex;flex-direction:column;gap:5px;min-width:132px;flex:0 1 195px;
+  color:#9cbab1;font-size:10px;font-weight:760}
+.market-hm-toolbar select{width:100%;height:36px;min-width:0;background:#182b2e;color:#eff9f3;
+  border:1px solid #355051;border-radius:6px;padding:0 9px;outline-color:#70b59b;font-size:12px}
+.market-hm-status{color:#9eb5b2;font-size:10px;line-height:1.5;align-self:center;margin-left:auto}
+.market-hm-status[data-loading="true"]{color:#f1c77d}
+.market-hm-summary{font-size:11px;color:#a8c2b9;margin:13px 1px 9px;line-height:1.5;
+  font-variant-numeric:tabular-nums}
+.market-hm-viewport{border:1px solid #31413d;border-radius:5px;background:#010908;overflow:hidden}
+.market-hm-canvas{width:100%;height:570px;position:relative;isolation:isolate;
+  background:#06110f;overflow:hidden}
+.market-hm-group{position:absolute;overflow:hidden;border:2px solid #06100f;background:#0b1517}
+.market-hm-group-header{height:24px;display:flex;align-items:center;gap:8px;justify-content:space-between;
+  overflow:hidden;padding:0 7px;color:#edf6f2;background:#0d181b;font-size:10px;font-weight:750}
+.market-hm-group-header strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.market-hm-group-header span{white-space:nowrap;color:#8daba4;font-size:9px}
+.market-hm-group-body{position:absolute;left:0;right:0;bottom:0;overflow:hidden}
+.market-hm-cell{position:absolute;appearance:none;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:5px;min-width:0;min-height:0;padding:4px 5px;border:1.5px solid #0b1a1c;
+  border-radius:0;color:#fff;overflow:hidden;text-align:center;transition:filter .11s ease,box-shadow .11s ease;
+  line-height:1.12;z-index:1}
+.market-hm-cell:hover,.market-hm-cell:focus-visible{z-index:3;filter:brightness(1.18);
+  box-shadow:inset 0 0 0 2px #fcf8dc;outline:none}
+.market-hm-name{font-size:clamp(7px,.9vw,11px);font-weight:780;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.market-hm-change{font-size:clamp(10px,1.2vw,16px);font-weight:850;white-space:nowrap;
+  font-variant-numeric:tabular-nums;letter-spacing:-.25px}
+.market-hm-cell.large .market-hm-name{font-size:clamp(12px,1.18vw,18px)}
+.market-hm-cell.large .market-hm-change{font-size:clamp(16px,1.7vw,26px)}
+.market-hm-cell.large small{display:block;color:#dbf3e9;font-size:9px;white-space:nowrap}
+.market-hm-cell.medium .market-hm-change{font-size:13px}
+.market-hm-cell.tiny .market-hm-name{font-size:8px}
+.market-heatmap-empty{position:absolute;inset:0;display:flex;flex-direction:column;gap:9px;
+  align-items:center;justify-content:center;padding:25px;text-align:center;color:#f1f9f3;font-size:14px}
+.market-heatmap-empty span{color:#9cb5aa;font-size:11px}
+.market-hm-detail{font-size:11px;line-height:1.8;color:#d2e7de;min-height:40px;
+  display:flex;align-items:center;border-bottom:1px solid #28413d;padding:10px 1px}
+.market-hm-timeline{display:flex;align-items:center;gap:18px;padding:16px 0 3px}
+.market-hm-play{border:1px solid #597769;border-radius:9px;background:#e6f4eb;
+  color:#173c2a;padding:10px 15px;font-size:12px;font-weight:780;white-space:nowrap;
+  min-width:86px}
+.market-hm-play:hover{background:#fff}
+.market-hm-play:disabled{opacity:.4;cursor:not-allowed}
+.market-hm-timeline-track{flex:1;min-width:0}
+.market-hm-timeline-label{display:flex;justify-content:space-between;gap:12px;
+  align-items:center;font-size:10px;color:#a6bfb8}
+.market-hm-timeline-label strong{font-size:13px;color:#f2fcf8;letter-spacing:.3px;
+  font-variant-numeric:tabular-nums}
+.market-hm-timeline input[type="range"]{display:block;width:100%;accent-color:#5fbf99;
+  margin:8px 0 4px;cursor:pointer}
+.market-hm-timeline-ends{display:flex;justify-content:space-between;gap:8px;
+  color:#7e9d94;font-size:10px;font-variant-numeric:tabular-nums}
+.market-hm-disclaimer{font-size:10px!important;line-height:1.8!important;color:#8eaaa1!important;
+  margin:15px 0 0!important}
+@media(max-width:900px){
+  .market-hm-canvas{height:650px}
+  .market-heatmap-panel{padding:16px}
+  .market-hm-toolbar label{flex:1 1 145px;min-width:120px}
+  .market-hm-status{flex:1 1 100%;margin-left:0}
+}
+@media(max-width:550px){
+  .market-heatmap-heading h2{font-size:21px}
+  .market-heatmap-heading h2 span{display:block;font-size:12px;margin-top:4px}
+  .market-hm-canvas{height:730px}
+  .market-hm-toolbar{gap:9px}
+  .market-hm-toolbar label{flex:1 1 100%}
+  .market-hm-timeline{gap:10px}
+  .market-hm-play{min-width:74px;padding:9px}
+  .market-hm-group-header{font-size:9px}
+  .market-hm-cell.large .market-hm-change{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){
+  .market-hm-cell{transition:none}
+}
