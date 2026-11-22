@@ -1,0 +1,32 @@
+/* Archive-wide state price detail view (FAMA source-derived observations). */
+.product-history-panel{scroll-margin-top:25px}
+.product-history-controls{display:flex;align-items:end;justify-content:space-between;
+  gap:12px;flex-wrap:wrap;margin-bottom:13px}
+.product-history-controls label{display:flex;flex-direction:column;gap:7px;
+  min-width:235px;max-width:370px;flex:1;color:#53765e;
+  font-weight:750;font-size:11px}
+.product-history-controls select{height:39px;width:100%;padding:0 12px;
+  background:#f8fcfa;border:1px solid #d7e6dd;border-radius:9px;
+  color:#234d38;font-size:12px}
+.product-history-status{font-size:11px;color:#618471;background:#f3f9f5;
+  border:1px solid #e0ede3;border-radius:9px;padding:12px 13px;line-height:1.65;
+  margin:0 0 14px;font-variant-numeric:tabular-nums}
+.product-history-table{min-width:780px}
+.product-history-table td{font-variant-numeric:tabular-nums}
+.product-history-table td strong{color:#22644d;font-size:13px}
+.product-history-table .history-level{font-size:10px;font-weight:770;display:inline-block;
+  border:1px solid #cfe3d6;background:#edf7f0;padding:5px 9px;border-radius:7px;
+  color:#35724f}
+.product-history-market-panel{margin-top:20px;border:1px solid #d9e8dd;
+  background:#fbfefa;border-radius:12px;padding:16px}
+.product-history-market-heading{display:flex;align-items:center;
+  justify-content:space-between;gap:12px}
+.product-history-market-heading h3{font-size:15px;font-weight:820;margin:0;color:#285b3d}
+#product-history-market-status{color:#60806a;font-size:11px;line-height:1.7}
+.product-history-market-table{min-width:930px}
+#product-history-visible{font-variant-numeric:tabular-nums}
+@media(max-width:650px){
+ .product-history-controls label{max-width:none;flex:1 1 100%}
+ .product-history-controls #product-history-export{width:100%}
+ .product-history-market-panel{padding:12px}
+}
