@@ -199,7 +199,7 @@ export function heatmapColor(percent,quality='strict'){
   return percent>0?'hsl(153 78% '+light+'%)':'hsl(355 75% '+light+'%)';
 }
 
-export function createMarketHeatmap({loadSnapshot,showComparison,showProductHistory,notify}){
+export function createMarketHeatmap({loadSnapshot,showComparison,showProductHistory,showPreview,notify}){
   const $=id=>document.getElementById(id);
   const canvas=$('market-heatmap-canvas');
   const dateSlider=$('market-heatmap-date');
@@ -214,8 +214,12 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
   const speedSelector=$('market-heatmap-speed');
   const dateCount=$('market-heatmap-date-count');
   const dateTicks=$('market-heatmap-ticks');
+  const searchEl=$('market-heatmap-search'),categoryEl=$('market-heatmap-category');
+  const sortEl=$('market-heatmap-sort'),lockEl=$('market-heatmap-lock');
+  const stateEl=$('market-heatmap-state'),backEl=$('market-heatmap-back-all');
+  const modeEl=$('market-heatmap-mode'),captureEl=$('market-heatmap-capture');
   let dates=[],snapshot=null,selection=0,token=0,playing=false,playTimer=null,tiles=[];
-  let observer=null;
+  let observer=null,lockedKeys=null;
 
   const setPlayLabel=()=>{
     const parts=playButton.querySelectorAll('span');
@@ -246,105 +250,138 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
   };
   const state=()=>({
     level:$('market-heatmap-level').value,
-    region:$('market-heatmap-state').value,
-    period:Number($('market-heatmap-period').value)
+    region:stateEl.value,
+    period:Number($('market-heatmap-period').value),
+    search:searchEl.value,category:categoryEl.value,sort:sortEl.value
   });
+  const resetLayout=()=>{lockedKeys=null};
+  const keyFor=t=>[t.region,t.key,t.level].join('\u001F');
+  const applyLockedLayout=result=>{
+    if(!lockEl.checked)return result;
+    if(!lockedKeys)lockedKeys=result.groups.map(group=>({
+      name:group.name,items:group.items.map(item=>({...item,lockKey:keyFor(item)}))
+    }));
+    const lookup=new Map(result.tiles.map(tile=>[keyFor(tile),tile]));
+    const current=new Map(result.groups.map(group=>[group.name,group]));
+    const groups=lockedKeys.map(g=>{
+      const currentGroup=current.get(g.name);
+      return {...(currentGroup||{name:g.name,weight:1,observed:0,strict:0,smallSample:0}),
+        items:g.items.map(baseline=>lookup.get(baseline.lockKey)||
+          {...baseline,missing:true,evidence:null,percent:null,quality:'missing',price:null})};
+    });
+    return {...result,groups,tiles:groups.flatMap(g=>g.items)};
+  };
   const rectStyle=(r)=>'left:'+position(r.x)+'px;top:'+position(r.y)+
     'px;width:'+position(r.w)+'px;height:'+position(r.h)+'px';
+  const tileHTML=(item,idx,{box='',single=false}={})=>{
+    tiles[idx]=item;
+    const missing=Boolean(item.missing);
+    const percent=item.percent;
+    const neutral=item.evidence&&Math.abs(percent)<.05;
+    const value=missing?'无报价':item.evidence?
+      (percent>0?'+':'')+tooltipValue(percent):'N/A';
+    const current=Number.isFinite(item.price)?fmtMoney(item.price):'—';
+    const quality=missing?'无当日报价':item.quality==='strict'?'严格同市场对比':
+      item.quality==='small-sample'?'小样本同市场对比，仅代表对应市场':'当日报价，无历史可比数据';
+    const title=[item.region||'全国',item.name,item.grade,item.level,
+      value,item.evidence?item.markets+' 个共同市场':current+' / '+item.unit,quality].join(' · ');
+    const klass=missing?' missing':neutral?' neutral':item.quality==='small-sample'?
+      ' small-sample':item.evidence?'':' uncomparable';
+    const content='<span class="market-hm-name">'+escapeHtml(item.name)+'</span>'+
+      '<strong class="market-hm-change">'+escapeHtml(value)+'</strong>'+
+      (single?'<small>'+escapeHtml(missing?'当日无价':current+' / '+item.unit)+
+        ' · '+escapeHtml(item.grade)+'</small>':'');
+    const style=box?box+';':'';
+    return '<button type="button" class="market-hm-cell'+klass+
+      (single?' market-hm-product-card':'')+'" data-market-hm-index="'+idx+
+      '" title="'+escapeHtml(title)+'" aria-label="'+escapeHtml(title)+
+      '"'+(missing?' disabled':'')+' style="'+style+'background:'+heatmapColor(percent,item.quality)+
+      '">'+content+'</button>';
+  };
   const paint=()=>{
     if(!snapshot)return;
-    const filter=state(),allStates=filter.region===ALL_STATES;
+    const filter=state(),allStates=filter.region===ALL_STATES,selectedState=Boolean(filter.region)&&!allStates;
     const w=canvas.clientWidth;
     if(w<100)return;
-    // State overview uses equal-size state panels; no state silently disappears.
+    canvas.classList.toggle('all-states',allStates);
+    canvas.classList.toggle('single-state',selectedState);
     const columns=w>=1040?4:w>=720?3:2;
     const rows=Math.ceil(MALAYSIA_STATES.length/columns);
-    canvas.classList.toggle('all-states',allStates);
-    canvas.style.height=allStates?String(rows*(w<550?244:252))+'px':'';
+    canvas.style.height=allStates?String(rows*(w<550?244:252))+'px':selectedState?'auto':'';
     const h=canvas.clientHeight;
-    if(h<100)return;
-    const result=prepareHeatmap(snapshot.prices,{
-      level:filter.level,state:filter.region,period:filter.period,
-      limit:w<700?75:130
+    if(h<100&&!selectedState)return;
+    const rawResult=prepareHeatmap(snapshot.prices,{
+      ...filter,limit:w<700?75:130
     });
+    const result=applyLockedLayout(rawResult);
     tiles=[];
-    const label=filter.period===1?'昨日':filter.period+' 天';
-    const regionLabel=allStates?'全马州别':filter.region||'全国均价';
+    const periodName=filter.period===1?'1 日':filter.period+' 日';
+    const regionLabel=allStates?'全马 16 州／直辖区':filter.region||'全国均价';
     summary.textContent=allStates?
-      snapshot.survey_date+' · '+filter.level+' · 全马 16 州／直辖区 · 有该层级报价 '+
-        result.coverage+'/16 · '+label+'严格比较 '+result.strict+
-        ' 组 · 小样本比较 '+result.smallSample+' 组；其余只有当日价格':
-      snapshot.survey_date+' · '+filter.level+' · '+regionLabel+' · '+label+
-        '严格比较 '+result.strict+' 组 · 小样本比较 '+result.smallSample+' 组'+
-        (result.excluded?' · '+result.excluded+' 组仅有当日价格':'');
+      snapshot.survey_date+' · '+filter.level+' · '+regionLabel+' · 报价覆盖 '+
+      rawResult.coverage+'/16 · 严格比较 '+rawResult.strict+' · 小样本 '+rawResult.smallSample+
+      ' · 当前显示 '+rawResult.shown+' / '+rawResult.total+' 项（点击州标题查看全部）':
+      snapshot.survey_date+' · '+filter.level+' · '+regionLabel+' · '+periodName+
+      '比较：严格 '+rawResult.strict+'、小样本 '+rawResult.smallSample+
+      ' · 显示 '+rawResult.shown+' / '+rawResult.total+' 个产品';
     dateValue.textContent=snapshot.survey_date;
-    if(!result.groups.length){
-      canvas.innerHTML='<div class="market-heatmap-empty">当前筛选没有满足同市场样本门槛的涨跌数据。<span>可切换价格层级、地区或比较周期。</span></div>';
-      detail.textContent='只显示实际 FAMA 价格，不补造缺失的比较数据。';return;
+    backEl.hidden=allStates;
+    modeEl.textContent=allStates?'全马概览 · 点击州标题展开全部产品':
+      selectedState?filter.region+' · 全部符合筛选条件的产品':'全国平均 · 按农产品类别';
+    if(!result.groups.length||(!result.tiles.length&&!allStates)){
+      canvas.innerHTML='<div class="market-heatmap-empty">当前筛选没有可显示的实际报价。<span>尝试清除搜索或调整价格层级、日期和分类。</span></div>';
+      detail.textContent='没有替换成别州或其他日期的数据。';return;
     }
-    const groupRects=allStates?
-      result.groups.map((group,i)=>({
+    let markup='',index=0;
+    if(selectedState){
+      // Responsive full-list mode: all matching items, no hard-coded first N cap.
+      for(const group of result.groups){
+        markup+='<section class="market-hm-single-category"><h3>'+
+          escapeHtml(group.name)+' <span>'+group.items.length+' 项</span></h3>'+
+          '<div class="market-hm-single-cards">';
+        for(const item of group.items)markup+=tileHTML(item,index++,{single:true});
+        markup+='</div></section>';
+      }
+    }else{
+      const rects=allStates?result.groups.map((group,i)=>({
         item:group,x:(i%columns)*w/columns,y:Math.floor(i/columns)*h/rows,
         w:w/columns,h:h/rows
-      })):
-      treemapLayout(result.groups,w,h);
-    let index=0,markup='';
-    for(const r of groupRects){
-      const group=r.item;
-      if(r.w<1||r.h<1)continue;
-      const showHeader=allStates||r.h>=52&&r.w>=100;
-      const head=showHeader?(allStates?31:24):0;
-      const innerW=Math.max(0,r.w-4),innerH=Math.max(0,r.h-head-4);
-      const itemRects=allStates?
-        group.items.map((item,i)=>({
+      })):treemapLayout(result.groups,w,h);
+      for(const r of rects){
+        const group=r.item;
+        const head=allStates?32:r.h>=52&&r.w>=100?24:0;
+        const innerW=Math.max(0,r.w-4),innerH=Math.max(0,r.h-head-4);
+        const itemRects=allStates?group.items.map((item,i)=>({
           item,x:(i%2)*innerW/2,
-          y:Math.floor(i/2)*innerH/Math.ceil(group.items.length/2),
-          w:innerW/2,h:innerH/Math.ceil(group.items.length/2)
-        })):
-        treemapLayout(group.items,innerW,innerH);
-      const cells=itemRects.map(t=>{
-        const item=t.item,idx=index++;tiles[idx]=item;
-        const huge=t.w>=132&&t.h>=99;
-        const medium=t.w>=77&&t.h>=62;
-        const tiny=t.w<58||t.h<37;
-        const move=item.evidence?(item.percent>0?'+':'')+tooltipValue(item.percent):'—';
-        const current=fmtMoney(item.price);
-        const display=item.evidence?move:current;
-        const reliability=item.quality==='strict'?'严格同市场对比':
-          item.quality==='small-sample'?'小样本观察，不代表全州趋势':'不可比';
-        const label=item.name+' · '+item.grade+' · '+filter.level+
-          ' · '+(item.evidence?move+' · '+reliability+' · 共同市场 '+item.markets:
-            '当日均价 '+current+'/'+item.unit+' · '+item.surveyedMarkets+
-            ' 个报价市场 · 涨跌不可比');
-        const content='<span class="market-hm-name">'+escapeHtml(item.name)+'</span>'+
-          (tiny?'':'<strong class="market-hm-change">'+escapeHtml(display)+'</strong>')+
-          (huge?'<small>'+escapeHtml(item.grade)+'</small>':'');
-        return '<button type="button" class="market-hm-cell'+
-          (huge?' large':medium?' medium':tiny?' tiny':'')+
-          (item.quality==='small-sample'?' small-sample':item.evidence?'':' uncomparable')+
-          '" data-market-hm-index="'+idx+
-          '" title="'+escapeHtml(label)+'" aria-label="'+escapeHtml(label)+
-          '" style="'+rectStyle(t)+';background:'+heatmapColor(item.percent,item.quality)+'">'+
-          content+'</button>';
-      }).join('');
-      const groupDescription=allStates?
-        (group.observed?
-          (group.observed+' 报价 · '+group.strict+' 严格 · '+group.smallSample+' 小样本'):
-          '该层级当天无报价'):
-        group.items.length+' 项';
-      const placeholder=allStates&&!group.items.length?
-        '<div class="market-hm-no-data">该调查日此层级无报价<br><small>不使用其他日期填补</small></div>':'';
-      markup+='<div class="market-hm-group'+(allStates?' market-hm-state':'')+
-        '" style="'+rectStyle(r)+'" title="'+escapeHtml(group.name)+'">'+
-        (showHeader?'<div class="market-hm-group-header"><strong>'+escapeHtml(group.name)+
-          '</strong><span>'+escapeHtml(groupDescription)+'</span></div>':'')+
-        '<div class="market-hm-group-body" style="top:'+head+'px">'+
-        cells+placeholder+'</div></div>';
+          y:Math.floor(i/2)*innerH/Math.max(1,Math.ceil(group.items.length/2)),
+          w:innerW/2,h:innerH/Math.max(1,Math.ceil(group.items.length/2))
+        })):treemapLayout(group.items,innerW,innerH);
+        const cells=itemRects.map(t=>tileHTML(t.item,index++,{
+          box:rectStyle(t)
+        })).join('');
+        const more=allStates?Math.max(0,group.observed-group.items.length):0;
+        const caption=allStates?(group.totalActual?
+          group.items.length+'/'+group.observed+' 项 · '+group.strict+' 严格 / '+
+          group.smallSample+' 小样本'+(more?' · +'+more:''):'当日无此层级报价'):
+          group.items.length+' 项';
+        const header=allStates?'<button type="button" class="market-hm-open-state" data-hm-state="'+
+          escapeHtml(group.name)+'" aria-label="查看 '+escapeHtml(group.name)+
+          ' 的全部农产品">'+escapeHtml(group.name)+' <span>展开 ↗</span></button>':
+          '<strong>'+escapeHtml(group.name)+'</strong>';
+        const placeholder=allStates&&!group.items.length?
+          '<div class="market-hm-no-data">'+
+          (group.totalActual?'当前筛选没有匹配产品':'该调查日没有此层级报价')+'</div>':'';
+        markup+='<div class="market-hm-group'+(allStates?' market-hm-state':'')+
+          '" style="'+rectStyle(r)+'">'+
+          (head?'<div class="market-hm-group-header">'+header+
+            '<span title="'+escapeHtml(caption)+'">'+escapeHtml(caption)+'</span></div>':'')+
+          '<div class="market-hm-group-body" style="top:'+head+'px">'+cells+
+          placeholder+'</div></div>';
+      }
     }
     canvas.innerHTML=markup;
-    detail.textContent=allStates?
-      '选择某个州的色块，可以查看该产品在该州的全部历史价格、日期及来源记录。鲜艳红绿＝严格可比，柔和红绿＝小样本。':
-      '悬停查看报价，点击有可比涨跌的色块核对逐市场记录。';
+    detail.textContent=allStates?'点击州标题查看全部农产品；点击产品查看当前调查日的真实价格及历史记录。':
+      '点击产品打开历史价格详情；虚线 / * 表示小样本，0.0% 与 N/A 含义不同。';
   };
   const showDetail=event=>{
     const btn=event.target.closest('[data-market-hm-index]');
