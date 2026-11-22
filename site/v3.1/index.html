@@ -9,8 +9,8 @@
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
   <link rel="stylesheet" href="./styles.css?rev=v3-5-completeness-1">
   <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
-  <script type="module" src="./app.mjs?rev=2026-11-22-market-heatmap-v1"></script>
-  <link rel="stylesheet" href="./heatmap.css?rev=2026-11-22-market-heatmap-v1">
+  <script type="module" src="./app.mjs?rev=2026-11-22-replay-polish-v2"></script>
+  <link rel="stylesheet" href="./heatmap.css?rev=2026-11-22-replay-polish-v2">
   <link rel="stylesheet" href="./fb-export.css?rev=2026-11-21-multilevel-v1">
   <script type="module" src="./fb-export.mjs?rev=2026-11-21-multilevel-v1"></script>
 </head>
@@ -119,14 +119,50 @@
             <div id="market-heatmap-canvas" class="market-hm-canvas" role="group" aria-label="农产品涨跌热力图"></div>
           </div>
           <div class="market-hm-detail" id="market-heatmap-detail" aria-live="polite">悬停或选中某个色块查看详细价格变化。</div>
-          <div class="market-hm-timeline">
-            <button type="button" class="market-hm-play" id="market-heatmap-play" aria-pressed="false">▶ 播放</button>
-            <div class="market-hm-timeline-track">
-              <div class="market-hm-timeline-label"><span>FAMA 实际调查日</span><strong id="market-heatmap-date-value">—</strong></div>
-              <input id="market-heatmap-date" type="range" min="0" max="0" value="0" step="1" aria-label="切换历史 FAMA 调查日">
-              <div class="market-hm-timeline-ends"><span id="market-heatmap-first-date">—</span><span id="market-heatmap-last-date">—</span></div>
+          <section class="market-hm-replay" aria-label="FAMA 历史行情回放">
+            <div class="market-hm-replay-header">
+              <div class="market-hm-replay-heading">
+                <span class="market-hm-replay-emblem" aria-hidden="true">◷</span>
+                <div>
+                  <span class="market-hm-replay-eyebrow">HISTORICAL MARKET REPLAY</span>
+                  <h3>历史行情回放 <span>逐个真实调查日</span></h3>
+                </div>
+              </div>
+              <div class="market-hm-replay-current" aria-live="polite">
+                <span>当前调查日期</span>
+                <strong id="market-heatmap-date-value">—</strong>
+              </div>
             </div>
-          </div>
+            <div class="market-hm-replay-main">
+              <div class="market-hm-replay-buttons" role="group" aria-label="历史日期回放控制">
+                <button type="button" class="market-hm-step" id="market-heatmap-prev" aria-label="上一个真实调查日" title="上一个调查日">‹</button>
+                <button type="button" class="market-hm-play" id="market-heatmap-play" aria-pressed="false" aria-label="开始历史行情回放"><span aria-hidden="true">▶</span><span>开始回放</span></button>
+                <button type="button" class="market-hm-step" id="market-heatmap-next" aria-label="下一个真实调查日" title="下一个调查日">›</button>
+              </div>
+              <div class="market-hm-timeline-track">
+                <div class="market-hm-timeline-label">
+                  <span>FAMA 调查日期记录 <small>只播放有真实档案的日期</small></span>
+                  <strong id="market-heatmap-date-count">— / —</strong>
+                </div>
+                <div class="market-hm-range-wrap">
+                  <div class="market-hm-date-ticks" id="market-heatmap-ticks" aria-hidden="true"></div>
+                  <input id="market-heatmap-date" type="range" min="0" max="0" value="0" step="1" aria-label="选择一个真实 FAMA 调查日">
+                </div>
+                <div class="market-hm-timeline-ends"><span id="market-heatmap-first-date">—</span><span id="market-heatmap-last-date">—</span></div>
+              </div>
+              <label class="market-hm-replay-speed">回放速度
+                <select id="market-heatmap-speed" aria-label="调整历史价格回放速度">
+                  <option value="1800">0.5× 慢速</option>
+                  <option value="1050" selected>1× 标准</option>
+                  <option value="520">2× 快速</option>
+                </select>
+              </label>
+            </div>
+            <div class="market-hm-replay-foot">
+              <p>每次自动切换到下一次实际调查日期，并重新计算所选的昨日／7 天／30 天涨跌。</p>
+              <button type="button" id="market-heatmap-latest">回到最新 <span aria-hidden="true">↗</span></button>
+            </div>
+          </section>
           <p class="market-hm-disclaimer">数据来源：FAMA AMI。绿色＝同市场均价上升，红色＝下降；色块面积＝可比的共同调查市场数量，并非销量、市值或产量。仅展示至少 3 个共同市场且两期市场覆盖率各达 50% 的报价；不具可比性的记录不着色。历史播放仅使用归档的真实调查日。</p>
         </section>
       </section>
