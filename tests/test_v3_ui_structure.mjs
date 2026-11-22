@@ -110,75 +110,55 @@ test('price explorer date selector recalculates historic matched-market comparis
 });
 
 
-test('overview replaces giant promotional hero with FAMA daily story board and copy controls',()=>{
-  assert.match(html,/class="insight-board"/);
-  for(const id of ['insight-date','insight-rise','insight-fall',
-    'insight-aligned','insight-warning','insight-method'])
+test('overview keeps price monitoring without the removed content ideas board',()=>{
+  for(const id of ['overview-title','completeness-monitor','movers-up','movers-down','quick-prices',
+    'stat-survey','stat-rows','stat-states','stat-quotes'])
     assert.match(html,new RegExp('id="'+id+'"'));
-  for(const period of [1,7,30])assert.match(html,new RegExp('data-insight-period="'+period+'"'));
+  assert.match(html,/id="overview-title">农价总览<\/h1>/);
+  assert.doesNotMatch(html,/每日农价内容灵感板|class="insight-board"|data-insight-period|id="insight-rise"/);
   assert.doesNotMatch(html,/class="hero"/);
-  assert.doesNotMatch(code,/\$\('hero-date'\)/);
-  assert.match(code,/renderDailyInsights\(\)/);
-  assert.match(code,/dailyStorySignals\(data\.prices,period\)/);
-  assert.match(code,/buildMarketPostIdea\(quote,period,data\.survey_date,data\.prices\)/);
-  assert.match(code,/comparisonMarketDetails\(rows,evidence,superseded\)/);
-  assert.match(code,/navigator\.clipboard\.writeText\(message\)/);
-  assert.match(code,/data-insight-copy=/);
-  assert.match(code,/data-insight-view=/);
-  assert.match(code,/renderMovers\(\);renderDailyInsights\(\)/,'period buttons remain in sync');
-  assert.match(style,/\.insight-board/);
-  assert.match(style,/\.insight-aux-grid/);
+  assert.match(code,/store\.insightData=store\.overview/);
+  assert.match(code,/rankMovers\(data\.prices,store\.period,direction\)/);
+  assert.doesNotMatch(code,/renderDailyInsights|insight-survey-date|data-insight-studio/);
 });
 
-test('price evidence dialog and public content actions use the shared archive and validation',()=>{
-  for(const id of ['insight-survey-date','creator-signal-date','comparison-dialog','comparison-sort',
-    'creator-source','creator-validation','creator-studio-details'])assert.match(html,new RegExp('id="'+id+'"'));
+test('price evidence dialog and topic intelligence remain without studio controls',()=>{
+  for(const id of ['creator-signal-date','comparison-dialog','comparison-sort','creator-signal-list',
+    'creator-calendar-month','creator-import-json'])
+    assert.match(html,new RegExp('id="'+id+'"'));
   assert.match(html,/<dialog id="comparison-dialog"/);
   assert.match(html,/class="table-scroll comparison-table"/);
   const creator=readFileSync(new URL('../site/v3.1/creator-app.mjs',import.meta.url),'utf8');
   assert.match(creator,/comparisonMarketDetails\(rows,source,superseded\)/);
-  assert.match(creator,/validateCreatorDraft\(draft,verifiedEvidence,options\(\)\)/);
-  assert.match(creator,/if\(!validation\.valid\)throw Error\(validation\.message\)/);
-  assert.match(creator,/makeCard\(verifiedEvidence,platform,options\(\)\.settings\)/);
+  assert.match(creator,/validateCreatorDraft\(record,source,record\)/);
+  assert.doesNotMatch(creator,/navigate\('studio'\)|data-creator-draft|creator-studio-details/);
 });
 
-test('Pages loads the same cache revision for the dashboard and its price evidence modules',()=>{
+test('Pages cache-busts changed application modules without requiring CSS rebuild',()=>{
   const revision=html.match(/src="\.\/app\.mjs\?rev=([^"]+)"/)?.[1];
   assert.ok(revision);
-  assert.ok(html.includes('./styles.css?rev='+revision));
-  const creator=readFileSync(new URL('../site/v3.1/creator-app.mjs',import.meta.url),'utf8');
-  const core=readFileSync(new URL('../site/v3.1/creator-core.mjs',import.meta.url),'utf8');
-  for(const [source,names] of [[code,['engine','creator-app','creator-core']],
-    [creator,['engine','creator-core']],[core,['engine']]]){
-    for(const name of names)assert.ok(source.includes("'./"+name+".mjs?rev="+revision+"'"));
-  }
+  assert.match(html,/href="\.\/styles\.css\?rev=[^"]+"/);
+  assert.match(code,/import \{createCreatorWorkspace\} from '\.\/creator-app\.mjs\?rev=[^']+'/);
+  assert.ok(code.includes("'./creator-app.mjs?rev="+revision+"'"));
 });
 
-
-test('V3.5 retains creator routes and workflows from the original dashboard',()=>{
+test('creator signals, calendar and local backups remain; removed studio stays inaccessible',()=>{
   const creator=readFileSync(new URL('../site/v3.1/creator-app.mjs',import.meta.url),'utf8');
   const core=readFileSync(new URL('../site/v3.1/creator-core.mjs',import.meta.url),'utf8');
-  for(const page of ['signals','studio','calendar']){
+  for(const page of ['signals','calendar']){
     assert.match(html,new RegExp('data-screen="'+page+'"'));
     assert.match(html,new RegExp('data-page="'+page+'"'));
   }
-  assert.match(html,/MALAYSIA PRICE MONITOR · V3\.5/);
+  assert.doesNotMatch(html,/data-screen="studio"|data-page="studio"|id="creator-body"|内容工作室/);
   assert.match(code,/import \{createCreatorWorkspace\} from '\.\/creator-app\.mjs\?rev=[^']+'/);
   assert.match(code,/creator\.bind\(\)/);
   assert.match(code,/creator\.refresh\(\)/);
   assert.match(code,/creator\.render\(page\)/);
-  assert.match(html,/id="creator-signal-list"/);
-  assert.match(html,/id="creator-kpis"/);
-  assert.match(html,/id="creator-body"/);
-  assert.match(html,/id="creator-calendar-month"/);
-  assert.match(html,/id="creator-calendar-grid"/);
+  for(const id of ['creator-signal-list','creator-kpis','creator-calendar-month','creator-calendar-grid',
+    'creator-import-json','creator-backup-json'])
+    assert.match(html,new RegExp('id="'+id+'"'));
   assert.match(creator,/const firstDay=new Date\(Date\.UTC\(year,mon-1,1\)\)/);
-  assert.match(creator,/data-creator-edit/);
-  assert.match(html,/id="creator-import-json"/);
-  assert.match(creator,/navigator\.clipboard\.writeText/);
-  assert.match(creator,/canvas\.toBlob/);
   assert.match(creator,/localStorage\.setItem/);
-  assert.match(creator,/confirm\(/);
   assert.match(creator,/JSON\.stringify\(workspace,null,2\)/);
   assert.match(core,/FAMA AMI/);
   assert.match(core,/currentCoverage/);
