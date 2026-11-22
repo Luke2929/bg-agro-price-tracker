@@ -117,7 +117,7 @@ export function prepareHeatmap(prices,{
     const tiles=groups.flatMap(g=>g.items);
     return {groups,tiles,total:candidates.length,shown:tiles.length,comparable,strict,
       smallSample,coverage:groups.filter(g=>g.totalActual>0).length,
-      excluded:candidates.length-comparable,allStates:true};
+      excluded:candidates.length-comparable,allStates:true,allItems:candidates};
   }
   // A single selected state displays every matching product, never an arbitrary
   // "first 75/130" cutoff. The plain national aggregate keeps its earlier limit.
@@ -222,6 +222,9 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
   const sortEl=$('market-heatmap-sort'),lockEl=$('market-heatmap-lock');
   const stateEl=$('market-heatmap-state'),backEl=$('market-heatmap-back-all');
   const modeEl=$('market-heatmap-mode'),captureEl=$('market-heatmap-capture');
+  const crossPanel=$('market-heatmap-crossstate'),crossBody=$('market-heatmap-crossstate-body');
+  const fullscreenEl=$('market-heatmap-fullscreen');
+  let crossItems=[];
   let dates=[],snapshot=null,selection=0,token=0,playing=false,playTimer=null,tiles=[];
   let observer=null,lockedKeys=null;
 
@@ -302,6 +305,32 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
       '"'+(missing?' disabled':'')+' style="'+style+'background:'+heatmapColor(percent,item.quality)+
       '">'+content+'</button>';
   };
+  const paintCrossState=(result,filter)=>{
+    crossItems=[];
+    const show=filter.region===ALL_STATES&&String(filter.search||'').trim().length>=2;
+    crossPanel.hidden=!show;
+    if(!show)return;
+    crossItems=result.allItems||[];
+    $('market-heatmap-crossstate-status').textContent=
+      snapshot.survey_date+' · '+filter.level+' · '+filter.search.trim()+
+      ' · '+crossItems.length+' 条有真实报价的同规格州级记录；不同产品品级和单位不合并计算。';
+    crossBody.innerHTML=crossItems.length?crossItems.map((tile,i)=>{
+      const delta=tile.evidence?(tile.percent>0?'+':'')+tooltipValue(tile.percent):'N/A';
+      const color=!tile.evidence?'is-unknown':tile.percent>0?'is-positive':
+        tile.percent<0?'is-negative':'is-unknown';
+      const quality=tile.quality==='strict'?'严格 · '+tile.markets+' 市场':
+        tile.quality==='small-sample'?'小样本 · '+tile.markets+' 市场':
+        '无有效同市场对比';
+      return '<tr><td>'+escapeHtml(tile.region)+'</td><td>'+
+        escapeHtml(tile.name)+'<small style="display:block;color:#a9cdb9">'+
+        escapeHtml(tile.grade+' · '+tile.unit)+'</small></td>'+
+        '<td>'+fmtMoney(tile.price)+'</td><td class="'+color+'">'+escapeHtml(delta)+
+        (tile.quality==='small-sample'?'*':'')+'</td>'+
+        '<td class="'+(tile.quality==='small-sample'?'is-small':'')+'">'+
+        escapeHtml(quality)+'</td><td><button type="button" data-hm-cross-index="'+
+        i+'">查看历史 ↗</button></td></tr>';
+    }).join(''):'<tr><td colspan="6">没有符合此搜索条件的真实同规格报价。</td></tr>';
+  };
   const paint=()=>{
     if(!snapshot)return;
     const filter=state(),allStates=filter.region===ALL_STATES,selectedState=Boolean(filter.region)&&!allStates;
@@ -320,6 +349,7 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
       limit:w<700?75:130
     });
     const result=applyLockedLayout(rawResult);
+    paintCrossState(rawResult,filter);
     tiles=[];
     const periodName=filter.period===1?'1 日':filter.period+' 日';
     const regionLabel=allStates?'全马 16 州／直辖区':filter.region||'全国均价';
@@ -558,6 +588,40 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
         });
       }else step();
     });
+    crossBody.addEventListener('click',event=>{
+      const btn=event.target.closest('[data-hm-cross-index]');
+      if(!btn)return;
+      const tile=crossItems[Number(btn.dataset.hmCrossIndex)];
+      if(!tile)return;
+      stop();
+      if(typeof showPreview==='function')showPreview(tile,snapshot);
+      else if(typeof showProductHistory==='function')
+        showProductHistory(tile.key,tile.region,tile.level,snapshot.survey_date,snapshot);
+    });
+    fullscreenEl.addEventListener('click',async()=>{
+      const panel=canvas.closest?.('.market-heatmap-panel');
+      if(!panel)return;
+      try{
+        if(document.fullscreenElement===panel){
+          await document.exitFullscreen();
+        }else if(typeof panel.requestFullscreen==='function'){
+          await panel.requestFullscreen();
+        }else{
+          panel.classList.toggle('market-hm-pseudo-fullscreen');
+          const pressed=panel.classList.contains('market-hm-pseudo-fullscreen');
+          fullscreenEl.setAttribute('aria-pressed',String(pressed));
+          fullscreenEl.textContent=pressed?'退出全屏':'全屏查看';
+          paint();
+        }
+      }catch(error){notify('全屏模式不可用：'+error.message,true);}
+    });
+    if(typeof document.addEventListener==='function')
+      document.addEventListener('fullscreenchange',()=>{
+        const active=Boolean(document.fullscreenElement);
+        fullscreenEl.setAttribute('aria-pressed',String(active));
+        fullscreenEl.textContent=active?'退出全屏':'全屏查看';
+        paint();
+      });
     canvas.addEventListener('pointerover',showDetail);
     canvas.addEventListener('focusin',showDetail);
     canvas.addEventListener('click',event=>{
