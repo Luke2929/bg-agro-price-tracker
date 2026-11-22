@@ -9,8 +9,8 @@
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
   <link rel="stylesheet" href="./styles.css?rev=v3-5-completeness-1">
   <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
-  <script type="module" src="./app.mjs?rev=2026-11-22-full-state-history-v1"></script>
-  <link rel="stylesheet" href="./heatmap.css?rev=2026-11-22-low-sample-v2">
+  <script type="module" src="./app.mjs?rev=2026-11-22-heatmap-v4-1"></script>
+  <link rel="stylesheet" href="./heatmap.css?rev=2026-11-22-heatmap-v4-1">
   <link rel="stylesheet" href="./product-history.css?rev=2026-11-22-full-state-history-v1">
   <link rel="stylesheet" href="./fb-export.css?rev=2026-11-21-multilevel-v1">
   <script type="module" src="./fb-export.mjs?rev=2026-11-21-multilevel-v1"></script>
@@ -98,8 +98,9 @@
             <div class="market-hm-legend" aria-label="色块说明">
               <span><i class="market-hm-legend-swatch" style="background:#008452"></i>上涨</span>
               <span><i class="market-hm-legend-swatch" style="background:#dc344b"></i>下跌</span>
-              <span><i class="market-hm-legend-swatch" style="background:#315e4d;border:1px dashed #d9fce4"></i>柔和颜色＝小样本／覆盖不足</span>
-              <span><i class="market-hm-legend-swatch" style="background:#3b4b4c"></i>灰色＝持平／无可用对比</span>
+              <span><i class="market-hm-legend-swatch" style="background:#667780"></i>0.0% 持平</span>
+              <span><i class="market-hm-legend-swatch" style="background:#34484b"></i>N/A 无法比较</span>
+              <span>虚线框 / * = 小样本（不改变颜色）</span>
             </div>
           </div>
           <div class="market-hm-toolbar" role="group" aria-label="热力图筛选">
@@ -114,9 +115,29 @@
               <option value="7" selected>7 天</option>
               <option value="30">30 天</option>
             </select></label>
+            <label>产品搜索<input id="market-heatmap-search" type="search" placeholder="TIMUN、CILI、BENDI…" autocomplete="off"></label>
+            <label>产品分类<select id="market-heatmap-category"><option value="">全部分类</option></select></label>
+            <label>排列方式<select id="market-heatmap-sort">
+              <option value="coverage" selected>市场覆盖量</option>
+              <option value="rise">涨幅最大</option>
+              <option value="fall">跌幅最大</option>
+              <option value="swing">波动幅度最大</option>
+              <option value="name">产品名称 A–Z</option>
+            </select></label>
             <span class="market-hm-status" id="market-heatmap-status" role="status" aria-live="polite">正在载入真实报价…</span>
           </div>
+          <div class="market-hm-actions">
+            <button type="button" id="market-heatmap-back-all" class="market-hm-return" hidden>← 返回全马 16 州</button>
+            <span class="market-hm-mode" id="market-heatmap-mode">全马总览 · 点击州标题放大查看全部产品</span>
+            <label class="market-hm-lock"><input type="checkbox" id="market-heatmap-lock"> 历史回放锁定产品位置</label>
+            <button type="button" id="market-heatmap-capture" class="market-hm-capture">导出热力图 PNG</button>
+          </div>
           <p class="market-hm-summary" id="market-heatmap-summary" aria-live="polite">正在核对同市场历史比较…</p>
+          <div class="market-hm-colorbar" aria-label="统一价格涨跌幅色阶">
+            <span>≤−20%</span><i style="background:#a51b38"></i><i style="background:#cf5769"></i><i style="background:#e8a9af"></i>
+            <i style="background:#667780"></i>
+            <i style="background:#9ad9b9"></i><i style="background:#3ca87a"></i><i style="background:#087b58"></i><span>≥+20%</span>
+          </div>
           <div class="market-hm-viewport">
             <div id="market-heatmap-canvas" class="market-hm-canvas" role="group" aria-label="农产品涨跌热力图"></div>
           </div>
@@ -165,9 +186,26 @@
               <button type="button" id="market-heatmap-latest">回到最新 <span aria-hidden="true">↗</span></button>
             </div>
           </section>
-          <p class="market-hm-disclaimer">数据来源：FAMA AMI。全马州别模式固定显示 13 州及 3 直辖区：当日有报价但不足以计算涨跌的产品以灰色显示实际均价；当天无该层级报价则标示无数据，绝不借用其他日期。鲜艳的绿／红色表示至少 3 个共同市场、两期覆盖率均 ≥ 50% 的严格对比；柔和绿／红和星号（*）表示真实的同市场小样本或覆盖不足对比，只代表对应调查市场，不代表全州普遍涨跌。灰色表示持平或未能形成可靠对比。州别视图每州等大；单州／全国均价视图的方块面积按共同或调查市场数分配，均不代表产量或交易额。回放仅使用真实归档调查日。</p>
+          <p class="market-hm-disclaimer">数据来源：FAMA AMI。16 州／直辖区均有固定位置，当前调查日没有报价时明确标示。所有有可核对百分比的产品遵循相同颜色尺度，红跌绿涨，颜色只代表幅度；小样本用虚线和 * 单独标记。0.0% 持平与 N/A 不可比严格区分。全马视图每州仅显示 9 个预览产品，点击州标题进入该州全部产品。历史回放只用实际归档日期；查看产品详情会继承所选历史日期。方块面积在单州 Treemap 模式按调查市场数量，而非销量或市值。</p>
         </section>
       </section>
+
+        <dialog id="market-heatmap-preview" class="market-hm-preview" aria-labelledby="market-heatmap-preview-title">
+          <div class="market-hm-preview-head">
+            <div><span class="market-hm-preview-eyebrow">FAMA · PRODUCT PRICE EVIDENCE</span>
+              <h2 id="market-heatmap-preview-title">农产品历史报价</h2>
+              <p id="market-heatmap-preview-meta">读取中…</p>
+            </div>
+            <button type="button" id="market-heatmap-preview-close" aria-label="关闭详情">✕</button>
+          </div>
+          <div id="market-heatmap-preview-summary" class="market-hm-preview-summary">核对市场价格中…</div>
+          <div id="market-heatmap-preview-chart" class="market-hm-preview-chart" aria-label="真实历史价格走势图"></div>
+          <p id="market-heatmap-preview-status" class="market-hm-preview-note" role="status">来源：FAMA 历史档案。</p>
+          <div id="market-heatmap-preview-rows" class="market-hm-preview-rows"></div>
+          <div class="market-hm-preview-foot">
+            <button type="button" id="market-heatmap-preview-full">查看完整历史记录与原始报价</button>
+          </div>
+        </dialog>
 
       <section data-screen="prices" class="screen" aria-labelledby="prices-title"><div class="page-intro"><span class="eyebrow green">FAMA PRICE EXPLORER</span><h1 id="prices-title">价格明细</h1><p>筛选产品、州别与价格层级；所有报价都来自所显示的调查日期。</p></div>
         <section class="panel"><div class="filters four"><label>查找农产品<input id="price-search" type="search" placeholder="例如 CILI, KUBIS, BAYAM"></label><label>价格层级<select id="price-level"><option value="">全部层级</option><option>Ladang</option><option>Borong</option><option>Runcit</option></select></label><label>州／直辖区<select id="price-state"><option value="">全马平均</option></select></label><label>产品分类<select id="price-category"><option value="">全部分类</option></select></label></div><div class="price-date-toolbar" role="group" aria-label="选择价格调查日期">
