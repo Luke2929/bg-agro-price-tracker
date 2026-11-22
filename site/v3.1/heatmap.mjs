@@ -257,11 +257,11 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
     const regionLabel=allStates?'全马州别':filter.region||'全国均价';
     summary.textContent=allStates?
       snapshot.survey_date+' · '+filter.level+' · 全马 16 州／直辖区 · 有该层级报价 '+
-        result.coverage+'/16 · 合格 '+label+'涨跌 '+result.comparable+
-        ' 组；其余保留真实价格，以灰色标示不可比':
+        result.coverage+'/16 · '+label+'严格比较 '+result.strict+
+        ' 组 · 小样本比较 '+result.smallSample+' 组；其余只有当日价格':
       snapshot.survey_date+' · '+filter.level+' · '+regionLabel+' · '+label+
-        '可比 '+result.comparable+' 组'+
-        (result.excluded?' · '+result.excluded+' 组仅有当日价格，无合格涨跌对比':'');
+        '严格比较 '+result.strict+' 组 · 小样本比较 '+result.smallSample+' 组'+
+        (result.excluded?' · '+result.excluded+' 组仅有当日价格':'');
     dateValue.textContent=snapshot.survey_date;
     if(!result.groups.length){
       canvas.innerHTML='<div class="market-heatmap-empty">当前筛选没有满足同市场样本门槛的涨跌数据。<span>可切换价格层级、地区或比较周期。</span></div>';
@@ -295,8 +295,10 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
         const move=item.evidence?(item.percent>0?'+':'')+tooltipValue(item.percent):'—';
         const current=fmtMoney(item.price);
         const display=item.evidence?move:current;
+        const reliability=item.quality==='strict'?'严格同市场对比':
+          item.quality==='small-sample'?'小样本观察，不代表全州趋势':'不可比';
         const label=item.name+' · '+item.grade+' · '+filter.level+
-          ' · '+(item.evidence?move+' · 共同市场 '+item.markets:
+          ' · '+(item.evidence?move+' · '+reliability+' · 共同市场 '+item.markets:
             '当日均价 '+current+'/'+item.unit+' · '+item.surveyedMarkets+
             ' 个报价市场 · 涨跌不可比');
         const content='<span class="market-hm-name">'+escapeHtml(item.name)+'</span>'+
@@ -304,15 +306,15 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
           (huge?'<small>'+escapeHtml(item.grade)+'</small>':'');
         return '<button type="button" class="market-hm-cell'+
           (huge?' large':medium?' medium':tiny?' tiny':'')+
-          (item.evidence?'':' uncomparable')+
+          (item.quality==='small-sample'?' small-sample':item.evidence?'':' uncomparable')+
           '" data-market-hm-index="'+idx+
           '" title="'+escapeHtml(label)+'" aria-label="'+escapeHtml(label)+
-          '" style="'+rectStyle(t)+';background:'+heatmapColor(item.percent)+'">'+
+          '" style="'+rectStyle(t)+';background:'+heatmapColor(item.percent,item.quality)+'">'+
           content+'</button>';
       }).join('');
       const groupDescription=allStates?
         (group.observed?
-          (group.observed+' 组当日报价 · '+group.comparable+' 组可比'):
+          (group.observed+' 报价 · '+group.strict+' 严格 · '+group.smallSample+' 小样本'):
           '该层级当天无报价'):
         group.items.length+' 项';
       const placeholder=allStates&&!group.items.length?
@@ -326,7 +328,7 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
     }
     canvas.innerHTML=markup;
     detail.textContent=allStates?
-      '16 个州／直辖区均显示；彩色为可比涨跌，灰色为当天有报价但涨跌不可比。点击方块查看依据或当日价格。':
+      '16 州／直辖区：鲜艳红绿＝严格可比；柔和红绿＝小样本比较（并非全州趋势）；灰色＝只有当日价格。':
       '悬停查看报价，点击有可比涨跌的色块核对逐市场记录。';
   };
   const showDetail=event=>{
@@ -348,6 +350,7 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
       fmtMoney(item.previousMean)+' / '+item.unit+' → '+
       fmtMoney(item.currentMean)+' / '+item.unit+' | '+direction+' '+
       Math.abs(item.percent).toFixed(1)+'% | '+item.markets+' 个共同市场'+
+      (item.quality==='small-sample'?' · ⚠ 小样本观察，不代表全州趋势':' · 严格同市场对比')+
       (Math.abs(item.percent)>=50?' · ⚠ 大幅波动，建议核实原始报价':'');
   };
   const chooseDate=async(index)=>{
@@ -434,7 +437,7 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
       const btn=event.target.closest('[data-market-hm-index]');
       if(btn&&canvas.contains(btn)){
         const tile=tiles[Number(btn.dataset.marketHmIndex)];
-        if(tile?.evidence)showComparison(tile.evidence);
+        if(tile?.quality==='strict'&&tile.evidence)showComparison(tile.evidence);
         else if(tile)showDetail({target:btn});
       }
     });
