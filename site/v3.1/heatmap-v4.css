@@ -145,3 +145,37 @@
 @media(prefers-reduced-motion:reduce){
  .market-hm-canvas.single-state .market-hm-cell:hover{transform:none}
 }
+
+/* Exact-spec cross-state comparison only appears after a product search. */
+.market-hm-crossstate{margin:15px 0;padding:15px;background:#102620;border:1px solid #386049;border-radius:11px}
+.market-hm-crossstate[hidden]{display:none}
+.market-hm-crossstate-heading{display:flex;justify-content:space-between;gap:10px}
+.market-hm-crossstate h3{color:#f4fff7;margin:0 0 5px;font-size:15px}
+.market-hm-crossstate p{color:#a7ccb9;font-size:11px;line-height:1.65;margin:0 0 11px}
+.market-hm-crossstate-scroll{max-height:410px;overflow:auto;border-radius:7px}
+.market-hm-crossstate table{width:100%;min-width:760px;border-collapse:collapse}
+.market-hm-crossstate th,.market-hm-crossstate td{
+  padding:10px 9px;color:#e1f1e6;font-size:11px;text-align:left;
+  border-bottom:1px solid #315442;font-variant-numeric:tabular-nums}
+.market-hm-crossstate th{background:#203d30;color:#a8ddbb;position:sticky;top:0;z-index:1}
+.market-hm-crossstate tr:hover td{background:#234334}
+.market-hm-crossstate td button{
+  background:#bdeed6;color:#17422f;border:0;border-radius:6px;
+  padding:6px 9px;font-weight:750;font-size:11px;cursor:pointer;white-space:nowrap}
+.market-hm-crossstate .is-positive{color:#87e7ab;font-weight:800}
+.market-hm-crossstate .is-negative{color:#ff9aa5;font-weight:800}
+.market-hm-crossstate .is-unknown{color:#abc3b3}
+.market-hm-crossstate .is-small{font-size:10px;color:#e4bc77}
+.market-heatmap-panel:fullscreen{padding:26px!important;overflow:auto!important;
+  max-height:100vh!important;height:100vh!important;border-radius:0!important}
+.market-heatmap-panel.market-hm-pseudo-fullscreen{
+  position:fixed!important;inset:0!important;z-index:9999!important;
+  height:100dvh!important;width:100vw!important;max-height:100dvh!important;
+  padding:20px!important;overflow:auto!important;border-radius:0!important;
+  margin:0!important
+}
+@media(max-width:520px){
+  .market-hm-crossstate{padding:10px}
+  .market-hm-crossstate h3{font-size:13px}
+  .market-hm-crossstate table{min-width:740px}
+}
