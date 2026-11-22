@@ -26,7 +26,7 @@ const creator=createCreatorWorkspace({getOverview:()=>store.overview,
   getArchiveDates:()=>store.meta.archive_dates,loadSnapshot,loadEvidenceRows,
   loadHistory,loadStreaks,showComparison,notify:alertUser,navigate});
 const completeness=createCompletenessMonitor({loadDaily});
-const marketHeatmap=createMarketHeatmap({loadSnapshot,showProduct:openProductDetail,notify:alertUser});
+const marketHeatmap=createMarketHeatmap({loadSnapshot,showComparison,notify:alertUser});
 const LEVEL_MEANINGS={Ladang:'农场端 · Farm-gate price',Borong:'批发端 · Wholesale price',
   Runcit:'零售端 · Consumer retail price'};
 
