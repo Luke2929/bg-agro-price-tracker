@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
   <link rel="stylesheet" href="./styles.css?rev=v3-5-completeness-1">
   <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
-  <script type="module" src="./app.mjs?rev=2026-11-22-low-sample-v2"></script>
+  <script type="module" src="./app.mjs?rev=2026-11-22-full-state-history-v1"></script>
   <link rel="stylesheet" href="./heatmap.css?rev=2026-11-22-low-sample-v2">
   <link rel="stylesheet" href="./fb-export.css?rev=2026-11-21-multilevel-v1">
   <script type="module" src="./fb-export.mjs?rev=2026-11-21-multilevel-v1"></script>
@@ -184,7 +184,7 @@
       </section>
 
       <section data-screen="history" class="screen" aria-labelledby="history-title"><div class="page-intro"><span class="eyebrow green">HISTORICAL COMPARISON</span><h1 id="history-title">历史趋势与州别价格</h1><p>只连接真实有记录的调查日；缺失日期不会人工补价。</p></div>
-        <section class="panel"><div class="filters four"><label>农产品（规格相同）<select id="history-product"></select></label><label>价格层级<select id="history-level"><option>Borong</option><option>Ladang</option><option>Runcit</option></select></label><label>观察地区<select id="history-state"><option value="">全马平均</option></select></label><label>历史窗口<select id="history-window"><option value="30">近 30 天</option><option value="90" selected>近 90 天</option><option value="180">近 180 天</option></select></label></div><div class="chart-heading"><div><h2 id="chart-title">历史价格趋势</h2><p id="chart-caption">加载真实价格数据中…</p></div><span class="chart-unit">RM / 来源单位</span></div><div class="chart-scroller"><svg id="history-chart" role="img" aria-label="按实际调查日期绘制的 FAMA 历史价格柱状图"></svg></div><p class="method-note">不同日期的样本市场可能不同；此图展示当天各市场等权均价，不能单独用来判断同一市场的涨跌。上方涨跌榜采用同市场匹配算法。</p></section>
+        <section class="panel"><div class="filters four"><label>农产品（规格相同）<select id="history-product"></select></label><label>价格层级<select id="history-level"><option>Borong</option><option>Ladang</option><option>Runcit</option></select></label><label>观察地区<select id="history-state"><option value="">全马平均</option></select></label><label>历史窗口<select id="history-window"><option value="30">近 30 天</option><option value="90" selected>近 90 天</option><option value="180">近 180 天</option><option value="all">全部已归档日期</option></select></label></div><div class="chart-heading"><div><h2 id="chart-title">历史价格趋势</h2><p id="chart-caption">加载真实价格数据中…</p></div><span class="chart-unit">RM / 来源单位</span></div><div class="chart-scroller"><svg id="history-chart" role="img" aria-label="按实际调查日期绘制的 FAMA 历史价格柱状图"></svg></div><p class="method-note">不同日期的样本市场可能不同；此图展示当天各市场等权均价，不能单独用来判断同一市场的涨跌。上方涨跌榜采用同市场匹配算法。</p></section>
         <section class="panel"><div class="panel-heading"><div><h2>各州报价对比</h2><p id="states-caption">同一调查日 · 同一种规格 · 同一价格层级</p></div></div><div id="states-bars" class="states-bars"></div></section>
         <button type="button" class="secondary-button" id="history-open-detail">查看此农产品的完整详情 →</button>
       </section>
@@ -226,6 +226,45 @@
             <div id="product-states-bars" class="states-bars"></div>
           </section>
         </div>
+
+        <section class="panel product-history-panel" id="product-history-panel" aria-labelledby="product-history-title">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow green">FULL ARCHIVED PRICE HISTORY</span>
+              <h2 id="product-history-title">完整历史价格记录</h2>
+              <p>自动使用上方选中的 Negeri；显示此产品在该州所有已归档调查日期的真实每日均价。没有记录的日期不补价。</p>
+            </div>
+          </div>
+          <div class="product-history-controls">
+            <label>历史价格层级
+              <select id="product-history-level">
+                <option value="" selected>全部 · Ladang / Borong / Runcit</option>
+                <option value="Ladang">Ladang · 农场价</option>
+                <option value="Borong">Borong · 批发价</option>
+                <option value="Runcit">Runcit · 零售价</option>
+              </select>
+            </label>
+            <button type="button" class="secondary-button small" id="product-history-export" disabled>下载完整历史 CSV</button>
+          </div>
+          <p id="product-history-status" class="product-history-status" role="status" aria-live="polite">正在读取全部历史调查档案…</p>
+          <div class="table-scroll"><table class="product-history-table">
+            <thead><tr><th>实际调查日</th><th>价格层级</th><th>州属</th><th>当日市场均价 (RM)</th><th>调查市场数</th><th>原始报价记录数</th><th>查看来源</th></tr></thead>
+            <tbody id="product-history-body"><tr><td colspan="7" class="empty">等待历史数据。</td></tr></tbody>
+          </table></div>
+          <div class="table-foot"><span id="product-history-visible">—</span><button type="button" class="secondary-button small" id="product-history-more" disabled>加载更多历史记录</button></div>
+          <p class="method-note">历史均价先求各调查市场当日均价，再按市场等权计算。不同日期的市场覆盖可能变化；表格中的两天价格不能直接视为严格同一市场涨跌。可按行查阅当日原始报价。</p>
+          <div id="product-history-market-panel" class="product-history-market-panel" hidden>
+            <div class="product-history-market-heading">
+              <h3>所选调查日的原始市场记录</h3>
+              <button type="button" class="quiet-button" id="product-history-market-close">关闭</button>
+            </div>
+            <p id="product-history-market-status" role="status" aria-live="polite"></p>
+            <div class="table-scroll"><table class="product-history-market-table">
+              <thead><tr><th>日期</th><th>Negeri</th><th>Daerah</th><th>Lokasi</th><th>层级</th><th>原始价格 (RM)</th><th>Sublevel</th><th>Price ID</th></tr></thead>
+              <tbody id="product-history-market-body"></tbody>
+            </table></div>
+          </div>
+        </section>
 
         <section class="panel">
           <div class="panel-heading"><div><h2>原始市场报价 · FAMA CSV</h2><p>已剔除更新前版本的 priceid，原始空价格显示「—」，不当作 RM0。</p></div></div>
