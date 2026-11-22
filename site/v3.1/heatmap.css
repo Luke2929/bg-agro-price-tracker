@@ -46,6 +46,44 @@
 .market-hm-cell.large small{display:block;color:#dbf3e9;font-size:9px;white-space:nowrap}
 .market-hm-cell.medium .market-hm-change{font-size:13px}
 .market-hm-cell.tiny .market-hm-name{font-size:8px}
+
+/* All-state coverage view: every Malaysian state and federal territory is visible. */
+.market-hm-canvas.all-states{background:#071312}
+.market-hm-canvas.all-states .market-hm-state{
+  border:3px solid #071311;background:#0d1c1c;box-shadow:inset 0 0 0 1px #264a3c;
+}
+.market-hm-canvas.all-states .market-hm-group-header{
+  height:31px;padding:0 8px;background:linear-gradient(90deg,#203d36,#152e2b);
+  border-bottom:1px solid #4c69543d;font-size:11px;letter-spacing:.1px;
+}
+.market-hm-canvas.all-states .market-hm-group-header span{
+  font-size:9px;font-weight:600;color:#b3cebf;overflow:hidden;text-overflow:ellipsis;
+  max-width:52%;white-space:nowrap;
+}
+.market-hm-canvas.all-states .market-hm-cell{
+  padding:4px 3px;gap:3px;border:1px solid #112825;justify-content:center;
+}
+.market-hm-cell.uncomparable{
+  color:#dcebe7;background:#354b4b;
+}
+.market-hm-canvas.all-states .market-hm-cell.uncomparable .market-hm-change{
+  color:#c9eee6;font-size:11px;letter-spacing:0;
+}
+.market-hm-canvas.all-states .market-hm-cell .market-hm-name{font-size:10px}
+.market-hm-canvas.all-states .market-hm-cell .market-hm-change{font-size:12px}
+.market-hm-canvas.all-states .market-hm-cell.large .market-hm-change{font-size:17px}
+.market-hm-no-data{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;flex-direction:column;gap:8px;padding:12px;
+  font-size:11px;font-weight:650;text-align:center;color:#90aaa3;
+  background:repeating-linear-gradient(135deg,#152522,#152522 10px,#1c2e29 10px,#1c2e29 20px)}
+.market-hm-no-data small{font-size:9px;font-weight:500;color:#758e84}
+@media(max-width:710px){
+  .market-hm-canvas.all-states .market-hm-group-header{padding:0 5px;font-size:9px}
+  .market-hm-canvas.all-states .market-hm-group-header span{font-size:8px}
+  .market-hm-canvas.all-states .market-hm-cell .market-hm-name{font-size:9px}
+  .market-hm-canvas.all-states .market-hm-cell .market-hm-change{font-size:10px}
+  .market-hm-canvas.all-states .market-hm-cell.uncomparable .market-hm-change{font-size:10px}
+}
 .market-heatmap-empty{position:absolute;inset:0;display:flex;flex-direction:column;gap:9px;
   align-items:center;justify-content:center;padding:25px;text-align:center;color:#f1f9f3;font-size:14px}
 .market-heatmap-empty span{color:#9cb5aa;font-size:11px}
