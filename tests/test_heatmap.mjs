@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {prepareHeatmap,treemapLayout,heatmapColor} from '../site/v3.1/heatmap.mjs';
+import {prepareHeatmap,treemapLayout,heatmapColor,smallSampleEvidence} from '../site/v3.1/heatmap.mjs';
+import {parseCSV,buildPriceDateSnapshot} from '../site/v3.1/engine.mjs';
 import {readFileSync} from 'node:fs';
 
 function quote(name,{level='Borong',state='',category='Sayur-Sayuran',markets=6,
@@ -89,6 +90,55 @@ test('state-specific mode does not hide actual FAMA prices when percent cannot b
   assert.equal(result.tiles[0].percent,null);
 });
 
+test('legitimate low-sample matched movement is visible, qualified, and not promoted to strict evidence',()=>{
+  const low=quote('AYAM PROSES STANDARD',{state:'PERAK',markets:1,previous:8,current:8.3,eligible:false});
+  const observed=smallSampleEvidence(low,7);
+  assert.ok(observed);
+  assert.equal(observed.quality,'small-sample');
+  assert.equal(observed.markets,1);
+  assert.ok(Math.abs(observed.percent-3.75)<.000001);
+  const result=prepareHeatmap([low],{level:'Borong',state:'PERAK',period:7});
+  assert.equal(result.comparable,1);
+  assert.equal(result.strict,0);
+  assert.equal(result.smallSample,1);
+  assert.equal(result.tiles[0].quality,'small-sample');
+  assert.equal(result.tiles[0].previousMean,8);
+  assert.equal(result.tiles[0].currentMean,8.3);
+  assert.match(heatmapColor(result.tiles[0].percent,'small-sample'),/hsl\(153 42%/);
+  assert.equal(smallSampleEvidence({...low,changes:{7:{...low.changes[7],current:900}}},7),null,
+    'tampered prices cannot be displayed as genuine low sample');
+  assert.equal(smallSampleEvidence({...low,changes:{7:{...low.changes[7],percent:900}}},7),null,
+    'tampered percent cannot be displayed');
+  assert.equal(smallSampleEvidence(quote('NOT LOW',{eligible:false,markets:6}),7),null,
+    'unexplained ineligibility must not be bypassed');
+});
+test('real FAMA archived days retain Perak matched comparisons instead of gray-only heatmap',()=>{
+  const date14='2026-11-14',date21='2026-11-21';
+  const rows=new Map([date14,date21].map(day=>[
+    day,parseCSV(readFileSync(new URL('../data/daily/'+day+'.csv',import.meta.url),'utf8'),day)
+  ]));
+  const snapshot=buildPriceDateSnapshot(rows,{surveyDate:date21,archiveDates:[date14,date21]});
+  const map=prepareHeatmap(snapshot.prices,{level:'Borong',state:'__ALL_STATES__',period:7});
+  assert.equal(map.groups.length,16);
+  const perak=map.groups.find(g=>g.name==='PERAK');
+  assert.equal(perak.observed,32);
+  assert.equal(perak.smallSample,32);
+  assert.equal(perak.strict,0);
+  const chicken=perak.items.find(tile=>tile.name==='AYAM PROSES STANDARD');
+  if(chicken){
+    assert.equal(chicken.quality,'small-sample');
+    assert.ok(Math.abs(chicken.percent-3.75)<.000001);
+  }
+  const quote=snapshot.prices.find(q=>q.state==='PERAK'&&q.level==='Borong'&&
+    q.varieti==='AYAM PROSES STANDARD');
+  const pair=smallSampleEvidence(quote,7);
+  assert.ok(pair);
+  assert.equal(pair.previousMean,8);
+  assert.equal(pair.currentMean,8.3);
+  assert.equal(map.strict,28);
+  assert.ok(map.smallSample>=400);
+});
+
 test('treemap tiles cover a box proportionally without overlap or negative coordinates',()=>{
   for(const [width,height] of [[1200,570],[350,730],[90,90]]){
     const items=[{weight:20},{weight:12},{weight:6},{weight:3},{weight:1}];
@@ -128,6 +178,7 @@ test('overview includes real heatmap controls after quick prices, with separate 
   assert.match(app,/marketHeatmap\.bind\(\)/);
   const heatmap=readFileSync(new URL('../site/v3.1/heatmap.mjs',import.meta.url),'utf8');
   assert.match(heatmap,/showComparison\(tile\.evidence\)/);
+  assert.match(heatmap,/tile\?\.quality==='strict'/);
   assert.match(css,/\.market-hm-canvas/);
   for(const id of ['market-heatmap-prev','market-heatmap-next','market-heatmap-latest',
     'market-heatmap-speed','market-heatmap-date-count','market-heatmap-ticks'])
