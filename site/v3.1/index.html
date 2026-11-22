@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
   <link rel="stylesheet" href="./styles.css?rev=v3-5-completeness-1">
   <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
-  <script type="module" src="./app.mjs?rev=v3-5-completeness-1"></script>
+  <script type="module" src="./app.mjs?rev=2026-11-22-remove-studio-v1"></script>
   <link rel="stylesheet" href="./fb-export.css?rev=2026-11-21-multilevel-v1">
   <script type="module" src="./fb-export.mjs?rev=2026-11-21-multilevel-v1"></script>
 </head>
@@ -25,7 +25,6 @@
       <button type="button" class="nav-item" data-page="watchlist"><span>☆</span> 我的关注 <small id="saved-counter">0</small></button>
       <span class="creator-nav-divider">CREATOR WORKSPACE</span>
       <button type="button" class="nav-item" data-page="signals"><span>◇</span> 选题情报</button>
-      <button type="button" class="nav-item" data-page="studio"><span>✎</span> 内容工作室</button>
       <button type="button" class="nav-item" data-page="calendar"><span>▦</span> 内容日历与成效</button>
       <button type="button" class="nav-item" data-page="export"><span>⇩</span> Excel / PDF / FB 导出</button>
       <button type="button" class="nav-item" data-page="system"><span>◉</span> 运行状态</button>
@@ -38,40 +37,7 @@
     <main class="main" id="main">
       <div class="notice" id="error-banner" role="alert" hidden></div>
       <section data-screen="overview" class="screen active" aria-labelledby="overview-title">
-        <section class="insight-board" aria-labelledby="overview-title">
-          <div class="insight-board-head">
-            <div class="insight-board-title">
-              <span class="insight-kicker">FAMA MARKET INTELLIGENCE · CONTENT IDEAS</span>
-              <h1 id="overview-title">每日农价内容灵感板</h1>
-            </div>
-            <div class="insight-board-tools">
-              <label class="insight-date-control">调查日期<select id="insight-survey-date"><option value="">载入中…</option></select></label>
-              <span class="insight-date" id="insight-date" role="status">正在读取调查日期…</span>
-              <div class="insight-periods" role="group" aria-label="每日农价灵感比较窗口">
-                <button type="button" data-insight-period="1" class="active">昨日</button>
-                <button type="button" data-insight-period="7">7 天</button>
-                <button type="button" data-insight-period="30">30 天</button>
-              </div>
-            </div>
-          </div>
-          <div class="insight-main-grid">
-            <article class="insight-story insight-story-rise" id="insight-rise" aria-label="最大可比涨幅">
-              <p class="insight-loading">正在分析上涨幅度…</p>
-            </article>
-            <article class="insight-story insight-story-fall" id="insight-fall" aria-label="最大可比跌幅">
-              <p class="insight-loading">正在分析下跌幅度…</p>
-            </article>
-          </div>
-          <div class="insight-aux-grid">
-            <article class="insight-aux" id="insight-aligned" aria-label="农场批发零售同步变化">正在筛选三个价格层级的同步变化…</article>
-            <article class="insight-aux insight-audit" id="insight-warning" aria-label="需要核实的大幅波动">正在检查异常波动…</article>
-          </div>
-          <div class="insight-board-foot">
-            <span id="insight-method">仅选全国同市场可比数据；需 ≥ 3 个共同市场且双方覆盖率 ≥ 50%。</span>
-            <div class="creator-overview-actions"><button type="button" class="insight-open-prices" data-go="prices">价格明细 →</button><button type="button" class="creator-overview-action" data-go="signals">Creator 选题情报 →</button></div>
-          </div>
-          <p class="insight-level-guide">Ladang 农场端 · Borong 批发端 · Runcit 零售端</p>
-        </section>
+        <div class="page-intro"><span class="eyebrow green">FAMA MARKET OVERVIEW</span><h1 id="overview-title">农价总览</h1><p>查看最新 FAMA 调查日期、价格覆盖、完整性监控及市场涨跌。</p></div>
 
         <div class="stat-grid">
           <article class="stat"><span>最新调查日期</span><strong id="stat-survey">—</strong><small id="stat-age">以官方价格日期为准</small></article>
@@ -214,44 +180,6 @@
           <div id="creator-signal-list" class="creator-signal-list" aria-live="polite"></div>
         </section>
         <section class="panel"><div class="panel-heading"><div><h2>历史均价趋势 · 辅助调查</h2><p>查看最近真实调查日的均价变化；不同日期的调查市场可能不一样，这不是同市场连续涨跌证据。</p></div></div><div id="creator-streak" class="creator-streak">点击选题中的「检查历史」，查看真实观察序列。</div></section>
-      </section>
-
-      <section data-screen="studio" class="screen" aria-labelledby="studio-title">
-        <div class="page-intro"><span class="eyebrow green">V3.3 · CONTENT STUDIO</span><h1 id="studio-title">内容工作室</h1><p>以 FAMA 原始比较证据制作可编辑文案、短视频脚本及 PNG 价格图卡。不接入外部 AI，不能凭空编造农民经历。</p></div>
-        <section class="panel">
-          <div class="filters four">
-            <label>选题<select id="creator-topic"><option value="">等候行情数据…</option></select></label>
-            <label>平台<select id="creator-channel"><option value="facebook">Facebook</option><option value="tiktok">TikTok</option><option value="whatsapp">WhatsApp</option></select></label>
-            <label>语言<select id="creator-language"><option value="bm">马来文</option><option value="zh">简体中文</option><option value="both">BM + 中文</option></select></label>
-            <label>表达方式<select id="creator-format"><option value="discussion">农友讨论</option><option value="casual">马来西亚口语</option><option value="story">长篇故事</option><option value="analysis">专业行情简报</option><option value="educational">农业知识分享</option><option value="community">SKY AGRO 社群互动</option><option value="video">短视频脚本</option></select></label>
-          </div>
-          <div id="creator-evidence" class="creator-evidence">请选择有合格市场比较证据的选题。</div>
-          <details class="creator-draft-settings">
-            <summary>公开来源与社群选项</summary>
-            <div class="creator-checks">
-              <label><input type="checkbox" id="creator-source" checked> 显示来源 · Show Source</label>
-              <label><input type="checkbox" id="creator-mention-page"> 提及 SKY AGRO 页面</label>
-              <label><input type="checkbox" id="creator-invite-follow"> 邀请关注</label>
-              <label><input type="checkbox" id="creator-mention-whatsapp"> 提及 WhatsApp 农业群</label>
-              <label><input type="checkbox" id="creator-comment-keyword"> 邀请留言 NAK</label>
-              <label><input type="checkbox" id="creator-networking"> 邀请附近农友交流</label>
-              <label><input type="checkbox" id="creator-confirmed-conversation"> 我确认已和 SKY AGRO 老板聊过这组行情</label>
-            </div>
-          </details>
-          <div class="creator-actions"><button type="button" class="primary-button" id="creator-generate">生成文案</button><button type="button" class="secondary-button" id="creator-copy" disabled>复制正文</button><button type="button" class="secondary-button" id="creator-studio-details" disabled>查看价格对比依据</button><span class="creator-inline-status" id="creator-editing-status">新文章</span></div>
-          <p class="creator-validation" id="creator-validation" role="status">请选择调查数据并生成文案。</p>
-          <label class="creator-field">标题<input id="creator-title" maxlength="300" type="text" placeholder="自动生成后可手动修改"></label>
-          <label class="creator-field">正文 / 短视频口播<textarea id="creator-body" rows="14" maxlength="10000" placeholder="选择选题和类型后生成，也可继续编辑。"></textarea></label>
-          <div class="filters four">
-            <label>状态<select id="creator-status"><option value="idea">选题</option><option value="draft" selected>草稿</option><option value="scheduled">计划发布（不会自动发布）</option><option value="published">已发布（人工确认）</option></select></label>
-            <label>计划日期<input id="creator-scheduled-date" type="date"></label>
-            <label>实际发布日期<input id="creator-posted-date" type="date"></label>
-            <label>已发布网址<input id="creator-post-url" type="url" placeholder="https://..."></label>
-          </div>
-          <label class="creator-field">备注 / 待核实问题<textarea id="creator-notes" rows="2" maxlength="2000" placeholder="图片素材、农民访谈、验证事项…"></textarea></label>
-          <div class="creator-actions"><button type="button" class="primary-button" id="creator-save">保存到内容日历</button><button type="button" class="secondary-button" id="creator-new">新建草稿</button><button type="button" class="secondary-button" id="creator-export-fb" disabled>FB 1080×1350 PNG</button><button type="button" class="secondary-button" id="creator-export-tiktok" disabled>TikTok 1080×1920 PNG</button></div>
-          <p class="creator-help">草稿可编辑并保存在浏览器。复制和 PNG 导出需要通过文案核对。排期仅作记录。</p>
-        </section>
       </section>
 
       <section data-screen="calendar" class="screen" aria-labelledby="calendar-title">
