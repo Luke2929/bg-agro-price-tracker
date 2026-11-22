@@ -108,7 +108,7 @@ jobs:
           node --check site/v3.1/app.mjs
           node --check site/v3.1/fb-export.mjs
           node --check site/v3.1/fb-zh-names.mjs
-          node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs tests/test_v34_creator.mjs tests/test_fb_zh_names.mjs tests/test_heatmap.mjs
+          node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs tests/test_v34_creator.mjs tests/test_fb_zh_names.mjs tests/test_heatmap.mjs tests/test_product_history.mjs
 
       - name: Scrape rolling FAMA price window
         env:
