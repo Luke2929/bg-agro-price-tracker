@@ -184,7 +184,7 @@ export function heatmapColor(percent,quality='strict'){
     'hsl(355 '+(isLimited?48:79)+'% '+light+'%)';
 }
 
-export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
+export function createMarketHeatmap({loadSnapshot,showComparison,showProductHistory,notify}){
   const $=id=>document.getElementById(id);
   const canvas=$('market-heatmap-canvas');
   const dateSlider=$('market-heatmap-date');
@@ -328,7 +328,7 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
     }
     canvas.innerHTML=markup;
     detail.textContent=allStates?
-      '16 州／直辖区：鲜艳红绿＝严格可比；柔和红绿＝小样本比较（并非全州趋势）；灰色＝只有当日价格。':
+      '选择某个州的色块，可以查看该产品在该州的全部历史价格、日期及来源记录。鲜艳红绿＝严格可比，柔和红绿＝小样本。':
       '悬停查看报价，点击有可比涨跌的色块核对逐市场记录。';
   };
   const showDetail=event=>{
@@ -437,7 +437,10 @@ export function createMarketHeatmap({loadSnapshot,showComparison,notify}){
       const btn=event.target.closest('[data-market-hm-index]');
       if(btn&&canvas.contains(btn)){
         const tile=tiles[Number(btn.dataset.marketHmIndex)];
-        if(tile?.quality==='strict'&&tile.evidence)showComparison(tile.evidence);
+        if(tile?.region&&typeof showProductHistory==='function'){
+          stop();
+          showProductHistory(tile.key,tile.region,tile.level);
+        }else if(tile?.quality==='strict'&&tile.evidence)showComparison(tile.evidence);
         else if(tile)showDetail({target:btn});
       }
     });
