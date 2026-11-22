@@ -9,7 +9,7 @@ import {createCreatorWorkspace} from './creator-app.mjs?rev=2026-11-22-market-he
 import {formatPercent,formatPrice} from './creator-core.mjs?rev=v3-5-completeness-1';
 import {buildFamaPdf,downloadPdf} from '../pdf.mjs';
 import {createCompletenessMonitor} from './completeness.mjs?rev=v3-5-completeness-1';
-import {createMarketHeatmap} from './heatmap.mjs?rev=2026-11-22-market-heatmap-v1';
+import {createMarketHeatmap} from './heatmap.mjs?rev=2026-11-22-replay-polish-v2';
 
 const $=id=>document.getElementById(id);
 const BASE='../data/v3/';
