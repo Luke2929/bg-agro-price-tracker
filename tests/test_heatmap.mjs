@@ -171,6 +171,46 @@ test('V4 search and sorting keep states distinct and do not invent missing quote
   assert.equal(out.groups.find(g=>g.name==='SELANGOR').items.length,1);
   assert.equal(out.shown,2);
 });
+test('V4 cross-state search does not average or combine different product specifications',()=>{
+  const rows=[
+    quote('TIMUN',{state:'PERAK',current:12}),
+    quote('TIMUN',{state:'SELANGOR',current:14}),
+    quote('TIMUN',{state:'SARAWAK',level:'Runcit',current:18}),
+    quote('TIMUN',{state:'JOHOR',current:13,category:'Buah-Buahan'}),
+    quote('CILI',{state:'SABAH',current:9})
+  ];
+  const heat=prepareHeatmap(rows,{state:'__ALL_STATES__',search:'TIMUN',
+    level:'Borong',category:'Sayur-Sayuran'});
+  assert.equal(heat.allItems.length,2);
+  assert.deepEqual(new Set(heat.allItems.map(x=>x.region)),new Set(['PERAK','SELANGOR']));
+  assert.equal(heat.allItems[0].unit,'Kilogram');
+  assert.ok(heat.allItems.every(q=>q.key==='TIMUN||F.A.Q||Kilogram'));
+  assert.deepEqual(new Set(heat.allItems.map(x=>x.price)),new Set([12,14]));
+});
+
+test('V4 dashboard includes independent non-synthetic filters, same-date preview and exports',()=>{
+  const html=readFileSync(new URL('../site/v3.1/index.html',import.meta.url),'utf8');
+  const js=readFileSync(new URL('../site/v3.1/heatmap.mjs',import.meta.url),'utf8');
+  const app=readFileSync(new URL('../site/v3.1/app.mjs',import.meta.url),'utf8');
+  const css=readFileSync(new URL('../site/v3.1/heatmap-v4.css',import.meta.url),'utf8');
+  for(const id of ['market-heatmap-search','market-heatmap-category','market-heatmap-sort',
+    'market-heatmap-lock','market-heatmap-back-all','market-heatmap-crossstate',
+    'market-heatmap-fullscreen','market-heatmap-capture',
+    'market-heatmap-preview','market-heatmap-preview-full'])
+    assert.match(html,new RegExp('id="'+id+'"'));
+  assert.match(js,/const result=applyLockedLayout\(rawResult\)/);
+  assert.match(js,/paintCrossState\(rawResult,filter\)/);
+  assert.match(js,/showPreview\(tile,snapshot\)/);
+  assert.match(js,/toBlob\(blob=>/);
+  assert.match(js,/data-hm-state/);
+  assert.match(app,/openHeatmapProductHistory\(selected\.tile\.key,selected\.tile\.region/);
+  assert.match(app,/date=detailSnapshot\(\)\.survey_date/);
+  assert.match(app,/endDate:detailSnapshot\(\)\.survey_date/);
+  assert.match(css,/\.market-hm-single-cards/);
+  assert.match(css,/\.market-hm-crossstate/);
+  assert.match(css,/\.market-hm-preview/);
+});
+
 test('treemap tiles cover a box proportionally without overlap or negative coordinates',()=>{
   for(const [width,height] of [[1200,570],[350,730],[90,90]]){
     const items=[{weight:20},{weight:12},{weight:6},{weight:3},{weight:1}];
