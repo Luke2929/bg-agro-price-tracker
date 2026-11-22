@@ -9,8 +9,8 @@
   <link rel="icon" type="image/png" href="../assets/agro-logo.png">
   <link rel="stylesheet" href="./styles.css?rev=v3-5-completeness-1">
   <link rel="stylesheet" href="../assets/editorial-theme.css?rev=v3-5-completeness-1">
-  <script type="module" src="./app.mjs?rev=2026-11-22-all-states-v1"></script>
-  <link rel="stylesheet" href="./heatmap.css?rev=2026-11-22-all-states-v1">
+  <script type="module" src="./app.mjs?rev=2026-11-22-low-sample-v2"></script>
+  <link rel="stylesheet" href="./heatmap.css?rev=2026-11-22-low-sample-v2">
   <link rel="stylesheet" href="./fb-export.css?rev=2026-11-21-multilevel-v1">
   <script type="module" src="./fb-export.mjs?rev=2026-11-21-multilevel-v1"></script>
 </head>
@@ -97,7 +97,8 @@
             <div class="market-hm-legend" aria-label="色块说明">
               <span><i class="market-hm-legend-swatch" style="background:#008452"></i>上涨</span>
               <span><i class="market-hm-legend-swatch" style="background:#dc344b"></i>下跌</span>
-              <span><i class="market-hm-legend-swatch" style="background:#3b4b4c"></i>不可比／基本持平</span>
+              <span><i class="market-hm-legend-swatch" style="background:#315e4d;border:1px dashed #d9fce4"></i>柔和颜色＝小样本／覆盖不足</span>
+              <span><i class="market-hm-legend-swatch" style="background:#3b4b4c"></i>灰色＝持平／无可用对比</span>
             </div>
           </div>
           <div class="market-hm-toolbar" role="group" aria-label="热力图筛选">
@@ -163,7 +164,7 @@
               <button type="button" id="market-heatmap-latest">回到最新 <span aria-hidden="true">↗</span></button>
             </div>
           </section>
-          <p class="market-hm-disclaimer">数据来源：FAMA AMI。全马州别模式固定显示 13 州及 3 直辖区：当日有报价但不足以计算涨跌的产品以灰色显示实际均价；当天无该层级报价则标示无数据，绝不借用其他日期。绿色／红色只用于至少 3 个共同市场且两期覆盖率各 ≥ 50% 的真实价格涨跌。州别视图每州等大；单州／全国均价视图的方块面积按共同或调查市场数分配，均不代表产量或交易额。回放仅使用真实归档调查日。</p>
+          <p class="market-hm-disclaimer">数据来源：FAMA AMI。全马州别模式固定显示 13 州及 3 直辖区：当日有报价但不足以计算涨跌的产品以灰色显示实际均价；当天无该层级报价则标示无数据，绝不借用其他日期。鲜艳的绿／红色表示至少 3 个共同市场、两期覆盖率均 ≥ 50% 的严格对比；柔和绿／红和星号（*）表示真实的同市场小样本或覆盖不足对比，只代表对应调查市场，不代表全州普遍涨跌。灰色表示持平或未能形成可靠对比。州别视图每州等大；单州／全国均价视图的方块面积按共同或调查市场数分配，均不代表产量或交易额。回放仅使用真实归档调查日。</p>
         </section>
       </section>
 
