@@ -30,7 +30,7 @@ test('heatmap uses only real, matched-market eligible data in the requested leve
     quote('FARM',{level:'Ladang'})
   ];
   const result=prepareHeatmap(all,{period:7,level:'Borong',state:''});
-  assert.equal(result.total,3);
+  assert.equal(result.total,4);
   assert.equal(result.shown,3);
   assert.equal(result.excluded,1);
   assert.equal(result.groups.length,2);
@@ -40,14 +40,14 @@ test('heatmap uses only real, matched-market eligible data in the requested leve
   assert.equal(result.tiles[0].currentMean,11);
   assert.equal(result.tiles[0].evidence.currentDate,'2026-11-21');
   assert.equal(result.tiles[1].percent,-25);
-  assert.equal(prepareHeatmap(all,{level:'Ladang',period:7}).shown,1);
+  assert.equal(prepareHeatmap(all,{level:'Ladang',state:'',period:7}).shown,1);
   assert.equal(prepareHeatmap(all,{state:'PERAK',period:7}).shown,1);
-  assert.equal(prepareHeatmap(all,{period:1}).shown,0);
+  assert.equal(prepareHeatmap(all,{state:'',period:1}).shown,0);
 });
 test('heatmap preserves source date, magnitude and grade; never invents invalid price comparisons',()=>{
   const malformed=quote('BAD');
   malformed.changes[7].currentCoverage=.1;
-  const out=prepareHeatmap([quote('REAL'),malformed,quote('BIG',{current:18})]);
+  const out=prepareHeatmap([quote('REAL'),malformed,quote('BIG',{current:18})],{state:''});
   assert.equal(out.shown,2);
   assert.equal(out.excluded,1);
   const real=out.tiles.find(tile=>tile.name==='REAL');
@@ -58,6 +58,37 @@ test('heatmap preserves source date, magnitude and grade; never invents invalid 
   assert.equal(big.percent,80);
   assert.equal(prepareHeatmap([quote('REAL')],{period:12}).shown,0);
 });
+test('16-state overview distinguishes actual observations from non-comparable changes and empty locations',()=>{
+  const rows=[
+    quote('TIMUN',{state:'SARAWAK',markets:6}),
+    quote('CILI',{state:'PERAK',markets:2}),
+    quote('TOMATO',{state:'SELANGOR',markets:5,eligible:false})
+  ];
+  const out=prepareHeatmap(rows,{state:'__ALL_STATES__',level:'Borong',period:7});
+  assert.equal(out.groups.length,16);
+  assert.equal(out.shown,3);
+  assert.equal(out.coverage,3);
+  assert.equal(out.comparable,1);
+  assert.equal(out.excluded,2);
+  assert.deepEqual(out.groups.map(g=>g.name).slice(0,2),['JOHOR','KEDAH']);
+  const swk=out.groups.find(g=>g.name==='SARAWAK');
+  const perak=out.groups.find(g=>g.name==='PERAK');
+  const melaka=out.groups.find(g=>g.name==='MELAKA');
+  assert.equal(swk.items[0].percent,10);
+  assert.equal(perak.items[0].percent,null);
+  assert.equal(perak.items[0].price,11);
+  assert.equal(melaka.observed,0);
+  assert.equal(melaka.items.length,0);
+});
+test('state-specific mode does not hide actual FAMA prices when percent cannot be verified',()=>{
+  const rows=[quote('CILI',{state:'PERAK',eligible:false})];
+  const result=prepareHeatmap(rows,{state:'PERAK',period:7});
+  assert.equal(result.shown,1);
+  assert.equal(result.comparable,0);
+  assert.equal(result.tiles[0].price,11);
+  assert.equal(result.tiles[0].percent,null);
+});
+
 test('treemap tiles cover a box proportionally without overlap or negative coordinates',()=>{
   for(const [width,height] of [[1200,570],[350,730],[90,90]]){
     const items=[{weight:20},{weight:12},{weight:6},{weight:3},{weight:1}];
@@ -108,6 +139,10 @@ test('overview includes real heatmap controls after quick prices, with separate 
   assert.match(heatmap,/nextButton\.addEventListener\('click'/);
   assert.match(heatmap,/latestButton\.addEventListener\('click'/);
   assert.match(heatmap,/speedSelector\.addEventListener\('change'/);
+  assert.match(html,/value="__ALL_STATES__" selected/);
+  assert.match(heatmap,/MALAYSIA_STATES/);
+  assert.match(heatmap,/market-hm-no-data/);
+  assert.match(css,/\.market-hm-canvas\.all-states/);
   assert.match(css,/\.market-hm-replay-main/);
   assert.match(css,/@media\(max-width:550px\)/);
 });
