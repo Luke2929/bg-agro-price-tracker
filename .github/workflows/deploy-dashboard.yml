@@ -1,0 +1,64 @@
+name: Publish BG Agro Dashboard (UI)
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "site/v3.1/**"
+      - "site/v3/**"
+      - "site/index.html"
+      - "site/assets/**"
+      - "site/pdf.mjs"
+      - "tests/**"
+      - ".github/workflows/deploy-dashboard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: bg-agro-ui-publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Validate and package dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current site
+        uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate dashboard JavaScript
+        run: |
+          node --check site/v3.1/app.mjs
+          node --check site/v3.1/creator-app.mjs
+          node --check site/v3.1/creator-core.mjs
+          node --check site/v3.1/fb-export.mjs
+          node --check site/v3.1/fb-zh-names.mjs
+      - name: Run dashboard regression tests
+        run: |
+          node --test tests/test_v3_engine.mjs tests/test_v3_backup.mjs tests/test_v3_ui_structure.mjs tests/test_pdf_export.mjs tests/test_v34_creator.mjs tests/test_fb_zh_names.mjs
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload dashboard
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    name: Deploy dashboard to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish current site files
+        id: deployment
+        uses: actions/deploy-pages@v4
