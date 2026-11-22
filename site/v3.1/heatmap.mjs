@@ -252,6 +252,7 @@ export function createMarketHeatmap({loadSnapshot,showProduct,notify}){
     canvas.addEventListener('click',event=>{
       const btn=event.target.closest('[data-market-hm-index]');
       if(btn&&canvas.contains(btn)){
+        event.stopPropagation(); // The main dashboard also delegates product clicks.
         const tile=tiles[Number(btn.dataset.marketHmIndex)];
         if(tile)showProduct(tile.key);
       }
