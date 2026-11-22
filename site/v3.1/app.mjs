@@ -5,11 +5,11 @@ import {FAMA_COLUMNS,escapeHtml,fmtMoney,fmtDate,ageDays,mytDate,quoteChange,
   comparisonEvidence,comparisonMarketDetails,matchedMarketStreaks,
   productAreaOptions} from './engine.mjs?rev=v3-5-completeness-1';
 import {buildXlsx,downloadXlsx} from './excel.mjs';
-import {createCreatorWorkspace} from './creator-app.mjs?rev=2026-11-22-full-state-history-v1';
+import {createCreatorWorkspace} from './creator-app.mjs?rev=2026-11-22-heatmap-v4-1';
 import {formatPercent,formatPrice} from './creator-core.mjs?rev=v3-5-completeness-1';
 import {buildFamaPdf,downloadPdf} from '../pdf.mjs';
 import {createCompletenessMonitor} from './completeness.mjs?rev=v3-5-completeness-1';
-import {createMarketHeatmap} from './heatmap.mjs?rev=2026-11-22-full-state-history-v1';
+import {createMarketHeatmap} from './heatmap.mjs?rev=2026-11-22-heatmap-v4-1';
 import {productHistoryRecords,productHistoryCSV} from './product-history.mjs?rev=2026-11-22-full-state-history-v1';
 
 const $=id=>document.getElementById(id);
@@ -21,13 +21,16 @@ const store={overview:null,index:null,meta:null,health:null,history:new Map(),pa
   period:1,visible:40,watch:[],fetching:false,rawCache:new Map(),dailyPending:new Map(),
   insightData:null,snapshots:new Map(),streaks:new Map(),comparison:null,comparisonRequest:0,
   priceData:null,priceDateRequest:0,
-  detail:{key:null,origin:'prices',rawRows:null,rawError:'',visible:80,rawRequest:0,historyRequest:0,historyTableRequest:0,historyRawRequest:0,historyRows:[],historyAll:null,historyVisible:60,historySelectionKey:''}};
+  detail:{key:null,snapshot:null,origin:'prices',rawRows:null,rawError:'',visible:80,rawRequest:0,historyRequest:0,historyTableRequest:0,historyRawRequest:0,historyRows:[],historyAll:null,historyVisible:60,historySelectionKey:''}};
 let historyRequestSequence=0;
 const creator=createCreatorWorkspace({getOverview:()=>store.overview,
   getArchiveDates:()=>store.meta.archive_dates,loadSnapshot,loadEvidenceRows,
   loadHistory,loadStreaks,showComparison,notify:alertUser,navigate});
 const completeness=createCompletenessMonitor({loadDaily});
-const marketHeatmap=createMarketHeatmap({loadSnapshot,showComparison,showProductHistory:openHeatmapProductHistory,notify:alertUser});
+const marketHeatmap=createMarketHeatmap({loadSnapshot,showComparison,
+  showProductHistory:openHeatmapProductHistory,showPreview:showHeatmapPreview,notify:alertUser});
+let currentHeatmapPreview=null,previewSequence=0;
+const detailSnapshot=()=>store.detail.snapshot||store.overview;
 const LEVEL_MEANINGS={Ladang:'农场端 · Farm-gate price',Borong:'批发端 · Wholesale price',
   Runcit:'零售端 · Consumer retail price'};
 
@@ -490,7 +493,7 @@ function updateProductAreaOptions(){
     districtEl.disabled=true;locationEl.disabled=true;
     return;
   }
-  const excluded=store.meta.superseded_priceids?.[store.overview.survey_date]||[];
+  const excluded=store.meta.superseded_priceids?.[detailSnapshot().survey_date]||[];
   const districts=productAreaOptions(raw,{productKey:store.detail.key,state,excludedPriceIds:excluded}).districts;
   selectOptions(districtEl,districts,{initialLabel:'全部 Daerah'});
   districtEl.disabled=!districts.length;
@@ -505,7 +508,7 @@ function renderProductPriceCards(){
   const productKey=store.detail.key,state=$('product-state').value,
     district=$('product-district').value,location=$('product-location').value;
   const isLocal=Boolean(district),excluded=store.meta.superseded_priceids?.[store.overview.survey_date]||[];
-  const quotes=productScopePrices(store.overview.prices,store.detail.rawRows,
+  const quotes=productScopePrices(detailSnapshot().prices,store.detail.rawRows,
     {productKey,state,district,location,excludedPriceIds:excluded});
   const scope=isLocal?[state,district,location].filter(Boolean).join(' / '):state||'全马';
   $('product-scope-note').textContent=isLocal?
@@ -520,8 +523,8 @@ function renderProductPriceCards(){
 
 function renderProductStates(){
   const key=store.detail.key,level=$('product-chart-level').value;
-  const ranked=statePrices(store.overview.prices,key,level),max=Math.max(1,...ranked.map(q=>q.price));
-  $('product-states-caption').textContent=`${store.overview.survey_date} · ${level} · 州级调查均价（不受 Daerah / Lokasi 筛选影响）`;
+  const ranked=statePrices(detailSnapshot().prices,key,level),max=Math.max(1,...ranked.map(q=>q.price));
+  $('product-states-caption').textContent=`${detailSnapshot().survey_date} · ${level} · 州级调查均价（不受 Daerah / Lokasi 筛选影响）`;
   $('product-states-bars').innerHTML=ranked.length?ranked.map(q=>
     `<div class="state-bar"><div class="state-name">${escapeHtml(q.state)}<small>${q.markets} 个市场</small></div><div class="state-track"><div class="state-fill" style="width:${(q.price/max*100).toFixed(1)}%"></div></div><div class="state-value">${fmtMoney(q.price)}</div></div>`
   ).join(''):'<p class="empty">该产品在当前调查日没有此层级的州别报价。</p>';
@@ -550,7 +553,7 @@ function paintProductHistoryTable(){
 async function renderProductHistorical(){
   const detail=store.detail,request=++detail.historyTableRequest,key=detail.key;
   const state=$('product-state').value,level=$('product-history-level').value;
-  const selectionKey=JSON.stringify([key,state,level]);
+  const selectionKey=JSON.stringify([key,state,level,detailSnapshot().survey_date]);
   if(detail.historySelectionKey===selectionKey&&detail.historyAll){
     paintProductHistoryTable();return;
   }
@@ -568,7 +571,7 @@ async function renderProductHistorical(){
     const history=await loadHistory(key);
     if(request!==detail.historyTableRequest||key!==detail.key||
        state!==$('product-state').value||level!==$('product-history-level').value)return;
-    const rows=productHistoryRecords(history,{state,level});
+    const rows=productHistoryRecords(history,{state,level,endDate:detailSnapshot().survey_date});
     detail.historyAll=history;detail.historyRows=rows;
     const first=rows.at(-1)?.date||'—',last=rows[0]?.date||'—';
     const distinct=new Set(rows.map(row=>row.date)).size;
@@ -647,7 +650,7 @@ async function renderProductTrend(){
     level=$('product-chart-level').value,state=$('product-state').value,
     selectedWindow=$('product-chart-window').value,
     days=selectedWindow==='all'?null:Number(selectedWindow),
-    end=store.overview.survey_date;
+    end=detailSnapshot().survey_date;
   $('product-chart-caption').textContent='正在读取真实历史观察记录…';
   const history=await loadHistory(key);
   if(seq!==store.detail.historyRequest||key!==store.detail.key)return;
@@ -664,7 +667,7 @@ async function renderProductTrend(){
 }
 
 function renderProductRaw(){
-  const detail=store.detail,date=store.overview.survey_date,raw=detail.rawRows;
+  const detail=store.detail,date=detailSnapshot().survey_date,raw=detail.rawRows;
   if(!raw){
     $('product-raw-status').textContent=detail.rawError?'原始档案读取失败：'+detail.rawError:
       `正在读取 ${date} 的原始 FAMA CSV…`;
@@ -691,7 +694,8 @@ function renderProductDetail(){
   if(!entry||!store.overview)return;
   $('product-title').textContent=entry.varieti;
   $('product-subtitle').textContent=`${entry.gred||'未分级'} · ${entry.unit} · ${entry.kategori||'FAMA 农产品'} · 精确匹配此品种、等级及单位`;
-  $('product-date').textContent=`最新调查日：${store.overview.survey_date}`;
+  $('product-date').textContent='所选调查日期：'+detailSnapshot().survey_date+
+    (detailSnapshot().survey_date===store.overview.survey_date?'（最新）':'（历史回放）');
   renderProductPriceCards();renderProductStates();renderProductRaw();
   renderProductHistorical().catch(error=>alertUser('历史表格读取失败：'+error.message,true));
   const scope=$('product-state').value||'全马';
@@ -705,7 +709,7 @@ function renderProductDetail(){
 }
 
 async function loadProductRaw(){
-  const detail=store.detail,seq=++detail.rawRequest,key=detail.key,date=store.overview.survey_date;
+  const detail=store.detail,seq=++detail.rawRequest,key=detail.key,date=detailSnapshot().survey_date;
   try{
     const rows=await loadDaily(date);
     if(seq!==detail.rawRequest||key!==detail.key)return;
@@ -718,11 +722,12 @@ async function loadProductRaw(){
   if(store.page==='product')renderProductDetail();
 }
 
-function openProductDetail(key,{state='',level='Borong',fullHistory=false}={}){
+function openProductDetail(key,{state='',level='Borong',fullHistory=false,snapshot=null}={}){
   if(!store.index?.products.some(x=>x.product_key===key))return alertUser('找不到产品的真实历史档案。',true);
   const detail=store.detail;
   detail.origin=store.page==='product'?detail.origin:store.page;
-  detail.key=key;detail.rawRows=null;detail.rawError='';detail.visible=80;
+  detail.key=key;detail.snapshot=snapshot||store.overview;
+  detail.rawRows=null;detail.rawError='';detail.visible=80;
   detail.rawRequest++;detail.historyRequest++;detail.historyTableRequest++;detail.historyRawRequest++;
   detail.historySelectionKey='';
   const options=store.overview.states.includes(state)||!state?store.overview.states:
@@ -736,9 +741,12 @@ function openProductDetail(key,{state='',level='Borong',fullHistory=false}={}){
   updateProductAreaOptions();navigate('product');
   loadProductRaw();
 }
-function openHeatmapProductHistory(key,state,level){
-  // One-state heatmap opens the correct state's entire existing price archive.
-  openProductDetail(key,{state,level,fullHistory:true});
+function openHeatmapProductHistory(key,state,level,date,snapshot){
+  // The entire product page uses the actual date the viewer selected in Heatmap.
+  if(!snapshot||snapshot.survey_date!==date){
+    alertUser('所选历史日期尚未核实；未打开不一致的最新价格。',true);return;
+  }
+  openProductDetail(key,{state,level,fullHistory:true,snapshot});
 }
 
 function renderExportDates(){
