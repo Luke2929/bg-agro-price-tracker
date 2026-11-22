@@ -5,10 +5,11 @@ import {FAMA_COLUMNS,escapeHtml,fmtMoney,fmtDate,ageDays,mytDate,quoteChange,
   comparisonEvidence,comparisonMarketDetails,matchedMarketStreaks,
   productAreaOptions} from './engine.mjs?rev=v3-5-completeness-1';
 import {buildXlsx,downloadXlsx} from './excel.mjs';
-import {createCreatorWorkspace} from './creator-app.mjs?rev=2026-11-22-remove-studio-v1';
+import {createCreatorWorkspace} from './creator-app.mjs?rev=2026-11-22-market-heatmap-v1';
 import {formatPercent,formatPrice} from './creator-core.mjs?rev=v3-5-completeness-1';
 import {buildFamaPdf,downloadPdf} from '../pdf.mjs';
 import {createCompletenessMonitor} from './completeness.mjs?rev=v3-5-completeness-1';
+import {createMarketHeatmap} from './heatmap.mjs?rev=2026-11-22-market-heatmap-v1';
 
 const $=id=>document.getElementById(id);
 const BASE='../data/v3/';
@@ -25,6 +26,7 @@ const creator=createCreatorWorkspace({getOverview:()=>store.overview,
   getArchiveDates:()=>store.meta.archive_dates,loadSnapshot,loadEvidenceRows,
   loadHistory,loadStreaks,showComparison,notify:alertUser,navigate});
 const completeness=createCompletenessMonitor({loadDaily});
+const marketHeatmap=createMarketHeatmap({loadSnapshot,showProduct:openProductDetail,notify:alertUser});
 const LEVEL_MEANINGS={Ladang:'农场端 · Farm-gate price',Borong:'批发端 · Wholesale price',
   Runcit:'零售端 · Consumer retail price'};
 
@@ -70,6 +72,7 @@ function navigate(page){
   if(page==='export')renderExportDates();
   if(page==='system'){renderHealth();loadGitHubRunHealth();}
   if(page==='product'&&store.detail.key)renderProductDetail();
+  if(page==='overview')marketHeatmap.paint();
   if(['signals','calendar'].includes(page))creator.render(page);
   window.scrollTo({top:0,behavior:'instant'});
 }
@@ -849,6 +852,7 @@ async function load(refresh=false){
     selectOptions($('history-product'),list.map(p=>({value:p.product_key,label:productLabel(p)})),{
       defaultValue:list[0]?.product_key||''});
     renderSummary();completeness.refresh(meta);loadInsightDate();renderWatchlist();renderExportDates();renderHealth();
+    marketHeatmap.refresh(overview,meta);
     creator.refresh();
     loadPriceDate();
     if(store.page==='history')await renderHistory();
@@ -863,5 +867,5 @@ async function load(refresh=false){
   }finally{$('reload').disabled=false;}
 }
 
-readWatch();bindEvents();creator.bind();load();
+readWatch();bindEvents();creator.bind();marketHeatmap.bind();load();
 
