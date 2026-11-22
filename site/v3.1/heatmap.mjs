@@ -129,8 +129,15 @@ export function prepareHeatmap(prices,{
     const group=grouped.get(tile.category);
     group.items.push(tile);group.weight+=tile.weight;
   }
-  const groups=[...grouped.values()].sort((a,b)=>b.weight-a.weight||
-    a.name.localeCompare(b.name));
+  const priority=new Map(candidates.map((item,index)=>[
+    [item.region,item.key,item.level].join('|'),index
+  ]));
+  const bestRank=group=>Math.min(...group.items.map(item=>
+    priority.get([item.region,item.key,item.level].join('|'))??Number.MAX_SAFE_INTEGER));
+  const groups=[...grouped.values()].sort((a,b)=>
+    sort==='coverage'?b.weight-a.weight||a.name.localeCompare(b.name):
+      sort==='name'?a.name.localeCompare(b.name):
+      bestRank(a)-bestRank(b)||a.name.localeCompare(b.name));
   const filteredTotal=source.filter(q=>
     (!category||q.kategori===category)&&(!query||[q.varieti,q.gred,q.unit].some(v=>
       String(v||'').toLocaleUpperCase().includes(query)))).length;
