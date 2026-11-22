@@ -131,9 +131,13 @@ export function prepareHeatmap(prices,{
   }
   const groups=[...grouped.values()].sort((a,b)=>b.weight-a.weight||
     a.name.localeCompare(b.name));
-  return {groups,tiles,total:candidates.length,shown:tiles.length,comparable,
+  const filteredTotal=source.filter(q=>
+    (!category||q.kategori===category)&&(!query||[q.varieti,q.gred,q.unit].some(v=>
+      String(v||'').toLocaleUpperCase().includes(query)))).length;
+  const total=state?candidates.length:filteredTotal;
+  return {groups,tiles,total,shown:tiles.length,comparable,
     strict,smallSample,coverage:Number(source.length>0),
-    excluded:candidates.length-comparable,allStates:false};
+    excluded:total-comparable,allStates:false};
 }
 
 // Squarified treemap. Both group and product areas are proportional to market coverage.
@@ -311,7 +315,9 @@ export function createMarketHeatmap({loadSnapshot,showComparison,showProductHist
     const h=canvas.clientHeight;
     if(h<100&&!selectedState)return;
     const rawResult=prepareHeatmap(snapshot.prices,{
-      ...filter,limit:w<700?75:130
+      level:filter.level,state:filter.region,period:filter.period,
+      search:filter.search,category:filter.category,sort:filter.sort,
+      limit:w<700?75:130
     });
     const result=applyLockedLayout(rawResult);
     tiles=[];
