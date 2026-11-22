@@ -10,6 +10,7 @@ import {formatPercent,formatPrice} from './creator-core.mjs?rev=v3-5-completenes
 import {buildFamaPdf,downloadPdf} from '../pdf.mjs';
 import {createCompletenessMonitor} from './completeness.mjs?rev=v3-5-completeness-1';
 import {createMarketHeatmap} from './heatmap.mjs?rev=2026-11-22-low-sample-v2';
+import {productHistoryRecords,productHistoryCSV} from './product-history.mjs?rev=2026-11-22-full-state-history-v1';
 
 const $=id=>document.getElementById(id);
 const BASE='../data/v3/';
@@ -20,13 +21,13 @@ const store={overview:null,index:null,meta:null,health:null,history:new Map(),pa
   period:1,visible:40,watch:[],fetching:false,rawCache:new Map(),dailyPending:new Map(),
   insightData:null,snapshots:new Map(),streaks:new Map(),comparison:null,comparisonRequest:0,
   priceData:null,priceDateRequest:0,
-  detail:{key:null,origin:'prices',rawRows:null,rawError:'',visible:80,rawRequest:0,historyRequest:0}};
+  detail:{key:null,origin:'prices',rawRows:null,rawError:'',visible:80,rawRequest:0,historyRequest:0,historyTableRequest:0,historyRawRequest:0,historyRows:[],historyAll:null,historyVisible:60}};
 let historyRequestSequence=0;
 const creator=createCreatorWorkspace({getOverview:()=>store.overview,
   getArchiveDates:()=>store.meta.archive_dates,loadSnapshot,loadEvidenceRows,
   loadHistory,loadStreaks,showComparison,notify:alertUser,navigate});
 const completeness=createCompletenessMonitor({loadDaily});
-const marketHeatmap=createMarketHeatmap({loadSnapshot,showComparison,notify:alertUser});
+const marketHeatmap=createMarketHeatmap({loadSnapshot,showComparison,showProductHistory:openHeatmapProductHistory,notify:alertUser});
 const LEVEL_MEANINGS={Ladang:'农场端 · Farm-gate price',Borong:'批发端 · Wholesale price',
   Runcit:'零售端 · Consumer retail price'};
 
@@ -522,15 +523,132 @@ function renderProductStates(){
   ).join(''):'<p class="empty">该产品在当前调查日没有此层级的州别报价。</p>';
 }
 
+function paintProductHistoryTable(){
+  const detail=store.detail,rows=detail.historyRows||[];
+  const visible=rows.slice(0,detail.historyVisible);
+  $('product-history-visible').textContent=
+    '显示 '+visible.length+' / '+rows.length+' 条完整州级历史均价记录';
+  $('product-history-more').disabled=visible.length>=rows.length;
+  $('product-history-export').disabled=!rows.length;
+  $('product-history-body').innerHTML=visible.map(row=>
+    '<tr><td>'+escapeHtml(row.date)+'</td>'+
+      '<td><span class="history-level">'+escapeHtml(row.level)+'</span></td>'+
+      '<td>'+escapeHtml(row.state||'全马')+'</td>'+
+      '<td class="price-cell"><strong>'+fmtMoney(row.price)+'</strong></td>'+
+      '<td>'+Number(row.markets).toLocaleString('en-MY')+'</td>'+
+      '<td>'+Number(row.observations).toLocaleString('en-MY')+'</td>'+
+      '<td><button type="button" class="text-button" data-history-date="'+
+        escapeHtml(row.date)+'" data-history-level="'+escapeHtml(row.level)+
+        '">查看当日原始报价 ↗</button></td></tr>'
+  ).join('')||'<tr><td colspan="7" class="empty">这个州和价格层级没有已归档的真实报价。</td></tr>';
+}
+
+async function renderProductHistorical(){
+  const detail=store.detail,request=++detail.historyTableRequest,key=detail.key;
+  const state=$('product-state').value,level=$('product-history-level').value;
+  detail.historyRows=[];detail.historyAll=null;detail.historyVisible=60;
+  $('product-history-export').disabled=true;
+  $('product-history-more').disabled=true;
+  $('product-history-status').textContent=
+    '正在读取 '+(state||'全国')+' · '+(level||'Ladang / Borong / Runcit')+
+    ' 的全部已归档调查日期…';
+  $('product-history-body').innerHTML=
+    '<tr><td colspan="7" class="empty">正在验证官方历史档案…</td></tr>';
+  $('product-history-market-panel').hidden=true;
+  try{
+    const history=await loadHistory(key);
+    if(request!==detail.historyTableRequest||key!==detail.key||
+       state!==$('product-state').value||level!==$('product-history-level').value)return;
+    const rows=productHistoryRecords(history,{state,level});
+    detail.historyAll=history;detail.historyRows=rows;
+    const first=rows.at(-1)?.date||'—',last=rows[0]?.date||'—';
+    const distinct=new Set(rows.map(row=>row.date)).size;
+    $('product-history-status').textContent=
+      (state||'全马')+' · '+(level||'所有价格层级')+
+      ' | 共 '+rows.length+' 条州级均价记录、'+distinct+
+      ' 个实际调查日 | '+first+' → '+last+
+      '。没有记录的日期不会填补。';
+    paintProductHistoryTable();
+  }catch(error){
+    if(request!==detail.historyTableRequest||key!==detail.key)return;
+    $('product-history-status').textContent='无法加载该产品全部历史记录：'+error.message;
+    $('product-history-body').innerHTML='<tr><td colspan="7" class="empty">历史档案读取失败，没有用其他州的价格代替。</td></tr>';
+    alertUser('全部历史价格读取失败：'+error.message,true);
+  }
+}
+
+function downloadProductHistorical(){
+  const detail=store.detail;
+  if(!detail.historyRows.length||!detail.historyAll)return;
+  const state=$('product-state').value||'ALL_MALAYSIA';
+  const level=$('product-history-level').value||'ALL_LEVELS';
+  const clean=value=>String(value).replace(/[^a-zA-Z0-9_-]+/g,'_').slice(0,54);
+  const dates=detail.historyRows;
+  const name=['FAMA_HISTORY',clean(detail.historyAll.varieti),clean(state),level,
+    dates.at(-1).date,dates[0].date].join('_')+'.csv';
+  const blob=new Blob([productHistoryCSV(detail.historyAll,detail.historyRows)],
+    {type:'text/csv;charset=utf-8'});
+  const uri=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=uri;link.download=name;document.body.append(link);link.click();link.remove();
+  // The download uses a local blob; no other dates or price levels are fetched.
+  setTimeout(()=>URL.revokeObjectURL(uri),1200);
+}
+
+async function showHistoricalMarketRaw(date,level){
+  const detail=store.detail,key=detail.key,state=$('product-state').value;
+  const seq=++detail.historyRawRequest,panel=$('product-history-market-panel');
+  if(!store.meta?.archive_dates?.includes(date)||!['Ladang','Borong','Runcit'].includes(level)){
+    alertUser('没有这一天的原始 FAMA 档案。',true);return;
+  }
+  panel.hidden=false;
+  $('product-history-market-status').textContent=
+    '正在核对 '+date+' · '+(state||'全国')+' · '+level+' 的原始报价…';
+  $('product-history-market-body').innerHTML=
+    '<tr><td colspan="8" class="empty">正在读取当天来源 CSV…</td></tr>';
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+  try{
+    const rows=await loadDaily(date);
+    if(seq!==detail.historyRawRequest||key!==detail.key||
+      state!==$('product-state').value||panel.hidden)return;
+    const excluded=store.meta.superseded_priceids?.[date]||[];
+    const record=productAreaRows(rows,{productKey:key,state,excludedPriceIds:excluded})
+      .filter(row=>row.peringkat===level&&row.tarikh_harga===date)
+      .sort((a,b)=>a.negeri.localeCompare(b.negeri)||
+        a.daerah.localeCompare(b.daerah)||a.lokasi.localeCompare(b.lokasi));
+    $('product-history-market-status').textContent=
+      date+' · '+(state||'全马')+' · '+level+' · '+record.length+
+      ' 条真实原始市场记录（包含无效价格，显示为 —；不会用 RM0 代替）。';
+    $('product-history-market-body').innerHTML=record.map(row=>
+      '<tr>'+[date,row.negeri,row.daerah,row.lokasi,row.peringkat,
+        validPrice(row.harga)===null?'—':fmtMoney(validPrice(row.harga)),
+        row.sublevel,row.priceid].map(value=>'<td>'+escapeHtml(value)+'</td>').join('')+
+      '</tr>').join('')||
+      '<tr><td colspan="8" class="empty">已归档州级均价与当天原始市场记录无法对应；请检查来源 CSV。</td></tr>';
+  }catch(error){
+    if(seq!==detail.historyRawRequest||key!==detail.key)return;
+    $('product-history-market-status').textContent='无法读取 '+date+' 的原始档案：'+error.message;
+    $('product-history-market-body').innerHTML=
+      '<tr><td colspan="8" class="empty">来源读取失败，没有替换成其他日期的数据。</td></tr>';
+  }
+}
+
 async function renderProductTrend(){
   const seq=++store.detail.historyRequest,key=store.detail.key,
     level=$('product-chart-level').value,state=$('product-state').value,
-    days=Number($('product-chart-window').value),end=store.overview.survey_date;
+    selectedWindow=$('product-chart-window').value,
+    days=selectedWindow==='all'?null:Number(selectedWindow),
+    end=store.overview.survey_date;
   $('product-chart-caption').textContent='正在读取真实历史观察记录…';
   const history=await loadHistory(key);
   if(seq!==store.detail.historyRequest||key!==store.detail.key)return;
-  const start=new Date(Date.parse(end+'T00:00:00Z')-(days-1)*86400000).toISOString().slice(0,10);
-  const points=historySeries(history,{level,state,days,endDate:end});
+  const matching=history.observations.filter(p=>p.level===level&&p.state===state&&
+    p.date<=end&&Number.isFinite(p.price));
+  const earliest=matching.length?matching.reduce((a,p)=>p.date<a?p.date:a,matching[0].date):
+    store.meta.window.min;
+  const start=days===null?earliest:
+    new Date(Date.parse(end+'T00:00:00Z')-(days-1)*86400000).toISOString().slice(0,10);
+  const effectiveDays=days===null?Math.round((Date.parse(end)-Date.parse(start))/86400000)+1:days;
+  const points=historySeries(history,{level,state,days:effectiveDays,endDate:end});
   $('product-chart-caption').textContent=`${start} 至 ${end} · ${state||'全马'} · ${level} · ${points.length} 个实际调查日`;
   drawChart(points,start,end,$('product-chart'));
 }
@@ -565,6 +683,7 @@ function renderProductDetail(){
   $('product-subtitle').textContent=`${entry.gred||'未分级'} · ${entry.unit} · ${entry.kategori||'FAMA 农产品'} · 精确匹配此品种、等级及单位`;
   $('product-date').textContent=`最新调查日：${store.overview.survey_date}`;
   renderProductPriceCards();renderProductStates();renderProductRaw();
+  renderProductHistorical().catch(error=>alertUser('历史表格读取失败：'+error.message,true));
   const scope=$('product-state').value||'全马';
   $('product-chart-scope').textContent=$('product-district').value?
     `注意：已选 ${scope} 的 Daerah / Lokasi，价格卡与原始市场表使用当地报价；历史图只显示 ${scope} 州／全国均价，因为旧档未发布地点级聚合历史。`:
@@ -589,17 +708,26 @@ async function loadProductRaw(){
   if(store.page==='product')renderProductDetail();
 }
 
-function openProductDetail(key){
+function openProductDetail(key,{state='',level='Borong',fullHistory=false}={}){
   if(!store.index?.products.some(x=>x.product_key===key))return alertUser('找不到产品的真实历史档案。',true);
   const detail=store.detail;
   detail.origin=store.page==='product'?detail.origin:store.page;
   detail.key=key;detail.rawRows=null;detail.rawError='';detail.visible=80;
-  detail.rawRequest++;detail.historyRequest++;
-  selectOptions($('product-state'),store.overview.states,{initialLabel:'全马平均'});
-  $('product-state').value='';
-  $('product-chart-level').value='Borong';$('product-chart-window').value='90';
+  detail.rawRequest++;detail.historyRequest++;detail.historyTableRequest++;detail.historyRawRequest++;
+  const options=store.overview.states.includes(state)||!state?store.overview.states:
+    [...store.overview.states,state].sort();
+  selectOptions($('product-state'),options,{initialLabel:'全马平均'});
+  $('product-state').value=state;
+  $('product-chart-level').value=PRICE_LEVELS.includes(level)?level:'Borong';
+  $('product-chart-window').value=fullHistory?'all':'90';
+  $('product-history-level').value=''; // All three actual price tiers, not just today's tile.
+  $('product-history-market-panel').hidden=true;
   updateProductAreaOptions();navigate('product');
   loadProductRaw();
+}
+function openHeatmapProductHistory(key,state,level){
+  // One-state heatmap opens the correct state's entire existing price archive.
+  openProductDetail(key,{state,level,fullHistory:true});
 }
 
 function renderExportDates(){
@@ -760,6 +888,18 @@ function bindEvents(){
   });
   for(const id of ['product-chart-level','product-chart-window'])
     $(id).addEventListener('change',renderProductDetail);
+  $('product-history-level').addEventListener('change',renderProductHistorical);
+  $('product-history-more').addEventListener('click',()=>{
+    store.detail.historyVisible+=60;paintProductHistoryTable();
+  });
+  $('product-history-export').addEventListener('click',downloadProductHistorical);
+  $('product-history-body').addEventListener('click',event=>{
+    const btn=event.target.closest('[data-history-date][data-history-level]');
+    if(btn)showHistoricalMarketRaw(btn.dataset.historyDate,btn.dataset.historyLevel);
+  });
+  $('product-history-market-close').addEventListener('click',()=>{
+    ++store.detail.historyRawRequest;$('product-history-market-panel').hidden=true;
+  });
   $('product-raw-more').addEventListener('click',()=>{
     store.detail.visible+=80;renderProductRaw();
   });
