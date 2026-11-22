@@ -5,11 +5,11 @@ import {FAMA_COLUMNS,escapeHtml,fmtMoney,fmtDate,ageDays,mytDate,quoteChange,
   comparisonEvidence,comparisonMarketDetails,matchedMarketStreaks,
   productAreaOptions} from './engine.mjs?rev=v3-5-completeness-1';
 import {buildXlsx,downloadXlsx} from './excel.mjs';
-import {createCreatorWorkspace} from './creator-app.mjs?rev=2026-11-22-replay-polish-v2';
+import {createCreatorWorkspace} from './creator-app.mjs?rev=2026-11-22-all-states-v1';
 import {formatPercent,formatPrice} from './creator-core.mjs?rev=v3-5-completeness-1';
 import {buildFamaPdf,downloadPdf} from '../pdf.mjs';
 import {createCompletenessMonitor} from './completeness.mjs?rev=v3-5-completeness-1';
-import {createMarketHeatmap} from './heatmap.mjs?rev=2026-11-22-replay-polish-v2';
+import {createMarketHeatmap} from './heatmap.mjs?rev=2026-11-22-all-states-v1';
 
 const $=id=>document.getElementById(id);
 const BASE='../data/v3/';
